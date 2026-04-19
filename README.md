@@ -47,7 +47,7 @@ npx typeorm migration:run -d ormconfig.ts
 
 1. **All code in English** — variable names, method names, DTO properties, file names
 2. **DB columns stay Vietnamese** — `@Column({ name: 'ten_san_pham' })` as defined in ERD
-3. **No file > 300 lines** — split into sub-services or separate controllers
+3. **No file > 500 lines** — split into sub-services or separate controllers
 
 ## Build Order
 

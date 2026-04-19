@@ -419,11 +419,11 @@ export class OrdersService {
 
 | File type | Max lines | Split strategy |
 |---|---|---|
-| `*.service.ts` | 300 | Create `-query.service.ts`, `-event.service.ts` |
-| `*.controller.ts` | 200 | Split public / admin controllers |
+| `*.service.ts` | 400 | Create `-query.service.ts`, `-event.service.ts` |
+| `*.controller.ts` | 300 | Split public / admin controllers |
 | `*.entity.ts` | 150 | One entity per file |
 | `*.dto.ts` | 100 | One DTO per file |
-| `*.module.ts` | 50 | — |
+| `*.module.ts` | 70 | — |
 
 ---
 

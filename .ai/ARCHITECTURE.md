@@ -106,7 +106,7 @@ src/modules/<feature>/
     └── <entity>.entity.ts               # One entity per file
 ```
 
-**Split service when > 300 lines:**
+**Split service when > 500 lines:**
 ```
 ├── <feature>.service.ts                 # CRUD core
 ├── <feature>-query.service.ts           # Complex queries / filtering
