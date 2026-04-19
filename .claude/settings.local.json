@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(pandoc \"Docs/Trình tự xây dựng Backend NestJS.docx\" -t plain)",
+      "Bash(pandoc *)"
+    ]
+  }
+}

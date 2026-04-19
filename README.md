@@ -1,98 +1,85 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# computer-store-backend
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+NestJS REST API backend for **Online PC Store System** — a retail platform for computers and peripherals.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+> AI agent documentation is in the `.ai/` folder. Read `CLAUDE.md` first before writing any code.
 
-## Description
+## Tech Stack
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- **NestJS 10** · **TypeScript 5** · **TypeORM 0.3** · **MySQL 8**
+- **Redis 7** (cache + BullMQ queues) · **Passport JWT** · **Swagger**
+- Port: **4000** | Docs: **`/api/docs`**
 
-## Project setup
+## Quick Start
 
 ```bash
-$ npm install
+npm install
+cp .env.example .env   # fill in DB, JWT, Redis, Cloudinary, payment keys
+npm run start:dev
 ```
 
-## Compile and run the project
+## Commands
 
 ```bash
-# development
-$ npm run start
+npm run start:dev       # Development with hot reload
+npm run build           # Compile TypeScript
+npm run test            # Unit tests
+npm run test:e2e        # End-to-end tests
+npm run test:cov        # Coverage report
 
-# watch mode
-$ npm run start:dev
-
-# production mode
-$ npm run start:prod
+# TypeORM migrations
+npx typeorm migration:generate src/database/migrations/Init -d ormconfig.ts
+npx typeorm migration:run -d ormconfig.ts
 ```
 
-## Run tests
+## AI Agent Guidance (`.ai/`)
+
+| File | Purpose | When to Read |
+|---|---|---|
+| `CLAUDE.md` | Master guide: tech stack, naming rules, build phases, key rules | **Always — read first** |
+| `.ai/DATABASE.md` | Full mapping: Vietnamese ERD tables → English entity class + properties | When creating/editing any entity |
+| `.ai/MODULES.md` | All 27 modules: DB tables, endpoints, business logic summary | When working on any module |
+| `.ai/ARCHITECTURE.md` | Folder structure, Redis usage, BullMQ queues, Docker, indexes | When setting up infrastructure or adding a new module |
+| `.ai/CONVENTIONS.md` | Code patterns for DTOs, entities, services, controllers, errors | When writing any source file |
+| `.ai/BUSINESS-RULES.md` | Critical business logic: checkout flow, stock, loyalty, promotions | When implementing order/payment/stock logic |
+
+## 3 Rules Always Apply
+
+1. **All code in English** — variable names, method names, DTO properties, file names
+2. **DB columns stay Vietnamese** — `@Column({ name: 'ten_san_pham' })` as defined in ERD
+3. **No file > 300 lines** — split into sub-services or separate controllers
+
+## Build Order
+
+```
+Phase 0 → Foundation (TypeORM, ConfigModule, Swagger, Guards)
+Phase 1 → Auth + Users + Employees + Roles
+Phase 2 → Categories + Brands + Specs + Products + Media + BuildPC
+Phase 3 → Cart + Orders + Payments (VNPay/MoMo/COD)
+Phase 4 → Inventory + Suppliers
+Phase 5 → Promotions + Flash Sales + Loyalty
+Phase 6 → Reviews + Returns + Support Tickets
+Phase 7 → Notifications + Wishlist + Search
+Phase 8 → CMS (banners, pages, FAQ, menus)
+Phase 9 → Reports + Settings
+Phase 10 → Tests + Docker + PM2 + Nginx
+```
+
+## Module Structure (mandatory for every module)
+
+```
+src/modules/<feature>/
+├── <feature>.module.ts
+├── <feature>.controller.ts       # public routes
+├── admin-<feature>.controller.ts # admin routes
+├── <feature>.service.ts
+├── dto/  (create, update, query, response — one file each)
+└── entities/  (one file per entity)
+```
+
+## Docker
 
 ```bash
-# unit tests
-$ npm run test
-
-# e2e tests
-$ npm run test:e2e
-
-# test coverage
-$ npm run test:cov
+docker compose up -d
+# NestJS :4000 + MySQL :3306 + Redis :6379
 ```
-
-## Deployment
-
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
-
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ npm install -g @nestjs/mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
