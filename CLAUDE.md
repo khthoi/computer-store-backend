@@ -5,7 +5,7 @@
 **Online PC Store System** — NestJS backend for a retail computer & peripheral e-commerce platform.
 
 - Runtime: Node.js ≥ 20 LTS
-- Framework: NestJS 10.x · TypeScript 5.x
+- Framework: NestJS 11.0.14 · TypeScript 6.0.3
 - ORM: TypeORM 0.3.x → MySQL 8.0+
 - Cache/Queue: Redis 7.x · BullMQ 5.x
 - Auth: Passport.js (JWT + Local strategy)

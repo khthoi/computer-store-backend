@@ -6,7 +6,7 @@ NestJS REST API backend for **Online PC Store System** — a retail platform for
 
 ## Tech Stack
 
-- **NestJS 10** · **TypeScript 5** · **TypeORM 0.3** · **MySQL 8**
+- **NestJS 11.0.14** · **TypeScript 6.0.3** · **TypeORM 0.3** · **MySQL 8**
 - **Redis 7** (cache + BullMQ queues) · **Passport JWT** · **Swagger**
 - Port: **4000** | Docs: **`/api/docs`**
 
