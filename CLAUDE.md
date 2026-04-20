@@ -34,6 +34,9 @@ for t in doc.tables:
 " "path/to/file.docx"
 ```
 
+## Using Powershell commands is allowed
+
+CLAUDE_CODE_USE_POWERSHELL_TOOL=1
 
 ## Architecture
 
@@ -149,3 +152,4 @@ src/modules/<feature>/
 | `.ai/MODULES.md` | All 27 modules: DB tables, entities, endpoints, business logic |
 | `.ai/ARCHITECTURE.md` | Folder structure, infrastructure, deployment |
 | `.ai/CONVENTIONS.md` | Detailed coding standards and patterns |
+| `.ai/TESTING.md` | **Testing skills**: cURL (real API calls, CORS, auth/cookies) + MySQL CLI (fake data seeding) |
