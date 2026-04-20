@@ -80,7 +80,21 @@
       "Bash(pkill -f \"ts-node\")",
       "Bash(echo \"PID: $!\")",
       "Bash(netstat -ano)",
-      "Bash(taskkill *)"
+      "Bash(taskkill *)",
+      "Bash(echo \"Restarted with PID $!\")",
+      "Bash(ls *)",
+      "Bash(grep -E \"^INSERT INTO \\\\`phien_ban_san_pham\\\\`\" src/database/seeds/seed-phase2.sql)",
+      "Bash(grep -A2 \"INSERT INTO \\\\`phien_ban_san_pham\\\\`\" src/database/seeds/seed-phase2.sql)",
+      "Bash(mysql -u root -pAdmin@123 \"pc-retails-store-database\" -e \"SELECT phien_ban_id, san_pham_id, ten_phien_ban, sku, gia_ban, trang_thai FROM phien_ban_san_pham ORDER BY phien_ban_id LIMIT 20;\")",
+      "Bash(mysql -u root -pAdmin@123 \"pc-retails-store-database\" -e \"SHOW TABLES;\")",
+      "Bash(timeout 15 node dist/main.js)",
+      "Bash(Select-Object Name\")",
+      "Bash(mysql -u root -ppassword computer_store -e \"SELECT email, trang_thai FROM khach_hang LIMIT 5;\")",
+      "Bash(mysql -u root computer_store -e \"SELECT email, trang_thai FROM khach_hang LIMIT 5;\")",
+      "Bash(mysql *)",
+      "Bash($MYSQL *)",
+      "Bash(node *)",
+      "Bash('/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe' -u root --host=127.0.0.1 --port=3306 -e ' *)"
     ]
   }
 }

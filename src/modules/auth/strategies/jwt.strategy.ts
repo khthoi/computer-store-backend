@@ -25,10 +25,10 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     });
   }
 
-  async validate(payload: JwtPayload): Promise<JwtPayload> {
+  async validate(payload: JwtPayload): Promise<JwtPayload & { id: number }> {
     if (payload.jti && (await this.redisService.isTokenBlacklisted(payload.jti))) {
       throw new UnauthorizedException('Token đã bị thu hồi');
     }
-    return payload;
+    return { ...payload, id: payload.sub };
   }
 }

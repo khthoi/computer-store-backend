@@ -124,7 +124,8 @@ export class AuthService {
     const accessToken = this.jwtService.sign(accessPayload, { expiresIn: ACCESS_TOKEN_TTL });
 
     const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET', 'refresh_fallback');
-    const refreshPayload = { sub: customer.id, email: customer.email, type: 'customer', roles: [] };
+    const refreshJti = randomUUID();
+    const refreshPayload = { sub: customer.id, email: customer.email, type: 'customer', roles: [], jti: refreshJti };
     const refreshToken = this.jwtService.sign(refreshPayload, { secret: refreshSecret, expiresIn: REFRESH_TOKEN_TTL });
     await this.redisService.saveRefreshToken(customer.id, 'customer', refreshToken, REFRESH_TOKEN_TTL);
 
@@ -138,7 +139,8 @@ export class AuthService {
     const accessToken = this.jwtService.sign(accessPayload, { expiresIn: ACCESS_TOKEN_TTL });
 
     const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET', 'refresh_fallback');
-    const refreshPayload = { sub: employee.id, email: employee.email, type: 'employee', roles };
+    const refreshJti = randomUUID();
+    const refreshPayload = { sub: employee.id, email: employee.email, type: 'employee', roles, jti: refreshJti };
     const refreshToken = this.jwtService.sign(refreshPayload, { secret: refreshSecret, expiresIn: REFRESH_TOKEN_TTL });
     await this.redisService.saveRefreshToken(employee.id, 'employee', refreshToken, REFRESH_TOKEN_TTL);
 

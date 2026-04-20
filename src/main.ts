@@ -2,6 +2,7 @@ import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
+import cookieParser from 'cookie-parser';
 import { AppModule } from './app.module';
 import { GlobalExceptionFilter } from './common/filters/global-exception.filter';
 import { ResponseInterceptor } from './common/interceptors/response.interceptor';
@@ -14,6 +15,9 @@ async function bootstrap() {
 
   // Security headers
   app.use(helmet());
+
+  // Cookie parser (for HttpOnly refresh token)
+  app.use(cookieParser());
 
   // CORS - đọc danh sách origin từ biến môi trường CORS_ORIGINS
   const corsOrigins = (process.env.CORS_ORIGINS ?? '')
