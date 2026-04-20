@@ -59,7 +59,28 @@
       "Bash(curl -s -w '\\\\nHTTP:%{http_code}' -X POST http://localhost:4000/api/auth/login -H 'Content-Type: application/json' -d '{\"email\":\"nguyenvana@gmail.com\",\"matKhau\":\"WrongPassword\"}')",
       "Bash(curl -s -w '\\\\nHTTP:%{http_code}' http://localhost:4000/api/admin/employees/999 -H 'Authorization: Bearer __TRACKED_VAR__')",
       "Bash(/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe *)",
-      "Bash(curl -s -w \"\\\\nHTTP:%{http_code}\" http://localhost:4000/api/)"
+      "Bash(curl -s -w \"\\\\nHTTP:%{http_code}\" http://localhost:4000/api/)",
+      "Bash(powershell *)",
+      "Bash(python *)",
+      "Bash(curl -s http://localhost:4000/api/health)",
+      "Bash(npm run *)",
+      "Bash(echo \"Server starting with PID $!\")",
+      "Bash(curl -s http://localhost:4000/api/docs-json)",
+      "Bash(curl -s -X POST http://localhost:4000/api/auth/admin/login -H 'Content-Type: application/json' -d '{\"email\": \"admin@pcstore.vn\", \"matKhau\": \"Admin@123\"}')",
+      "Bash(echo \"Server starting PID: $!\")",
+      "Bash(curl -s -X POST http://localhost:4000/api/auth/admin/login -H 'Content-Type: application/json' -c /tmp/cookies.txt -d '{\"email\": \"admin@pcstore.vn\", \"matKhau\": \"Admin@123\"}')",
+      "Bash(curl -s -X GET http://localhost:4000/api/categories -H \"Content-Type: application/json\")",
+      "Bash(curl -s -X GET http://localhost:4000/api/brands -H \"Content-Type: application/json\")",
+      "Bash(curl -s -X GET http://localhost:4000/api/categories/cpu-bo-vi-xu-ly -H 'Content-Type: application/json')",
+      "Bash(curl -s -X GET http://localhost:4000/api/admin/categories -H 'Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOjEsImVtYWlsIjoiYWRtaW5AcGNzdG9yZS52biIsInR5cGUiOiJlbXBsb3llZSIsInJvbGVzIjpbImFkbWluIl0sImp0aSI6IjhmODlmZjM3LTQyMjgtNDUzMy1hM2UwLTVkYTA2ZTllZGU1YyIsImlhdCI6MTc3NjY3MzcwMiwiZXhwIjoxNzc2Njc0NjAyfQ.46MQhwHhpmoOgmENUWtB2YyP0TRTTAV-4EzrwEZVGn4' -H 'Content-Type: application/json')",
+      "Bash(curl *)",
+      "Bash('/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe' -u root --host=127.0.0.1 --port=3306 -e 'USE `pc-retails-store-database`; SELECT pbsp.phien_ban_id, sp.ten_san_pham, sp.danh_muc_id FROM phien_ban_san_pham pbsp JOIN san_pham sp ON pbsp.san_pham_id = sp.san_pham_id WHERE sp.san_pham_id IN \\(1,7,17,19,20,21\\) LIMIT 10;')",
+      "Bash(node -e ' *)",
+      "Bash(pkill -f \"nest start\")",
+      "Bash(pkill -f \"ts-node\")",
+      "Bash(echo \"PID: $!\")",
+      "Bash(netstat -ano)",
+      "Bash(taskkill *)"
     ]
   }
 }

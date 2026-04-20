@@ -1,0 +1,164 @@
+{
+  "CPU AMD R5 5600X Full Box.jpg": {
+    "asset_id": 20,
+    "cloudinary_id": "store-media/vqwdpaxqrt7bwlf93syo",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671961/store-media/vqwdpaxqrt7bwlf93syo.jpg",
+    "folder": "pc-store/products/cpu"
+  },
+  "CPU AMD R7 7800X3D Full Box.jpg": {
+    "asset_id": 21,
+    "cloudinary_id": "store-media/hah6b6dsob26rxcy0nid",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671962/store-media/hah6b6dsob26rxcy0nid.jpg",
+    "folder": "pc-store/products/cpu"
+  },
+  "CPU AMD R9 9950X3D Full Box.jpg": {
+    "asset_id": 22,
+    "cloudinary_id": "store-media/tivnh3z010vpkzikvypz",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671963/store-media/tivnh3z010vpkzikvypz.jpg",
+    "folder": "pc-store/products/cpu"
+  },
+  "CPU Intel Core i5 12400F Full Box.jpg": {
+    "asset_id": 23,
+    "cloudinary_id": "store-media/botopfx21nxiecbhganh",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671967/store-media/botopfx21nxiecbhganh.jpg",
+    "folder": "pc-store/products/cpu"
+  },
+  "CPU Intel Core i7 12700F Full Box.jpg": {
+    "asset_id": 24,
+    "cloudinary_id": "store-media/f3ckmfmjgrbkkdo6jqrq",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671970/store-media/f3ckmfmjgrbkkdo6jqrq.jpg",
+    "folder": "pc-store/products/cpu"
+  },
+  "CPU Intel Core i9 14900K Full Box.jpg": {
+    "asset_id": 25,
+    "cloudinary_id": "store-media/lxfzgjqhowenky3dqexb",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671971/store-media/lxfzgjqhowenky3dqexb.jpg",
+    "folder": "pc-store/products/cpu"
+  },
+  "ASUS TUF GAMING B760 WIFI DDR5.jpg": {
+    "asset_id": 26,
+    "cloudinary_id": "store-media/s52iu1hmp9krg6coef0u",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671972/store-media/s52iu1hmp9krg6coef0u.jpg",
+    "folder": "pc-store/products/mainboard"
+  },
+  "ASUS TUF GAMING Z790 PLUS WIFI D5.jpg": {
+    "asset_id": 27,
+    "cloudinary_id": "store-media/g3hg26bhgzzyxata7r14",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671974/store-media/g3hg26bhgzzyxata7r14.jpg",
+    "folder": "pc-store/products/mainboard"
+  },
+  "Mainboard ASUS ROG STRIX X870-F GAMING WIFI.jpg": {
+    "asset_id": 28,
+    "cloudinary_id": "store-media/ehbmgxhmftjtza5yfutc",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671975/store-media/ehbmgxhmftjtza5yfutc.jpg",
+    "folder": "pc-store/products/mainboard"
+  },
+  "Mainboard ASUS TUF GAMING B550M-PLUS WIFI II.jpg": {
+    "asset_id": 29,
+    "cloudinary_id": "store-media/ysbtkwqcwfrm1a5liizv",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671976/store-media/ysbtkwqcwfrm1a5liizv.jpg",
+    "folder": "pc-store/products/mainboard"
+  },
+  "Mainboard Gigabyte X870 AORUS ELITE WIFI7.jpg": {
+    "asset_id": 30,
+    "cloudinary_id": "store-media/mhzijym9bdxccwne2bqx",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671977/store-media/mhzijym9bdxccwne2bqx.jpg",
+    "folder": "pc-store/products/mainboard"
+  },
+  "RTX 4060 MSI.png": {
+    "asset_id": 31,
+    "cloudinary_id": "store-media/khex1gpza4sxx8r7fhh1",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671979/store-media/khex1gpza4sxx8r7fhh1.png",
+    "folder": "pc-store/products/gpu"
+  },
+  "RTX 4070 Asus DUAL 2 FANs.jpg": {
+    "asset_id": 32,
+    "cloudinary_id": "store-media/ntgprea78crtdcxzo3ta",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671980/store-media/ntgprea78crtdcxzo3ta.jpg",
+    "folder": "pc-store/products/gpu"
+  },
+  "RTX 4070 ASUS TUF GAMING 12GB 3 FANs.png": {
+    "asset_id": 33,
+    "cloudinary_id": "store-media/ffvl7apmz63kow2ejjqb",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671981/store-media/ffvl7apmz63kow2ejjqb.png",
+    "folder": "pc-store/products/gpu"
+  },
+  "RTX 4080 ASUS TUF GAMING 16GB 3 FANs.png": {
+    "asset_id": 34,
+    "cloudinary_id": "store-media/ebyj6abll4siqcvtyikv",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671982/store-media/ebyj6abll4siqcvtyikv.png",
+    "folder": "pc-store/products/gpu"
+  },
+  "RTX 4090 ASUS ROG STRIX 24GB OC 3 FANs.png": {
+    "asset_id": 35,
+    "cloudinary_id": "store-media/ucvn5kcqyhco7abkv3w9",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671983/store-media/ucvn5kcqyhco7abkv3w9.png",
+    "folder": "pc-store/products/gpu"
+  },
+  "RAM Desktop Kingston Fury Beast DDR4 3200MHz.jpg": {
+    "asset_id": 36,
+    "cloudinary_id": "store-media/hfziodcgiedh0lga4aqf",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671984/store-media/hfziodcgiedh0lga4aqf.jpg",
+    "folder": "pc-store/products/ram"
+  },
+  "RAM Desktop Kingston Fury Beast RGB 32GB (2x16GB) DDR5 5600MHz.jpg": {
+    "asset_id": 37,
+    "cloudinary_id": "store-media/i3rbh3wymvkuntm8c0ow",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671985/store-media/i3rbh3wymvkuntm8c0ow.jpg",
+    "folder": "pc-store/products/ram"
+  },
+  "Ổ Cứng SSD Samsung 990 Pro 2TB – M.2 2280 PCIe Gen4 x4.jpg": {
+    "asset_id": 38,
+    "cloudinary_id": "store-media/krqodvnm5dkqyjamq2ty",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671986/store-media/krqodvnm5dkqyjamq2ty.jpg",
+    "folder": "pc-store/products/storage"
+  },
+  "Nguồn ASUS ROG THOR 1600W Titanium III - 1600W.jpg": {
+    "asset_id": 39,
+    "cloudinary_id": "store-media/yseamuxbjy3zuyyih8uk",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671988/store-media/yseamuxbjy3zuyyih8uk.jpg",
+    "folder": "pc-store/products/psu"
+  },
+  "Vỏ case Lian Li A3 - White Wood.jpg": {
+    "asset_id": 40,
+    "cloudinary_id": "store-media/ajgxd1g4hszlvasufuve",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671989/store-media/ajgxd1g4hszlvasufuve.jpg",
+    "folder": "pc-store/products/case"
+  },
+  "Laptop Acer Predator Helios Neo 16 AI PHN16-73-757W (NH.QVQSV.001).jpg": {
+    "asset_id": 41,
+    "cloudinary_id": "store-media/rrenkdtd4vkghm23bo9f",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671990/store-media/rrenkdtd4vkghm23bo9f.jpg",
+    "folder": "pc-store/products/laptop"
+  },
+  "Laptop Acer Predator Helios Neo PHN14-51-99Y8 (NH.QRPSV.001).jpg": {
+    "asset_id": 42,
+    "cloudinary_id": "store-media/voxrij7dc3ptqyuxcub8",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671991/store-media/voxrij7dc3ptqyuxcub8.jpg",
+    "folder": "pc-store/products/laptop"
+  },
+  "Laptop Asus Gaming ROG Strix G614PH-S5101W.jpg": {
+    "asset_id": 43,
+    "cloudinary_id": "store-media/wqawudzfo9idrncaxzpq",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671992/store-media/wqawudzfo9idrncaxzpq.jpg",
+    "folder": "pc-store/products/laptop"
+  },
+  "Laptop Asus Gaming ROG Strix G615LR-S5289W.jpg": {
+    "asset_id": 44,
+    "cloudinary_id": "store-media/kxfk1ff1xsika0pxxwxl",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671993/store-media/kxfk1ff1xsika0pxxwxl.jpg",
+    "folder": "pc-store/products/laptop"
+  },
+  "Laptop Asus ZenBook UM3406GA-QD073WS.jpg": {
+    "asset_id": 45,
+    "cloudinary_id": "store-media/kkwkpevfjdcgkjjplgaz",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671994/store-media/kkwkpevfjdcgkjjplgaz.jpg",
+    "folder": "pc-store/products/laptop"
+  },
+  "Laptop Lenovo Gaming Legion 5 15AHP11 83Q7001JVN.jpg": {
+    "asset_id": 46,
+    "cloudinary_id": "store-media/ag6r9xfdohzpxyiqzpc8",
+    "url": "https://res.cloudinary.com/dvn3b4en9/image/upload/v1776671996/store-media/ag6r9xfdohzpxyiqzpc8.jpg",
+    "folder": "pc-store/products/laptop"
+  }
+}

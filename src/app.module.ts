@@ -18,6 +18,14 @@ import { UsersModule } from './modules/users/users.module';
 import { EmployeesModule } from './modules/employees/employees.module';
 import { RolesModule } from './modules/roles/roles.module';
 
+// Phase 2 — Danh mục & Sản phẩm
+import { MediaModule } from './modules/media/media.module';
+import { CategoriesModule } from './modules/categories/categories.module';
+import { BrandsModule } from './modules/brands/brands.module';
+import { SpecificationsModule } from './modules/specifications/specifications.module';
+import { ProductsModule } from './modules/products/products.module';
+import { BuildPcModule } from './modules/build-pc/build-pc.module';
+
 // Guards
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -52,6 +60,14 @@ import { RolesGuard } from './common/guards/roles.guard';
     UsersModule,
     EmployeesModule,
     RolesModule,
+
+    // Phase 2
+    MediaModule,
+    CategoriesModule,
+    BrandsModule,
+    SpecificationsModule,
+    ProductsModule,
+    BuildPcModule,
   ],
   controllers: [AppController],
   providers: [

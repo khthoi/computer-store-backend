@@ -1,0 +1,38 @@
+import {
+  Entity,
+  PrimaryGeneratedColumn,
+  Column,
+  ManyToOne,
+  JoinColumn,
+  Index,
+} from 'typeorm';
+import { ProductVariant } from './product-variant.entity';
+
+@Entity('hinh_anh_san_pham')
+@Index('idx_hasp_phienban', ['phienBanId'])
+export class ProductImage {
+  @PrimaryGeneratedColumn({ name: 'hinh_anh_id' })
+  id: number;
+
+  @Column({ name: 'phien_ban_id' })
+  phienBanId: number;
+
+  @Column({ name: 'url_hinh_anh', length: 500 })
+  urlHinhAnh: string;
+
+  @Column({ name: 'loai_anh', length: 20, default: 'AnhPhu' })
+  loaiAnh: string; // 'AnhChinh' | 'AnhPhu' | 'Anh360'
+
+  @Column({ name: 'thu_tu', type: 'smallint', default: 0 })
+  thuTu: number;
+
+  @Column({ name: 'alt_text', length: 300, nullable: true })
+  altText: string | null;
+
+  @Column({ name: 'asset_id', nullable: true })
+  assetId: number | null;
+
+  @ManyToOne(() => ProductVariant, (v) => v.images, { onDelete: 'CASCADE' })
+  @JoinColumn({ name: 'phien_ban_id' })
+  variant: ProductVariant;
+}

@@ -152,6 +152,8 @@ SELECT COUNT(*) as total_addresses      FROM dia_chi_giao_hang;
 
 Expected counts after full seed:
 
+**Phase 1 (Auth/Users/Employees/Roles):**
+
 | Table             | Row count |
 |-------------------|-----------|
 | quyen             | 108       |
@@ -161,6 +163,24 @@ Expected counts after full seed:
 | nhan_vien_vai_tro | 7         |
 | khach_hang        | 10        |
 | dia_chi_giao_hang | 12        |
+
+**Phase 2 (Categories/Brands/Specs/Products/Media/BuildPC):**
+Seed file: `src/database/seeds/seed-phase2.sql`
+
+| Table                       | Row count |
+|-----------------------------|-----------|
+| danh_muc                    | 11        |
+| thuong_hieu                 | 11        |
+| nhom_thong_so               | 8         |
+| loai_thong_so               | 40        |
+| danh_muc_nhom_thong_so      | 10        |
+| san_pham                    | 27        |
+| phien_ban_san_pham          | 27        |
+| hinh_anh_san_pham           | 27        |
+| san_pham_thuong_hieu        | 32        |
+| gia_tri_thong_so            | 193       |
+| buildpc_slot_dinh_nghia     | 7         |
+| buildpc_quy_tac_tuong_thich | 4         |
 
 ### Reset / clean up test data
 
