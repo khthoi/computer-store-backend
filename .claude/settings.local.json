@@ -94,7 +94,11 @@
       "Bash(mysql *)",
       "Bash($MYSQL *)",
       "Bash(node *)",
-      "Bash('/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe' -u root --host=127.0.0.1 --port=3306 -e ' *)"
+      "Bash('/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe' -u root --host=127.0.0.1 --port=3306 -e ' *)",
+      "Bash(Invoke-WebRequest -Uri \"http://localhost:4000/flash-sales/active\" -UseBasicParsing)",
+      "Bash(Select-Object -ExpandProperty Content)",
+      "PowerShell(Invoke-WebRequest -Uri \"http://localhost:4000/flash-sales/active\" -UseBasicParsing | Select-Object StatusCode, Content)",
+      "PowerShell(cd \"D:\\\\Online PC Store System\\\\Source\\\\computer-store-backend\"; $job = Start-Job -ScriptBlock { cd \"D:\\\\Online PC Store System\\\\Source\\\\computer-store-backend\"; node dist/main 2>&1 }; Start-Sleep -Seconds 5; Invoke-WebRequest -Uri \"http://localhost:4000/flash-sales/active\" -UseBasicParsing | Select-Object StatusCode, Content)"
     ]
   }
 }

@@ -1,7 +1,15 @@
 import {
   Controller, Get, Post, Put, Param, Body, ParseIntPipe, Query, Request,
 } from '@nestjs/common';
-import { ApiTags } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiResponse,
+  ApiParam,
+  ApiQuery,
+} from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { InventoryService } from './inventory.service';
 import { InventoryImportsService } from './inventory-imports.service';
@@ -11,6 +19,7 @@ import { CreateImportReceiptDto } from './dto/create-import-receipt.dto';
 import { ApproveImportDto } from './dto/approve-import.dto';
 
 @ApiTags('Admin — Inventory')
+@ApiBearerAuth()
 @Controller('admin/inventory')
 @Roles('admin', 'warehouse', 'staff')
 export class AdminInventoryController {
@@ -20,16 +29,73 @@ export class AdminInventoryController {
   ) {}
 
   @Get('warehouses')
+  @ApiOperation({ summary: '[Admin] Danh sách kho hàng' })
+  @ApiOkResponse({
+    schema: {
+      example: [
+        {
+          id: 1,
+          name: 'Kho Hà Nội',
+          address: '123 Phố Huế, Hai Bà Trưng, Hà Nội',
+          isActive: true,
+        },
+      ],
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findWarehouses() {
     return this.inventoryService.findAllWarehouses();
   }
 
   @Get()
+  @ApiOperation({ summary: '[Admin] Xem mức tồn kho theo bộ lọc' })
+  @ApiQuery({ name: 'khoId', required: false, example: 1, description: 'Lọc theo kho' })
+  @ApiQuery({ name: 'lowStockOnly', required: false, example: false, description: 'Chỉ lấy sản phẩm dưới ngưỡng cảnh báo' })
+  @ApiQuery({ name: 'page', required: false, example: 1, description: 'Trang hiện tại' })
+  @ApiQuery({ name: 'limit', required: false, example: 20, description: 'Số bản ghi mỗi trang' })
+  @ApiOkResponse({
+    schema: {
+      example: {
+        items: [
+          {
+            variantId: 20,
+            warehouseId: 1,
+            soLuongTon: 150,
+            soLuongDatTruoc: 10,
+          },
+        ],
+        total: 80,
+        page: 1,
+        limit: 20,
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findStockLevels(@Query() query: QueryStockDto) {
     return this.inventoryService.findStockLevels(query);
   }
 
   @Get(':variantId/history')
+  @ApiOperation({ summary: '[Admin] Lịch sử tồn kho theo phiên bản sản phẩm' })
+  @ApiParam({ name: 'variantId', example: 20 })
+  @ApiOkResponse({
+    schema: {
+      example: [
+        {
+          id: 200,
+          type: 'import',
+          delta: 50,
+          soLuongSau: 150,
+          note: 'Nhập hàng tháng 3',
+          createdAt: '2024-03-01T08:00:00.000Z',
+        },
+      ],
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findHistory(@Param('variantId', ParseIntPipe) variantId: number) {
     return this.inventoryService.findHistoryByVariant(variantId);
   }
@@ -40,11 +106,49 @@ export class AdminInventoryController {
   }
 
   @Get('import')
+  @ApiOperation({ summary: '[Admin] Danh sách phiếu nhập kho' })
+  @ApiOkResponse({
+    schema: {
+      example: [
+        {
+          id: 10,
+          supplierId: 3,
+          supplierName: 'Distributor ABC',
+          status: 'pending',
+          totalAmount: 50000000,
+          createdAt: '2024-03-01T08:00:00.000Z',
+        },
+      ],
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findAllImports() {
     return this.importsService.findAll();
   }
 
   @Get('import/:id')
+  @ApiOperation({ summary: '[Admin] Chi tiết phiếu nhập kho' })
+  @ApiParam({ name: 'id', example: 10 })
+  @ApiOkResponse({
+    schema: {
+      example: {
+        id: 10,
+        supplierId: 3,
+        status: 'pending',
+        items: [
+          {
+            variantId: 20,
+            quantity: 50,
+            costPrice: 12000000,
+          },
+        ],
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Phiếu nhập không tồn tại' })
   findOneImport(@Param('id', ParseIntPipe) id: number) {
     return this.importsService.findOne(id);
   }

@@ -8,7 +8,7 @@ import {
   Param,
   ParseIntPipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiResponse } from '@nestjs/swagger';
 import { CartService } from './cart.service';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
@@ -22,6 +22,27 @@ export class CartController {
 
   @Get()
   @ApiOperation({ summary: 'Lấy giỏ hàng của tôi' })
+  @ApiOkResponse({
+    schema: {
+      example: {
+        id: 3,
+        customerId: 5,
+        items: [
+          {
+            id: 10,
+            variantId: 20,
+            productName: 'Intel Core i9-14900K',
+            sku: 'CPU-I9-14900K',
+            price: 15000000,
+            quantity: 1,
+            imageUrl: 'https://res.cloudinary.com/pc-store/image/upload/products/cpu-i9-14900k.jpg',
+          },
+        ],
+        total: 15000000,
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   getMyCart(@CurrentUser('sub') userId: number) {
     return this.cartService.getMyCart(userId);
   }

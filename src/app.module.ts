@@ -3,6 +3,7 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bull';
+import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
@@ -35,6 +36,11 @@ import { PaymentsModule } from './modules/payments/payments.module';
 // Phase 4 — Kho hàng & Nhà cung cấp
 import { InventoryModule } from './modules/inventory/inventory.module';
 import { SuppliersModule } from './modules/suppliers/suppliers.module';
+
+// Phase 5 — Khuyến mãi & Loyalty
+import { PromotionsModule } from './modules/promotions/promotions.module';
+import { FlashSalesModule } from './modules/flash-sales/flash-sales.module';
+import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 
 // Guards
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
@@ -73,6 +79,8 @@ import { RolesGuard } from './common/guards/roles.guard';
       }),
     }),
 
+    ScheduleModule.forRoot(),
+
     RedisModule,
 
     // Phase 1
@@ -97,6 +105,11 @@ import { RolesGuard } from './common/guards/roles.guard';
     // Phase 4
     InventoryModule,
     SuppliersModule,
+
+    // Phase 5
+    PromotionsModule,
+    FlashSalesModule,
+    LoyaltyModule,
   ],
   controllers: [AppController],
   providers: [

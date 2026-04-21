@@ -11,7 +11,7 @@ import {
   UnauthorizedException,
 } from '@nestjs/common';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiOkResponse, ApiResponse } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterCustomerDto } from './dto/register-customer.dto';
@@ -96,6 +96,18 @@ export class AuthController {
   @Get('me')
   @ApiBearerAuth('access-token')
   @ApiOperation({ summary: 'Thông tin người dùng từ JWT (không query DB)' })
+  @ApiOkResponse({
+    schema: {
+      example: {
+        sub: 5,
+        email: 'nguyenvana@gmail.com',
+        role: 'customer',
+        iat: 1714000000,
+        exp: 1714001800,
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   me(@CurrentUser() user: JwtPayload) {
     return user;
   }

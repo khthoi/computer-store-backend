@@ -10,7 +10,14 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiResponse,
+  ApiParam,
+} from '@nestjs/swagger';
 import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
@@ -26,12 +33,43 @@ export class RolesController {
 
   @Get()
   @ApiOperation({ summary: 'Danh sách vai trò' })
+  @ApiOkResponse({
+    schema: {
+      example: [
+        {
+          id: 1,
+          name: 'admin',
+          description: 'Quản trị viên hệ thống',
+          permissions: [{ id: 1, code: 'product.create' }],
+        },
+      ],
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findAll() {
     return this.rolesService.findAllRoles();
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Chi tiết vai trò' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiOkResponse({
+    schema: {
+      example: {
+        id: 1,
+        name: 'admin',
+        description: 'Quản trị viên hệ thống',
+        permissions: [
+          { id: 1, code: 'product.create' },
+          { id: 2, code: 'product.update' },
+        ],
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Vai trò không tồn tại' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.rolesService.findOne(id);
   }
@@ -74,6 +112,16 @@ export class PermissionsController {
 
   @Get()
   @ApiOperation({ summary: 'Danh sách tất cả quyền hạn (cached 10 phút)' })
+  @ApiOkResponse({
+    schema: {
+      example: [
+        { id: 1, code: 'product.create', description: 'Tạo sản phẩm' },
+        { id: 2, code: 'product.update', description: 'Cập nhật sản phẩm' },
+      ],
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findAll() {
     return this.rolesService.findAllPermissions();
   }

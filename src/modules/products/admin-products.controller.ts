@@ -12,7 +12,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { ProductsService } from './products.service';
 import { ProductsSearchService } from './products-search.service';
 import { SpecificationsService } from '../specifications/specifications.service';
@@ -37,12 +37,98 @@ export class AdminProductsController {
 
   @Get()
   @ApiOperation({ summary: 'Danh sách sản phẩm (admin, bao gồm bản nháp)' })
+  @ApiQuery({ name: 'q', required: false, example: 'RTX 4070', description: 'Tìm kiếm theo tên' })
+  @ApiQuery({ name: 'categoryId', required: false, example: 3, description: 'Lọc theo danh mục' })
+  @ApiQuery({ name: 'brandId', required: false, example: 2, description: 'Lọc theo thương hiệu' })
+  @ApiQuery({ name: 'minPrice', required: false, example: 5000000, description: 'Giá tối thiểu (VND)' })
+  @ApiQuery({ name: 'maxPrice', required: false, example: 50000000, description: 'Giá tối đa (VND)' })
+  @ApiQuery({ name: 'page', required: false, example: 1, description: 'Số trang (mặc định 1)' })
+  @ApiQuery({ name: 'limit', required: false, example: 20, description: 'Số bản ghi mỗi trang (mặc định 20)' })
+  @ApiQuery({ name: 'sortBy', required: false, example: 'createdAt', description: 'Trường sắp xếp (mặc định createdAt)' })
+  @ApiQuery({ name: 'sortOrder', required: false, example: 'DESC', description: 'Chiều sắp xếp: ASC | DESC (mặc định DESC)' })
+  @ApiOkResponse({
+    schema: {
+      example: {
+        data: [
+          {
+            id: 1,
+            name: 'ASUS ROG Strix GeForce RTX 4070',
+            slug: 'asus-rog-strix-rtx-4070',
+            status: 'DangBan',
+            brand: { id: 2, name: 'ASUS' },
+            category: { id: 3, name: 'Card màn hình' },
+            variantCount: 2,
+            minPrice: 18500000,
+            maxPrice: 22000000,
+            totalStock: 28,
+            createdAt: '2024-01-15T08:00:00.000Z',
+          },
+          {
+            id: 2,
+            name: 'Intel Core i9-14900K',
+            slug: 'intel-core-i9-14900k',
+            status: 'NhapKho',
+            brand: { id: 1, name: 'Intel' },
+            category: { id: 4, name: 'CPU / Bộ xử lý' },
+            variantCount: 1,
+            minPrice: 14900000,
+            maxPrice: 14900000,
+            totalStock: 0,
+            createdAt: '2024-02-01T10:00:00.000Z',
+          },
+        ],
+        total: 156,
+        page: 1,
+        limit: 20,
+        totalPages: 8,
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findAll(@Query() query: QueryProductDto) {
     return this.searchService.findAll(query);
   }
 
   @Get(':id')
   @ApiOperation({ summary: 'Chi tiết sản phẩm theo ID' })
+  @ApiParam({ name: 'id', description: 'ID của sản phẩm', example: 1 })
+  @ApiOkResponse({
+    schema: {
+      example: {
+        id: 1,
+        name: 'ASUS ROG Strix GeForce RTX 4070',
+        slug: 'asus-rog-strix-rtx-4070',
+        description: 'Card màn hình cao cấp dòng ROG với VRAM 12GB GDDR6X.',
+        status: 'DangBan',
+        brand: { id: 2, name: 'ASUS' },
+        category: { id: 3, name: 'Card màn hình' },
+        variants: [
+          {
+            id: 5,
+            sku: 'ROG-RTX4070-12G',
+            name: 'RTX 4070 12GB',
+            price: 20500000,
+            stock: 14,
+            isDefault: true,
+          },
+          {
+            id: 6,
+            sku: 'ROG-RTX4070-OC',
+            name: 'RTX 4070 OC Edition',
+            price: 22000000,
+            stock: 14,
+            isDefault: false,
+          },
+        ],
+        createdAt: '2024-01-15T08:00:00.000Z',
+        updatedAt: '2024-03-20T11:00:00.000Z',
+      },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
+  @ApiResponse({ status: 404, description: 'Sản phẩm không tồn tại' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.productsService.findOne(id);
   }

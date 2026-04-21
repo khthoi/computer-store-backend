@@ -10,7 +10,13 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import {
+  ApiTags,
+  ApiOperation,
+  ApiBearerAuth,
+  ApiOkResponse,
+  ApiResponse,
+} from '@nestjs/swagger';
 import { SpecificationsService } from './specifications.service';
 import { CreateSpecGroupDto } from './dto/create-spec-group.dto';
 import { CreateSpecTypeDto } from './dto/create-spec-type.dto';
@@ -28,6 +34,15 @@ export class AdminSpecificationsController {
 
   @Get('groups')
   @ApiOperation({ summary: 'Danh sách nhóm thông số' })
+  @ApiOkResponse({
+    schema: {
+      example: [
+        { id: 1, name: 'Bộ xử lý', specTypeId: 1, typeName: 'CPU', sortOrder: 1 },
+      ],
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findAllGroups() {
     return this.specsService.findAllGroups();
   }
@@ -55,6 +70,16 @@ export class AdminSpecificationsController {
 
   @Get('types')
   @ApiOperation({ summary: 'Danh sách loại thông số' })
+  @ApiOkResponse({
+    schema: {
+      example: [
+        { id: 1, name: 'CPU', slug: 'cpu' },
+        { id: 2, name: 'RAM', slug: 'ram' },
+      ],
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findAllTypes() {
     return this.specsService.findAllTypes();
   }

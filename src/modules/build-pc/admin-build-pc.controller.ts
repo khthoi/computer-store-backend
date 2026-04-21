@@ -10,7 +10,7 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { BuildPcService } from './build-pc.service';
 import { BuildSlot } from './entities/build-slot.entity';
 import { CompatibilityRule } from './entities/compatibility-rule.entity';
@@ -26,7 +26,17 @@ export class AdminBuildPcController {
   // ── Slots ─────────────────────────────────────────────────────────────────
 
   @Get('slots')
-  @ApiOperation({ summary: 'Danh sách slots' })
+  @ApiOperation({ summary: 'List all Build-PC slot definitions' })
+  @ApiOkResponse({
+    schema: {
+      example: [
+        { id: 1, tenSlot: 'CPU', danhMucId: 3, batBuoc: true, soLuongMin: 1, soLuongMax: 1, thuTu: 1, iconKey: 'cpu' },
+        { id: 2, tenSlot: 'RAM', danhMucId: 5, batBuoc: true, soLuongMin: 1, soLuongMax: 4, thuTu: 2, iconKey: 'ram' },
+      ],
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findAllSlots() {
     return this.buildPcService.findAllSlots();
   }
@@ -53,7 +63,16 @@ export class AdminBuildPcController {
   // ── Rules ─────────────────────────────────────────────────────────────────
 
   @Get('rules')
-  @ApiOperation({ summary: 'Danh sách quy tắc tương thích' })
+  @ApiOperation({ summary: 'List all compatibility rules' })
+  @ApiOkResponse({
+    schema: {
+      example: [
+        { id: 1, tenQuyTac: 'CPU socket must match Mainboard socket', slotNguonId: 1, maKtNguon: 'socket', slotDichId: 2, maKtDich: 'socket', loaiKiemTra: 'exact_match', heSo: 1, thongBaoLoi: 'CPU và mainboard không tương thích socket', isActive: true, thuTu: 1 },
+      ],
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findAllRules() {
     return this.buildPcService.findAllRules();
   }

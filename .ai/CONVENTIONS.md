@@ -451,16 +451,28 @@ Never write:
 
 ---
 
-## Swagger Documentation
+## Swagger API Standards (REQUIRED)
 
-### ApiTags naming convention (CRITICAL)
+### 1. Mandatory rules
+
+| # | Rule |
+|---|---|
+| 1 | Every endpoint must have `@ApiOperation({ summary: '...' })` |
+| 2 | Every GET endpoint must have `@ApiOkResponse` with a realistic example |
+| 3 | Use `@ApiProperty({ example: ... })` on DTOs when available — examples must be real data, not generic `"string"` or `123` placeholders |
+| 4 | If there is no response DTO yet → use `@ApiOkResponse({ schema: { example: { ... } } })` directly on the endpoint |
+| 5 | Every query param must have `@ApiQuery({ name, required, description, example })` for each field |
+| 6 | Every route param must have `@ApiParam({ name, example })` — e.g. `@ApiParam({ name: 'id', example: 1 })` |
+| 7 | No response may be left without a description — every `@ApiResponse` must have a clear `description` |
+
+### 2. ApiTags naming (CRITICAL)
 
 | Controller type | Pattern | Example |
 |---|---|---|
 | Public controller | `@ApiTags('ModuleName')` | `@ApiTags('Products')` |
 | Admin controller | `@ApiTags('Admin — ModuleName')` | `@ApiTags('Admin — Products')` |
 
-**Use em-dash (`—`) between `Admin` and module name — NEVER a hyphen (`-`).**
+**Use an em-dash (`—`) between `Admin` and the module name — do NOT use a hyphen (`-`).**
 
 ```typescript
 // ✓ CORRECT
@@ -468,27 +480,72 @@ Never write:
 @ApiTags('Admin — Inventory')
 @ApiTags('Admin — Customers')
 
-// ✗ WRONG — these break Swagger grouping
+// ✗ WRONG — breaks Swagger grouping
 @ApiTags('Admin - Products')
 @ApiTags('admin/inventory')
 @ApiTags('inventory')
 ```
 
-### Required decorators per endpoint
+### 3. Required decorator structure by endpoint type
 
+**GET list (returns array, has QueryDto):**
 ```typescript
-@ApiTags('Products')
-@ApiOperation({ summary: 'Get product by slug' })
-@ApiParam({ name: 'slug', example: 'intel-core-i9-14900k' })
-@ApiResponse({ status: 200, type: ProductResponseDto })
-@ApiResponse({ status: 404, description: 'Product not found' })
-@Get(':slug')
-findOne(@Param('slug') slug: string) { ... }
+@Get()
+@ApiOperation({ summary: 'Danh sách sản phẩm (filter / paginate)' })
+@ApiQuery({ name: 'q', required: false, description: 'Tìm theo tên', example: 'Core i9' })
+@ApiQuery({ name: 'page', required: false, description: 'Trang', example: 1 })
+@ApiQuery({ name: 'limit', required: false, description: 'Số item/trang', example: 20 })
+@ApiOkResponse({
+  schema: {
+    example: {
+      items: [{ id: 1, name: 'Intel Core i9-14900K', slug: 'intel-core-i9-14900k' }],
+      total: 42,
+      page: 1,
+      limit: 20,
+    },
+  },
+})
+findAll(@Query() query: QueryProductDto) { ... }
 ```
 
-Admin endpoints additionally:
+**GET detail with id/slug param:**
 ```typescript
-@ApiBearerAuth()
+@Get(':slug')
+@ApiOperation({ summary: 'Chi tiết sản phẩm theo slug' })
+@ApiParam({ name: 'slug', example: 'intel-core-i9-14900k' })
+@ApiOkResponse({
+  schema: {
+    example: { id: 1, name: 'Intel Core i9-14900K', price: 15000000, status: 'DangBan' },
+  },
+})
+@ApiResponse({ status: 404, description: 'Sản phẩm không tồn tại' })
+findBySlug(@Param('slug') slug: string) { ... }
+```
+
+**Admin GET (add 401/403):**
+```typescript
+@Get()
+@ApiOperation({ summary: 'Danh sách tất cả đơn hàng (admin)' })
+@ApiOkResponse({ schema: { example: { items: [...], total: 100, page: 1, limit: 20 } } })
 @ApiResponse({ status: 401, description: 'Unauthorized' })
 @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
+findAll() { ... }
+```
+
+**Auth-required GET (ApiBearerAuth at class level, add 401):**
+```typescript
+@Get('me')
+@ApiOperation({ summary: 'Thông tin profile của tôi' })
+@ApiOkResponse({ schema: { example: { id: 5, fullName: 'Nguyễn Văn A', email: 'a@example.com' } } })
+@ApiResponse({ status: 401, description: 'Unauthorized' })
+getProfile() { ... }
+```
+
+### 4. Required Swagger imports
+
+```typescript
+import {
+  ApiTags, ApiOperation, ApiOkResponse, ApiResponse,
+  ApiBearerAuth, ApiParam, ApiQuery, ApiBody,
+} from '@nestjs/swagger';
 ```
