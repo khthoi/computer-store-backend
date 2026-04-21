@@ -101,6 +101,11 @@ export class AdminInventoryController {
   }
 
   @Post('adjust')
+  @ApiOperation({ summary: 'Điều chỉnh tồn kho thủ công (nhập/xuất/điều chuyển)' })
+  @ApiResponse({ status: 201, description: 'Tồn kho đã được điều chỉnh thành công' })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   adjustStock(@Body() dto: AdjustStockDto, @Request() req: any) {
     return this.inventoryService.adjustStock(dto, req.user?.employeeId ?? req.user?.sub);
   }
@@ -154,11 +159,23 @@ export class AdminInventoryController {
   }
 
   @Post('import')
+  @ApiOperation({ summary: 'Tạo phiếu nhập kho mới' })
+  @ApiResponse({ status: 201, description: 'Phiếu nhập đã được tạo, chờ duyệt' })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   createImport(@Body() dto: CreateImportReceiptDto, @Request() req: any) {
     return this.importsService.create(dto, req.user?.employeeId ?? req.user?.sub);
   }
 
   @Put('import/:id/approve')
+  @ApiOperation({ summary: 'Duyệt phiếu nhập kho và cập nhật tồn kho' })
+  @ApiParam({ name: 'id', example: 10 })
+  @ApiResponse({ status: 200, description: 'Phiếu nhập đã được duyệt, tồn kho đã cập nhật' })
+  @ApiResponse({ status: 400, description: 'Phiếu nhập không ở trạng thái chờ duyệt' })
+  @ApiResponse({ status: 404, description: 'Phiếu nhập không tồn tại' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   approveImport(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ApproveImportDto,
@@ -168,6 +185,13 @@ export class AdminInventoryController {
   }
 
   @Put('import/:id/reject')
+  @ApiOperation({ summary: 'Từ chối phiếu nhập kho' })
+  @ApiParam({ name: 'id', example: 10 })
+  @ApiResponse({ status: 200, description: 'Phiếu nhập đã bị từ chối' })
+  @ApiResponse({ status: 400, description: 'Phiếu nhập không ở trạng thái chờ duyệt' })
+  @ApiResponse({ status: 404, description: 'Phiếu nhập không tồn tại' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   rejectImport(@Param('id', ParseIntPipe) id: number) {
     return this.importsService.reject(id);
   }

@@ -55,12 +55,43 @@ async function bootstrap() {
       { type: 'http', scheme: 'bearer', bearerFormat: 'JWT' },
       'access-token',
     )
+    // Phase 1 — Auth · Users · Employees · Roles
     .addTag('Auth', 'Xác thực & phân quyền')
-    .addTag('Users', 'Quản lý khách hàng')
-    .addTag('Products', 'Sản phẩm & biến thể')
+    .addTag('Users', 'Quản lý tài khoản khách hàng')
+    .addTag('Admin — Customers', 'Quản lý tài khoản khách hàng (admin)')
+    .addTag('Admin — Employees', 'Quản lý nhân viên')
+    .addTag('Admin — Roles', 'Quản lý vai trò & phân quyền')
+    .addTag('Admin — Permissions', 'Quản lý quyền hạn')
+    // Phase 2 — Categories · Brands · Specs · Products · Media · BuildPC
     .addTag('Categories', 'Danh mục sản phẩm')
+    .addTag('Admin — Categories', 'Quản lý danh mục sản phẩm (admin)')
+    .addTag('Brands', 'Thương hiệu sản phẩm')
+    .addTag('Admin — Brands', 'Quản lý thương hiệu (admin)')
+    .addTag('Specifications', 'Thông số kỹ thuật')
+    .addTag('Admin — Specifications', 'Quản lý thông số kỹ thuật (admin)')
+    .addTag('Products', 'Sản phẩm & biến thể')
+    .addTag('Admin — Products', 'Quản lý sản phẩm & biến thể (admin)')
+    .addTag('Media', 'Thư viện media')
+    .addTag('Admin — Media', 'Quản lý thư viện media (admin)')
+    .addTag('BuildPC', 'Xây dựng cấu hình PC')
+    .addTag('Admin — BuildPC', 'Quản lý cấu hình PC (admin)')
+    // Phase 3 — Cart · Orders · Payments
+    .addTag('Cart', 'Giỏ hàng')
     .addTag('Orders', 'Đơn hàng')
-    .addTag('Inventory', 'Kho hàng')
+    .addTag('Admin — Orders', 'Quản lý đơn hàng (admin)')
+    .addTag('Payments', 'Thanh toán')
+    // Phase 4 — Inventory · Suppliers
+    .addTag('Inventory', 'Tồn kho')
+    .addTag('Admin — Inventory', 'Quản lý kho hàng (admin)')
+    .addTag('Suppliers', 'Nhà cung cấp')
+    .addTag('Admin — Suppliers', 'Quản lý nhà cung cấp (admin)')
+    // Phase 5 — Promotions · Flash Sales · Loyalty
+    .addTag('Promotions', 'Khuyến mãi')
+    .addTag('Admin — Promotions', 'Quản lý khuyến mãi (admin)')
+    .addTag('Flash Sales', 'Flash sale đang diễn ra')
+    .addTag('Admin — Flash Sales', 'Quản lý flash sale (admin)')
+    .addTag('Loyalty', 'Điểm tích lũy')
+    .addTag('Admin — Loyalty', 'Quản lý điểm tích lũy (admin)')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);

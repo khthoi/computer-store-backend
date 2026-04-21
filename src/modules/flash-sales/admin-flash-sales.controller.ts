@@ -15,7 +15,7 @@ export class AdminFlashSalesController {
   constructor(private readonly flashSalesService: FlashSalesService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List all flash sales (newest first)' })
+  @ApiOperation({ summary: 'Danh sách tất cả flash sales (mới nhất trước)' })
   @ApiOkResponse({
     schema: {
       example: [
@@ -31,7 +31,7 @@ export class AdminFlashSalesController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get flash sale detail by ID including all items' })
+  @ApiOperation({ summary: 'Chi tiết flash sale kèm toàn bộ items theo ID' })
   @ApiParam({ name: 'id', example: 5 })
   @ApiOkResponse({
     schema: {
@@ -50,7 +50,7 @@ export class AdminFlashSalesController {
       },
     },
   })
-  @ApiResponse({ status: 404, description: 'Flash sale not found' })
+  @ApiResponse({ status: 404, description: 'Flash sale không tồn tại' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findOne(@Param('id', ParseIntPipe) id: number) {
@@ -69,7 +69,7 @@ export class AdminFlashSalesController {
 
   @Put(':id')
   @ApiOperation({ summary: 'Cập nhật flash sale (không cho sửa khi đang diễn ra)' })
-  @ApiParam({ name: 'id', example: 1 })
+  @ApiParam({ name: 'id', example: 5 })
   @ApiResponse({ status: 200, description: 'Flash sale đã được cập nhật' })
   @ApiResponse({ status: 400, description: 'Không thể sửa flash sale đang diễn ra' })
   @ApiResponse({ status: 404, description: 'Flash sale không tồn tại' })
@@ -80,8 +80,8 @@ export class AdminFlashSalesController {
   }
 
   @Delete(':id')
-  @ApiOperation({ summary: 'Hủy flash sale (set status = huy)' })
-  @ApiParam({ name: 'id', example: 1 })
+  @ApiOperation({ summary: 'Hủy flash sale (chuyển trạng thái sang huy)' })
+  @ApiParam({ name: 'id', example: 5 })
   @ApiResponse({ status: 200, description: 'Flash sale đã bị hủy' })
   @ApiResponse({ status: 404, description: 'Flash sale không tồn tại' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })

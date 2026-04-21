@@ -16,12 +16,12 @@ export class AdminPromotionsController {
   constructor(private readonly promotionsService: PromotionsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'List all promotions with optional filters and pagination' })
-  @ApiQuery({ name: 'status', required: false, enum: ['draft', 'active', 'scheduled', 'paused', 'ended', 'cancelled'], example: 'active', description: 'Filter by promotion status' })
-  @ApiQuery({ name: 'type', required: false, enum: ['standard', 'bxgy', 'bundle', 'bulk', 'free_shipping'], example: 'standard', description: 'Filter by promotion type' })
-  @ApiQuery({ name: 'search', required: false, description: 'Search by promotion name', example: 'Giảm giá laptop' })
-  @ApiQuery({ name: 'page', required: false, description: 'Page number', example: 1 })
-  @ApiQuery({ name: 'limit', required: false, description: 'Items per page', example: 20 })
+  @ApiOperation({ summary: 'Danh sách tất cả promotions (có filter và phân trang)' })
+  @ApiQuery({ name: 'status', required: false, enum: ['draft', 'active', 'scheduled', 'paused', 'ended', 'cancelled'], example: 'active', description: 'Lọc theo trạng thái promotion' })
+  @ApiQuery({ name: 'type', required: false, enum: ['standard', 'bxgy', 'bundle', 'bulk', 'free_shipping'], example: 'standard', description: 'Lọc theo loại promotion' })
+  @ApiQuery({ name: 'search', required: false, description: 'Tìm kiếm theo tên promotion', example: 'Giảm giá laptop' })
+  @ApiQuery({ name: 'page', required: false, description: 'Trang hiện tại', example: 1 })
+  @ApiQuery({ name: 'limit', required: false, description: 'Số bản ghi mỗi trang', example: 20 })
   @ApiOkResponse({
     schema: {
       example: {
@@ -55,7 +55,7 @@ export class AdminPromotionsController {
   }
 
   @Get(':id')
-  @ApiOperation({ summary: 'Get promotion detail including scopes, conditions and actions' })
+  @ApiOperation({ summary: 'Chi tiết promotion kèm scopes, conditions và actions' })
   @ApiParam({ name: 'id', example: 7 })
   @ApiOkResponse({
     schema: {
@@ -80,7 +80,7 @@ export class AdminPromotionsController {
       },
     },
   })
-  @ApiResponse({ status: 404, description: 'Promotion not found' })
+  @ApiResponse({ status: 404, description: 'Promotion không tồn tại' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findOne(@Param('id', ParseIntPipe) id: number) {

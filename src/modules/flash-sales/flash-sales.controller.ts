@@ -10,7 +10,7 @@ export class FlashSalesController {
 
   @Public()
   @Get('active')
-  @ApiOperation({ summary: 'Get the currently active flash sale (for homepage / countdown)' })
+  @ApiOperation({ summary: 'Flash sale đang diễn ra (dùng cho trang chủ / countdown)' })
   @ApiOkResponse({
     schema: {
       example: {
@@ -33,7 +33,7 @@ export class FlashSalesController {
 
   @Public()
   @Get(':id')
-  @ApiOperation({ summary: 'Get flash sale detail by ID' })
+  @ApiOperation({ summary: 'Chi tiết flash sale theo ID' })
   @ApiParam({ name: 'id', example: 3 })
   @ApiOkResponse({
     schema: {
@@ -49,7 +49,7 @@ export class FlashSalesController {
       },
     },
   })
-  @ApiResponse({ status: 404, description: 'Flash sale not found' })
+  @ApiResponse({ status: 404, description: 'Flash sale không tồn tại' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.flashSalesService.findOne(id);
   }

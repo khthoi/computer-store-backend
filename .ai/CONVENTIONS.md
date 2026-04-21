@@ -549,3 +549,109 @@ import {
   ApiBearerAuth, ApiParam, ApiQuery, ApiBody,
 } from '@nestjs/swagger';
 ```
+
+---
+
+### 5. Language rule: Vietnamese vs English
+
+| Location | Language | Reason |
+|---|---|---|
+| `@ApiOperation({ summary })` | **Vietnamese** | Shown in Swagger UI — read by devs/testers |
+| `@ApiResponse({ description })` | **Vietnamese** | Shown in Swagger UI |
+| `@ApiQuery({ description })` | **Vietnamese** | Shown in Swagger UI |
+| `@ApiParam({ description })` | **Vietnamese** | Shown in Swagger UI |
+| `@ApiOkResponse` / `schema.example` values | **Vietnamese where applicable** | Real data, may contain Vietnamese strings |
+| Code comments (`//`) | **English** | Read by AI agents and developers |
+| CONVENTIONS.md guide text & headings | **English** | AI-facing instructions |
+| Code block labels in docs | **English** | Consistent with tooling |
+
+**Examples — correct usage:**
+
+```typescript
+// ✓ CORRECT — summary and descriptions in Vietnamese
+@ApiOperation({ summary: 'Chi tiết sản phẩm theo slug' })
+@ApiParam({ name: 'slug', description: 'Slug của sản phẩm', example: 'intel-core-i9-14900k' })
+@ApiResponse({ status: 404, description: 'Sản phẩm không tồn tại' })
+
+// ✓ CORRECT — code comments in English
+// Slug is used instead of id to keep URLs SEO-friendly
+findBySlug(@Param('slug') slug: string) { ... }
+```
+
+```typescript
+// ✗ WRONG — summary in English
+@ApiOperation({ summary: 'Get product detail by slug' })
+
+// ✗ WRONG — code comment in Vietnamese
+// Dùng slug thay vì id để URL thân thiện với SEO
+```
+
+> **Rule of thumb:** if it appears in the Swagger UI (user/tester sees it) → Vietnamese. If it appears only in source code (AI/developer reads it) → English.
+
+---
+
+### 6. `addTag` registration in `main.ts` (REQUIRED)
+
+Every `@ApiTags('...')` used in any controller **must** have a matching `.addTag(name, description)` call in the `DocumentBuilder` block inside `src/main.ts`. Without it the tag appears in Swagger UI with no description and may be sorted arbitrarily.
+
+**Rules:**
+1. Add both the public tag and the admin tag for each module.
+2. Order: public tag first, then `Admin — <Module>` tag immediately below it.
+3. Description must be in Vietnamese (shown in Swagger UI).
+4. Keep the list ordered by build phase, then alphabetically within a phase.
+
+**Pattern:**
+```typescript
+// src/main.ts — DocumentBuilder block
+const swaggerConfig = new DocumentBuilder()
+  // ...
+  .addTag('Products', 'Sản phẩm & biến thể')
+  .addTag('Admin — Products', 'Quản lý sản phẩm & biến thể (admin)')
+  .addTag('Flash Sales', 'Flash sale đang diễn ra')
+  .addTag('Admin — Flash Sales', 'Quản lý flash sales (admin)')
+  // ...
+  .build();
+```
+
+**Checklist — add a tag pair when:**
+- [ ] A new module folder is created under `src/modules/`
+- [ ] A new `@ApiTags('...')` value appears that is not yet listed in `main.ts`
+
+**Current registered tags** (update this list whenever `main.ts` changes):
+
+| Tag | Mô tả |
+|---|---|
+| `Auth` | Xác thực & phân quyền |
+| `Users` | Quản lý tài khoản khách hàng |
+| `Admin — Customers` | Quản lý tài khoản khách hàng (admin) |
+| `Admin — Employees` | Quản lý nhân viên |
+| `Admin — Roles` | Quản lý vai trò & phân quyền |
+| `Admin — Permissions` | Quản lý quyền hạn |
+| `Categories` | Danh mục sản phẩm |
+| `Admin — Categories` | Quản lý danh mục sản phẩm (admin) |
+| `Brands` | Thương hiệu sản phẩm |
+| `Admin — Brands` | Quản lý thương hiệu (admin) |
+| `Specifications` | Thông số kỹ thuật |
+| `Admin — Specifications` | Quản lý thông số kỹ thuật (admin) |
+| `Products` | Sản phẩm & biến thể |
+| `Admin — Products` | Quản lý sản phẩm & biến thể (admin) |
+| `Media` | Thư viện media |
+| `Admin — Media` | Quản lý thư viện media (admin) |
+| `BuildPC` | Xây dựng cấu hình PC |
+| `Admin — BuildPC` | Quản lý cấu hình PC (admin) |
+| `Cart` | Giỏ hàng |
+| `Orders` | Đơn hàng |
+| `Admin — Orders` | Quản lý đơn hàng (admin) |
+| `Payments` | Thanh toán |
+| `Inventory` | Tồn kho |
+| `Admin — Inventory` | Quản lý kho hàng (admin) |
+| `Suppliers` | Nhà cung cấp |
+| `Admin — Suppliers` | Quản lý nhà cung cấp (admin) |
+| `Promotions` | Khuyến mãi |
+| `Admin — Promotions` | Quản lý khuyến mãi (admin) |
+| `Flash Sales` | Flash sale đang diễn ra |
+| `Admin — Flash Sales` | Quản lý flash sale (admin) |
+| `Loyalty` | Điểm tích lũy |
+| `Admin — Loyalty` | Quản lý điểm tích lũy (admin) |
+
+> When adding a new module (Phase 6+), append the tag pair here and in `src/main.ts` before shipping.

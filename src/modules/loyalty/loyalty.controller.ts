@@ -11,7 +11,7 @@ export class LoyaltyController {
 
   @Get('points')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get current loyalty point balance of the authenticated customer' })
+  @ApiOperation({ summary: 'Xem số điểm tích lũy hiện tại của khách hàng' })
   @ApiOkResponse({ schema: { example: 1250 } })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getBalance(@Request() req: any) {
@@ -20,12 +20,12 @@ export class LoyaltyController {
 
   @Get('transactions')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get loyalty point transaction history (latest 100)' })
+  @ApiOperation({ summary: 'Lịch sử giao dịch điểm tích lũy (100 giao dịch gần nhất)' })
   @ApiOkResponse({
     schema: {
       example: [
-        { id: 88, loaiGiaoDich: 'earn', diem: 120, soDuTruoc: 1130, soDuSau: 1250, moTa: 'Earn points for order #201', loaiThamChieu: 'don_hang', thamChieuId: 201, ngayTao: '2024-05-28T09:00:00.000Z' },
-        { id: 75, loaiGiaoDich: 'redeem', diem: -500, soDuTruoc: 1630, soDuSau: 1130, moTa: 'Redeem: Giảm 50k', loaiThamChieu: 'loyalty_redemption', thamChieuId: 12, ngayTao: '2024-05-20T14:00:00.000Z' },
+        { id: 88, loaiGiaoDich: 'earn', diem: 120, soDuTruoc: 1130, soDuSau: 1250, moTa: 'Tích điểm đơn hàng #201', loaiThamChieu: 'don_hang', thamChieuId: 201, ngayTao: '2024-05-28T09:00:00.000Z' },
+        { id: 75, loaiGiaoDich: 'redeem', diem: -500, soDuTruoc: 1630, soDuSau: 1130, moTa: 'Đổi điểm: Giảm 50k', loaiThamChieu: 'loyalty_redemption', thamChieuId: 12, ngayTao: '2024-05-20T14:00:00.000Z' },
       ],
     },
   })
@@ -36,7 +36,7 @@ export class LoyaltyController {
 
   @Public()
   @Get('catalog')
-  @ApiOperation({ summary: 'List all active redemption rewards (public)' })
+  @ApiOperation({ summary: 'Danh sách phần thưởng đang hoạt động có thể đổi điểm (public)' })
   @ApiOkResponse({
     schema: {
       example: [
@@ -51,7 +51,7 @@ export class LoyaltyController {
 
   @Get('redemptions')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Get redemption history of the authenticated customer' })
+  @ApiOperation({ summary: 'Lịch sử đổi điểm của khách hàng đang đăng nhập' })
   @ApiOkResponse({
     schema: {
       example: [

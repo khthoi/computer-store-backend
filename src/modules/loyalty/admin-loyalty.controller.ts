@@ -16,7 +16,7 @@ export class AdminLoyaltyController {
   constructor(private readonly loyaltyService: LoyaltyService) {}
 
   @Get('rules')
-  @ApiOperation({ summary: 'List all loyalty earn rules (sorted by priority desc)' })
+  @ApiOperation({ summary: 'Danh sách tất cả earn rules (sắp xếp theo priority giảm dần)' })
   @ApiOkResponse({
     schema: {
       example: [
@@ -83,7 +83,7 @@ export class AdminLoyaltyController {
   }
 
   @Get('catalog')
-  @ApiOperation({ summary: 'List all redemption catalog items including inactive (admin view)' })
+  @ApiOperation({ summary: 'Danh sách tất cả catalog items kể cả đã tắt (admin view)' })
   @ApiOkResponse({
     schema: {
       example: [
