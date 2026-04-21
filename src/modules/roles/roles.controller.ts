@@ -17,7 +17,7 @@ import { UpdateRoleDto } from './dto/update-role.dto';
 import { AssignPermissionsDto } from './dto/assign-permissions.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 
-@ApiTags('Admin - Roles')
+@ApiTags('Admin — Roles')
 @ApiBearerAuth('access-token')
 @Roles('admin')
 @Controller('admin/roles')
@@ -65,7 +65,7 @@ export class RolesController {
   }
 }
 
-@ApiTags('Admin - Permissions')
+@ApiTags('Admin — Permissions')
 @ApiBearerAuth('access-token')
 @Roles('admin')
 @Controller('admin/permissions')

@@ -108,6 +108,7 @@ export class Product {
 | `danh_muc_nhom_thong_so` | `CategorySpecGroup` | `specifications/entities/category-spec-group.entity.ts` |
 | `gia_tri_thong_so` | `SpecValue` | `specifications/entities/spec-value.entity.ts` |
 | `media_asset` | `MediaAsset` | `media/entities/media-asset.entity.ts` |
+| `media_thu_muc` | `MediaFolder` | `media/entities/media-folder.entity.ts` |
 | `buildpc_slot_dinh_nghia` | `BuildSlot` | `build-pc/entities/build-slot.entity.ts` |
 | `buildpc_quy_tac_tuong_thich` | `CompatibilityRule` | `build-pc/entities/compatibility-rule.entity.ts` |
 | `buildpc_da_luu` | `SavedBuild` | `build-pc/entities/saved-build.entity.ts` |
@@ -163,13 +164,28 @@ export class Product {
 | `chieu_rong` | `width` | `number` nullable |
 | `chieu_cao` | `height` | `number` nullable |
 | `alt_text` | `altText` | `string` nullable |
-| `thu_muc` | `folder` | `string` nullable |
+| `thu_muc` | `thuMuc` | `string` nullable — raw Cloudinary path |
+| `thu_muc_id` | `thuMucId` | `number` FK → `media_thu_muc` nullable |
 | `tags` | `tags` | `object` JSON nullable |
 | `so_lan_su_dung` | `usageCount` | `number` |
 | `trang_thai` | `status` | `string` (`'active'|'archived'`) |
 | `nguoi_upload_id` | `uploadedById` | `number` FK |
 | `ngay_upload` | `uploadedAt` | `Date` |
 | `ngay_cap_nhat` | `updatedAt` | `Date` |
+
+#### `media_thu_muc` → `MediaFolder`
+
+| DB Column | Property | Type |
+|---|---|---|
+| `thu_muc_id` | `id` | `number` PK |
+| `ten_hien_thi` | `tenHienThi` | `string` — display name |
+| `duong_dan` | `duongDan` | `string` UNIQUE — Cloudinary folder path |
+| `mo_ta` | `moTa` | `string` nullable |
+| `loai_cho_phep` | `loaiChoPhep` | `string` (`'all'|'image'|'video'|'raw'`) |
+| `thu_tu` | `thuTu` | `number` sort order |
+| `is_active` | `isActive` | `boolean` |
+| `ngay_tao` | `ngayTao` | `Date` |
+| `ngay_cap_nhat` | `ngayCapNhat` | `Date` |
 
 ---
 

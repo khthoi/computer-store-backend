@@ -19,7 +19,7 @@ import { AssignRolesDto } from './dto/assign-roles.dto';
 import { QueryEmployeesDto } from './dto/query-employees.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 
-@ApiTags('Admin - Employees')
+@ApiTags('Admin — Employees')
 @ApiBearerAuth('access-token')
 @Roles('admin')
 @Controller('admin/employees')

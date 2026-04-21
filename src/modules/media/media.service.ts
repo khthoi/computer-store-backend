@@ -8,6 +8,7 @@ import { Repository } from 'typeorm';
 import { ConfigService } from '@nestjs/config';
 import { v2 as cloudinary } from 'cloudinary';
 import { MediaAsset } from './entities/media-asset.entity';
+import { MediaFolderService } from './media-folder.service';
 import { QueryMediaDto } from './dto/query-media.dto';
 
 @Injectable()
@@ -16,6 +17,7 @@ export class MediaService {
     @InjectRepository(MediaAsset)
     private readonly repo: Repository<MediaAsset>,
     private readonly config: ConfigService,
+    private readonly folderService: MediaFolderService,
   ) {
     cloudinary.config({
       cloud_name: config.get<string>('CLOUDINARY_CLOUD_NAME'),
@@ -24,8 +26,26 @@ export class MediaService {
     });
   }
 
-  async upload(file: Express.Multer.File, employeeId: number, folder?: string): Promise<MediaAsset> {
-    const targetFolder = folder ?? 'pc-store/misc';
+  async upload(file: Express.Multer.File, employeeId: number, folderPath?: string): Promise<MediaAsset> {
+    let targetFolder = folderPath ?? 'pc-store/misc';
+    let thuMucId: number | null = null;
+
+    if (folderPath) {
+      const configured = await this.folderService.findByPath(folderPath);
+      if (!configured) {
+        throw new BadRequestException(`Thư mục "${folderPath}" không được cấu hình. Chọn thư mục hợp lệ từ danh sách.`);
+      }
+      if (configured.loaiChoPhep !== 'all') {
+        const fileType = file.mimetype.startsWith('image/') ? 'image'
+          : file.mimetype.startsWith('video/') ? 'video' : 'raw';
+        if (configured.loaiChoPhep !== fileType) {
+          throw new BadRequestException(`Thư mục này chỉ chấp nhận loại file: ${configured.loaiChoPhep}`);
+        }
+      }
+      targetFolder = configured.duongDan;
+      thuMucId = configured.id;
+    }
+
     const result = await this.uploadToCloudinary(file, targetFolder);
 
     const loaiFile = (result.resource_type === 'image' ? 'image'
@@ -43,6 +63,7 @@ export class MediaService {
       chieuRong: (result.width as number) ?? null,
       chieuCao: (result.height as number) ?? null,
       thuMuc: targetFolder,
+      thuMucId,
       trangThai: 'active',
       nguoiUploadId: employeeId,
     });

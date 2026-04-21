@@ -5,7 +5,7 @@ import { SuppliersService } from './suppliers.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
 
-@ApiTags('admin/suppliers')
+@ApiTags('Admin — Suppliers')
 @Controller('admin/suppliers')
 @Roles('admin', 'warehouse')
 export class AdminSuppliersController {

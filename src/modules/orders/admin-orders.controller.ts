@@ -6,7 +6,7 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 
-@ApiTags('Admin - Orders')
+@ApiTags('Admin — Orders')
 @ApiBearerAuth()
 @Roles('admin', 'staff')
 @Controller('admin/orders')

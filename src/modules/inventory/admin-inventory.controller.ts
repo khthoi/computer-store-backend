@@ -10,7 +10,7 @@ import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { CreateImportReceiptDto } from './dto/create-import-receipt.dto';
 import { ApproveImportDto } from './dto/approve-import.dto';
 
-@ApiTags('admin/inventory')
+@ApiTags('Admin — Inventory')
 @Controller('admin/inventory')
 @Roles('admin', 'warehouse', 'staff')
 export class AdminInventoryController {

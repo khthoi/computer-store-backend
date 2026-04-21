@@ -151,5 +151,41 @@ src/modules/<feature>/
 | `.ai/DATABASE.md` | Full entity name mapping (ERD → English) for all 40+ tables |
 | `.ai/MODULES.md` | All 27 modules: DB tables, entities, endpoints, business logic |
 | `.ai/ARCHITECTURE.md` | Folder structure, infrastructure, deployment |
-| `.ai/CONVENTIONS.md` | Detailed coding standards and patterns |
+| `.ai/CONVENTIONS.md` | Detailed coding standards and patterns (includes Swagger ApiTags rules) |
 | `.ai/TESTING.md` | **Testing skills**: cURL (real API calls, CORS, auth/cookies) + MySQL CLI (fake data seeding) |
+
+---
+
+## Documentation Source Files
+
+Primary design documents live at:
+```
+D:\Online PC Store System\Documentation\System Design\Docs\
+```
+
+### When to read each file
+
+| Situation | File to read | Section to target |
+|---|---|---|
+| Need column names / types for a specific DB table | `Tài liệu đặc tả ERD - Hệ thống bán lẻ máy tính & linh kiện trực tuyến.docx` | **Section 6 onwards** (`# 6. Mô tả Physical ERD`) — skip Sections 1–5 (Context/Conceptual/Logical) |
+| Need index strategy for a table | Same ERD doc | Section 7 (`# 7. Đặc tả các khoá chỉ mục`) |
+| Need module API prefix, DB tables list, or business rules for a module | `Trình tự xây dựng Backend NestJS.docx` | Sections 5 & 7 (module list + module details) |
+| Need build phase order or checklist | Same NestJS doc | Sections 4 & 10 |
+
+### How to read efficiently (large files)
+
+```bash
+# Step 1 — get headings outline first
+pandoc "D:/Online PC Store System/Documentation/System Design/Docs/<filename>.docx" \
+  -t markdown --wrap=none | grep "^#"
+
+# Step 2 — jump to Physical ERD section (skip first 5 sections)
+pandoc "D:/Online PC Store System/Documentation/System Design/Docs/Tài liệu đặc tả ERD - Hệ thống bán lẻ máy tính & linh kiện trực tuyến.docx" \
+  -t markdown --wrap=none | sed -n '/^# 6\. Mô tả Physical ERD/,$p'
+
+# Step 3 — target a specific table by name
+pandoc "..." -t markdown --wrap=none \
+  | sed -n '/### Bảng: ten_bang/,/### Bảng:/p' | head -60
+```
+
+> **Rule:** Always check `.ai/DATABASE.md` first. Only open the ERD docx when you need columns/types not listed there, or when implementing a new entity from scratch.

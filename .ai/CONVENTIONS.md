@@ -292,7 +292,7 @@ export class ProductsController {
 }
 
 // admin-products.controller.ts — admin routes
-@ApiTags('Admin - Products')
+@ApiTags('Admin — Products')   // em-dash (—), NOT hyphen (-)
 @ApiBearerAuth()
 @UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('admin/products')
@@ -453,7 +453,28 @@ Never write:
 
 ## Swagger Documentation
 
-Every endpoint must have Swagger decorators:
+### ApiTags naming convention (CRITICAL)
+
+| Controller type | Pattern | Example |
+|---|---|---|
+| Public controller | `@ApiTags('ModuleName')` | `@ApiTags('Products')` |
+| Admin controller | `@ApiTags('Admin — ModuleName')` | `@ApiTags('Admin — Products')` |
+
+**Use em-dash (`—`) between `Admin` and module name — NEVER a hyphen (`-`).**
+
+```typescript
+// ✓ CORRECT
+@ApiTags('Admin — Products')
+@ApiTags('Admin — Inventory')
+@ApiTags('Admin — Customers')
+
+// ✗ WRONG — these break Swagger grouping
+@ApiTags('Admin - Products')
+@ApiTags('admin/inventory')
+@ApiTags('inventory')
+```
+
+### Required decorators per endpoint
 
 ```typescript
 @ApiTags('Products')

@@ -2,6 +2,7 @@ import {
   Controller,
   Get,
   Post,
+  Put,
   Delete,
   Patch,
   Param,
@@ -15,9 +16,12 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { memoryStorage } from 'multer';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiConsumes, ApiBody, ApiQuery } from '@nestjs/swagger';
 import { MediaService } from './media.service';
+import { MediaFolderService } from './media-folder.service';
 import { QueryMediaDto } from './dto/query-media.dto';
+import { CreateMediaFolderDto } from './dto/create-media-folder.dto';
+import { UpdateMediaFolderDto } from './dto/update-media-folder.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
@@ -27,18 +31,24 @@ import { JwtPayload } from '../auth/strategies/jwt.strategy';
 @Roles('admin', 'staff')
 @Controller('admin/media')
 export class AdminMediaController {
-  constructor(private readonly mediaService: MediaService) {}
+  constructor(
+    private readonly mediaService: MediaService,
+    private readonly folderService: MediaFolderService,
+  ) {}
+
+  // ── Upload ────────────────────────────────────────────────────────────────
 
   @Post('upload')
-  @ApiOperation({ summary: 'Upload file lên Cloudinary' })
+  @ApiOperation({ summary: 'Upload file lên Cloudinary (folder phải nằm trong danh sách cấu hình)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
     schema: {
       type: 'object',
       properties: {
         file: { type: 'string', format: 'binary' },
-        folder: { type: 'string', example: 'pc-store/products/cpu', description: 'Cloudinary folder path' },
+        folder: { type: 'string', example: 'pc-store/products', description: 'Đường dẫn thư mục (phải khớp với cấu hình)' },
       },
+      required: ['file'],
     },
   })
   @UseInterceptors(FileInterceptor('file', {
@@ -52,6 +62,45 @@ export class AdminMediaController {
   ) {
     return this.mediaService.upload(file, user.sub, folder);
   }
+
+  // ── Folder Configuration (static routes first to avoid :id conflicts) ─────
+
+  @Get('folders')
+  @ApiOperation({ summary: 'Danh sách thư mục Cloudinary đã cấu hình' })
+  @ApiQuery({ name: 'onlyActive', required: false, type: Boolean, description: 'Chỉ lấy thư mục đang hoạt động' })
+  findFolders(@Query('onlyActive') onlyActive?: string) {
+    return this.folderService.findAll(onlyActive === 'true');
+  }
+
+  @Post('folders')
+  @Roles('admin')
+  @ApiOperation({ summary: 'Tạo cấu hình thư mục Cloudinary mới' })
+  createFolder(@Body() dto: CreateMediaFolderDto) {
+    return this.folderService.create(dto);
+  }
+
+  @Get('folders/:id')
+  @ApiOperation({ summary: 'Chi tiết cấu hình thư mục' })
+  findFolder(@Param('id', ParseIntPipe) id: number) {
+    return this.folderService.findOne(id);
+  }
+
+  @Put('folders/:id')
+  @Roles('admin')
+  @ApiOperation({ summary: 'Cập nhật cấu hình thư mục' })
+  updateFolder(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateMediaFolderDto) {
+    return this.folderService.update(id, dto);
+  }
+
+  @Delete('folders/:id')
+  @Roles('admin')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Xoá cấu hình thư mục' })
+  removeFolder(@Param('id', ParseIntPipe) id: number) {
+    return this.folderService.remove(id);
+  }
+
+  // ── Assets ────────────────────────────────────────────────────────────────
 
   @Get()
   @ApiOperation({ summary: 'Danh sách media assets' })

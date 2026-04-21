@@ -4,7 +4,10 @@ import {
   Column,
   CreateDateColumn,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { MediaFolder } from './media-folder.entity';
 
 @Entity('media_asset')
 export class MediaAsset {
@@ -47,6 +50,13 @@ export class MediaAsset {
 
   @Column({ name: 'thu_muc', length: 255, nullable: true })
   thuMuc: string | null;
+
+  @Column({ name: 'thu_muc_id', nullable: true })
+  thuMucId: number | null;
+
+  @ManyToOne(() => MediaFolder, (folder) => folder.assets, { nullable: true, onDelete: 'SET NULL' })
+  @JoinColumn({ name: 'thu_muc_id' })
+  thuMucObj: MediaFolder | null;
 
   @Column({ type: 'json', nullable: true })
   tags: string[] | null;

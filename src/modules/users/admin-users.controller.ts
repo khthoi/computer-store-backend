@@ -15,7 +15,7 @@ import { UsersService } from './users.service';
 import { QueryCustomersDto } from './dto/query-customers.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 
-@ApiTags('Admin - Customers')
+@ApiTags('Admin — Customers')
 @ApiBearerAuth('access-token')
 @Roles('admin', 'staff')
 @Controller('admin/customers')
