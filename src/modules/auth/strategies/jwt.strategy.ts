@@ -29,6 +29,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     if (payload.jti && (await this.redisService.isTokenBlacklisted(payload.jti))) {
       throw new UnauthorizedException('Token đã bị thu hồi');
     }
+
+    const activeJti = await this.redisService.getActiveJti(payload.sub, payload.type);
+    if (!activeJti || activeJti !== payload.jti) {
+      throw new UnauthorizedException('Phiên đăng nhập không hợp lệ, vui lòng đăng nhập lại');
+    }
+
     return { ...payload, id: payload.sub };
   }
 }

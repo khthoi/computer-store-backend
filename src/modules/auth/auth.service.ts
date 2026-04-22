@@ -97,9 +97,13 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token đã bị thu hồi');
     }
 
+    const oldJti = await this.redisService.getActiveJti(payload.sub, payload.type);
+    if (oldJti) await this.redisService.blacklistToken(oldJti, ACCESS_TOKEN_TTL);
+
     const jti = randomUUID();
     const accessPayload: JwtPayload = { sub: payload.sub, email: payload.email, type: payload.type, roles: payload.roles, jti };
     const accessToken = this.jwtService.sign(accessPayload, { expiresIn: ACCESS_TOKEN_TTL });
+    await this.redisService.saveActiveJti(payload.sub, payload.type, jti, ACCESS_TOKEN_TTL);
 
     return { accessToken };
   }
@@ -107,21 +111,24 @@ export class AuthService {
   // ─── Logout ───────────────────────────────────────────────────────────────
 
   async logout(user: JwtPayload, rawToken: string): Promise<void> {
-    // Blacklist access token
     if (user.jti) {
       await this.redisService.blacklistToken(user.jti, ACCESS_TOKEN_TTL);
     }
-    // Xoá refresh token khỏi Redis
+    await this.redisService.deleteActiveJti(user.sub, user.type);
     await this.redisService.deleteRefreshToken(user.sub, user.type);
-    void rawToken; // explicit no-op
+    void rawToken;
   }
 
   // ─── Token issuers ────────────────────────────────────────────────────────
 
   private async issueCustomerTokens(customer: Customer) {
+    const oldJti = await this.redisService.getActiveJti(customer.id, 'customer');
+    if (oldJti) await this.redisService.blacklistToken(oldJti, ACCESS_TOKEN_TTL);
+
     const jti = randomUUID();
     const accessPayload: JwtPayload = { sub: customer.id, email: customer.email, type: 'customer', roles: [], jti };
     const accessToken = this.jwtService.sign(accessPayload, { expiresIn: ACCESS_TOKEN_TTL });
+    await this.redisService.saveActiveJti(customer.id, 'customer', jti, ACCESS_TOKEN_TTL);
 
     const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET', 'refresh_fallback');
     const refreshJti = randomUUID();
@@ -133,10 +140,14 @@ export class AuthService {
   }
 
   private async issueEmployeeTokens(employee: Employee) {
+    const oldJti = await this.redisService.getActiveJti(employee.id, 'employee');
+    if (oldJti) await this.redisService.blacklistToken(oldJti, ACCESS_TOKEN_TTL);
+
     const jti = randomUUID();
     const roles = employee.roles?.map((r) => r.tenVaiTro) ?? [];
     const accessPayload: JwtPayload = { sub: employee.id, email: employee.email, type: 'employee', roles, jti };
     const accessToken = this.jwtService.sign(accessPayload, { expiresIn: ACCESS_TOKEN_TTL });
+    await this.redisService.saveActiveJti(employee.id, 'employee', jti, ACCESS_TOKEN_TTL);
 
     const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET', 'refresh_fallback');
     const refreshJti = randomUUID();

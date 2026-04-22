@@ -36,6 +36,19 @@ export class RedisService {
     return this.exists(`bl:${jti}`);
   }
 
+  // Active access token jti helpers (single-session enforcement)
+  async saveActiveJti(userId: number, type: string, jti: string, ttlSeconds: number): Promise<void> {
+    await this.set(`ajti:${type}:${userId}`, jti, ttlSeconds);
+  }
+
+  async getActiveJti(userId: number, type: string): Promise<string | null> {
+    return this.get(`ajti:${type}:${userId}`);
+  }
+
+  async deleteActiveJti(userId: number, type: string): Promise<void> {
+    await this.del(`ajti:${type}:${userId}`);
+  }
+
   // Refresh token helpers
   async saveRefreshToken(userId: number, type: string, token: string, ttlSeconds: number): Promise<void> {
     await this.set(`rt:${type}:${userId}`, token, ttlSeconds);
