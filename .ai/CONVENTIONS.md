@@ -653,5 +653,17 @@ const swaggerConfig = new DocumentBuilder()
 | `Admin — Flash Sales` | Quản lý flash sale (admin) |
 | `Loyalty` | Điểm tích lũy |
 | `Admin — Loyalty` | Quản lý điểm tích lũy (admin) |
+| `Reviews` | Đánh giá sản phẩm |
+| `Admin — Reviews` | Kiểm duyệt đánh giá sản phẩm (admin) |
+| `Returns` | Yêu cầu đổi/trả hàng |
+| `Admin — Returns` | Quản lý yêu cầu đổi/trả (admin) |
+| `Support` | Ticket hỗ trợ khách hàng |
+| `Admin — Support` | Quản lý ticket hỗ trợ (admin) |
+| `Notifications` | Thông báo cá nhân |
+| `Admin — Notifications` | Quản lý cấu hình thông báo tự động (admin) |
+| `Wishlist` | Danh sách sản phẩm yêu thích |
+| `Search` | Tìm kiếm & gợi ý sản phẩm |
+| `CMS` | Nội dung trang web (banners, pages, FAQ, menus, popups) |
+| `Admin — CMS` | Quản lý nội dung trang web (admin) |
 
-> When adding a new module (Phase 6+), append the tag pair here and in `src/main.ts` before shipping.
+> When adding a new module (Phase 9+), append the tag pair here and in `src/main.ts` before shipping.

@@ -92,6 +92,21 @@ async function bootstrap() {
     .addTag('Admin — Flash Sales', 'Quản lý flash sale (admin)')
     .addTag('Loyalty', 'Điểm tích lũy')
     .addTag('Admin — Loyalty', 'Quản lý điểm tích lũy (admin)')
+    // Phase 6 — Reviews · Returns · Support
+    .addTag('Reviews', 'Đánh giá sản phẩm')
+    .addTag('Admin — Reviews', 'Kiểm duyệt đánh giá sản phẩm (admin)')
+    .addTag('Returns', 'Yêu cầu đổi/trả hàng')
+    .addTag('Admin — Returns', 'Quản lý yêu cầu đổi/trả (admin)')
+    .addTag('Support', 'Ticket hỗ trợ khách hàng')
+    .addTag('Admin — Support', 'Quản lý ticket hỗ trợ (admin)')
+    // Phase 7 — Notifications · Wishlist · Search
+    .addTag('Notifications', 'Thông báo cá nhân')
+    .addTag('Admin — Notifications', 'Quản lý cấu hình thông báo tự động (admin)')
+    .addTag('Wishlist', 'Danh sách sản phẩm yêu thích')
+    .addTag('Search', 'Tìm kiếm & gợi ý sản phẩm')
+    // Phase 8 — CMS
+    .addTag('CMS', 'Nội dung trang web (banners, pages, FAQ, menus, popups)')
+    .addTag('Admin — CMS', 'Quản lý nội dung trang web (admin)')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);

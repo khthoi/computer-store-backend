@@ -42,6 +42,19 @@ import { PromotionsModule } from './modules/promotions/promotions.module';
 import { FlashSalesModule } from './modules/flash-sales/flash-sales.module';
 import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 
+// Phase 6 — Reviews · Returns · Support
+import { ReviewsModule } from './modules/reviews/reviews.module';
+import { ReturnsModule } from './modules/returns/returns.module';
+import { SupportModule } from './modules/support/support.module';
+
+// Phase 7 — Notifications · Wishlist · Search
+import { NotificationsModule } from './modules/notifications/notifications.module';
+import { WishlistModule } from './modules/wishlist/wishlist.module';
+import { SearchModule } from './modules/search/search.module';
+
+// Phase 8 — CMS
+import { CmsModule } from './modules/cms/cms.module';
+
 // Guards
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -110,6 +123,19 @@ import { RolesGuard } from './common/guards/roles.guard';
     PromotionsModule,
     FlashSalesModule,
     LoyaltyModule,
+
+    // Phase 6
+    ReviewsModule,
+    ReturnsModule,
+    SupportModule,
+
+    // Phase 7
+    NotificationsModule,
+    WishlistModule,
+    SearchModule,
+
+    // Phase 8
+    CmsModule,
   ],
   controllers: [AppController],
   providers: [
