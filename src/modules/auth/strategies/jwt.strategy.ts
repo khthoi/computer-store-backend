@@ -10,6 +10,7 @@ export interface JwtPayload {
   type: 'customer' | 'employee';
   roles: string[];
   jti: string;
+  sessionJti?: string; // chỉ có trong refresh token của customer (trỏ đến access JTI tương ứng)
 }
 
 @Injectable()
@@ -30,9 +31,16 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
       throw new UnauthorizedException('Token đã bị thu hồi');
     }
 
-    const activeJti = await this.redisService.getActiveJti(payload.sub, payload.type);
-    if (!activeJti || activeJti !== payload.jti) {
-      throw new UnauthorizedException('Phiên đăng nhập không hợp lệ, vui lòng đăng nhập lại');
+    if (payload.type === 'customer') {
+      const valid = await this.redisService.isCustomerSessionValid(payload.sub, payload.jti);
+      if (!valid) {
+        throw new UnauthorizedException('Phiên đăng nhập không hợp lệ, vui lòng đăng nhập lại');
+      }
+    } else {
+      const activeJti = await this.redisService.getActiveJti(payload.sub, payload.type);
+      if (!activeJti || activeJti !== payload.jti) {
+        throw new UnauthorizedException('Phiên đăng nhập không hợp lệ, vui lòng đăng nhập lại');
+      }
     }
 
     return { ...payload, id: payload.sub };

@@ -2,6 +2,8 @@ import { Injectable, Inject } from '@nestjs/common';
 import Redis from 'ioredis';
 import { REDIS_CLIENT } from './redis.constants';
 
+const REFRESH_TOKEN_TTL_SECONDS = 30 * 24 * 3600;
+
 @Injectable()
 export class RedisService {
   constructor(@Inject(REDIS_CLIENT) private readonly redis: Redis) {}
@@ -62,7 +64,58 @@ export class RedisService {
     await this.del(`rt:${type}:${userId}`);
   }
 
-  // Generic cache helpers
+  // ─── Customer multi-session (Redis Sorted Set: score=expiry_ms, member=jti) ──
+
+  private readonly CUSTOMER_SESSION_CAP = 5;
+  private readonly CUSTOMER_SESSION_KEY = (id: number) => `sessions:customer:${id}`;
+  private readonly CUSTOMER_RT_KEY = (id: number) => `customer_rts:${id}`;
+
+  async addCustomerSession(userId: number, jti: string, ttlSeconds: number): Promise<void> {
+    const key = this.CUSTOMER_SESSION_KEY(userId);
+    const now = Date.now();
+    const expiry = now + ttlSeconds * 1000;
+
+    await this.redis.zremrangebyscore(key, 0, now);
+
+    const count = await this.redis.zcard(key);
+    if (count >= this.CUSTOMER_SESSION_CAP) {
+      await this.redis.zremrangebyrank(key, 0, count - this.CUSTOMER_SESSION_CAP);
+    }
+
+    await this.redis.zadd(key, expiry, jti);
+    await this.redis.expire(key, REFRESH_TOKEN_TTL_SECONDS);
+  }
+
+  async isCustomerSessionValid(userId: number, jti: string): Promise<boolean> {
+    const score = await this.redis.zscore(this.CUSTOMER_SESSION_KEY(userId), jti);
+    if (!score) return false;
+    return Date.now() < Number(score);
+  }
+
+  async removeCustomerSession(userId: number, jti: string): Promise<void> {
+    await this.redis.zrem(this.CUSTOMER_SESSION_KEY(userId), jti);
+  }
+
+  async clearAllCustomerSessions(userId: number): Promise<void> {
+    await this.redis.del(this.CUSTOMER_SESSION_KEY(userId));
+    await this.redis.del(this.CUSTOMER_RT_KEY(userId));
+  }
+
+  async addCustomerRefreshToken(userId: number, sessionJti: string, refreshToken: string): Promise<void> {
+    const key = this.CUSTOMER_RT_KEY(userId);
+    await this.redis.hset(key, sessionJti, refreshToken);
+    await this.redis.expire(key, REFRESH_TOKEN_TTL_SECONDS);
+  }
+
+  async getCustomerRefreshToken(userId: number, sessionJti: string): Promise<string | null> {
+    return this.redis.hget(this.CUSTOMER_RT_KEY(userId), sessionJti);
+  }
+
+  async removeCustomerRefreshToken(userId: number, sessionJti: string): Promise<void> {
+    await this.redis.hdel(this.CUSTOMER_RT_KEY(userId), sessionJti);
+  }
+
+  // ─── Generic cache helpers ────────────────────────────────────────────────
   async cache<T>(key: string, ttlSeconds: number, factory: () => Promise<T>): Promise<T> {
     const cached = await this.get(key);
     if (cached) return JSON.parse(cached) as T;

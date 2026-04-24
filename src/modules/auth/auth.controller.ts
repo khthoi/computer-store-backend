@@ -73,10 +73,16 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cấp lại access token (đọc RT từ cookie)' })
-  refresh(@Req() req: Request) {
+  async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const rt = req.cookies?.[RT_COOKIE] as string | undefined;
     if (!rt) throw new UnauthorizedException('Không có refresh token');
-    return this.authService.refreshToken(rt);
+    const result = await this.authService.refreshToken(rt);
+    // Customer: rotate refresh token → set cookie mới; Employee: cookie cũ vẫn dùng được
+    if ('refreshToken' in result) {
+      res.cookie(RT_COOKIE, result.refreshToken, RT_COOKIE_OPTIONS);
+      return { accessToken: result.accessToken };
+    }
+    return result;
   }
 
   @Post('logout')

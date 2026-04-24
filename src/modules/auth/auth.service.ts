@@ -92,6 +92,40 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token không hợp lệ hoặc đã hết hạn');
     }
 
+    if (payload.type === 'customer') {
+      return this.refreshCustomerToken(payload, refreshToken);
+    }
+    return this.refreshEmployeeToken(payload, refreshToken);
+  }
+
+  private async refreshCustomerToken(payload: JwtPayload, refreshToken: string) {
+    const sessionJti = payload.sessionJti;
+    if (!sessionJti) throw new UnauthorizedException('Refresh token không hợp lệ');
+
+    const stored = await this.redisService.getCustomerRefreshToken(payload.sub, sessionJti);
+    if (!stored || stored !== refreshToken) {
+      throw new UnauthorizedException('Refresh token đã bị thu hồi');
+    }
+
+    // Xoá session cũ rồi phát session mới (rotate refresh token)
+    await this.redisService.removeCustomerSession(payload.sub, sessionJti);
+    await this.redisService.removeCustomerRefreshToken(payload.sub, sessionJti);
+
+    const newJti = randomUUID();
+    const accessPayload: JwtPayload = { sub: payload.sub, email: payload.email, type: 'customer', roles: [], jti: newJti };
+    const accessToken = this.jwtService.sign(accessPayload, { expiresIn: ACCESS_TOKEN_TTL });
+    await this.redisService.addCustomerSession(payload.sub, newJti, ACCESS_TOKEN_TTL);
+
+    const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET', 'refresh_fallback');
+    const newRefreshJti = randomUUID();
+    const refreshPayload: JwtPayload = { sub: payload.sub, email: payload.email, type: 'customer', roles: [], jti: newRefreshJti, sessionJti: newJti };
+    const newRefreshToken = this.jwtService.sign(refreshPayload, { secret: refreshSecret, expiresIn: REFRESH_TOKEN_TTL });
+    await this.redisService.addCustomerRefreshToken(payload.sub, newJti, newRefreshToken);
+
+    return { accessToken, refreshToken: newRefreshToken };
+  }
+
+  private async refreshEmployeeToken(payload: JwtPayload, refreshToken: string) {
     const stored = await this.redisService.getRefreshToken(payload.sub, payload.type);
     if (!stored || stored !== refreshToken) {
       throw new UnauthorizedException('Refresh token đã bị thu hồi');
@@ -111,30 +145,36 @@ export class AuthService {
   // ─── Logout ───────────────────────────────────────────────────────────────
 
   async logout(user: JwtPayload, rawToken: string): Promise<void> {
-    if (user.jti) {
-      await this.redisService.blacklistToken(user.jti, ACCESS_TOKEN_TTL);
-    }
-    await this.redisService.deleteActiveJti(user.sub, user.type);
-    await this.redisService.deleteRefreshToken(user.sub, user.type);
     void rawToken;
+    if (user.type === 'customer') {
+      // Chỉ xoá phiên hiện tại, không ảnh hưởng thiết bị khác
+      if (user.jti) {
+        await this.redisService.removeCustomerSession(user.sub, user.jti);
+        await this.redisService.removeCustomerRefreshToken(user.sub, user.jti);
+      }
+    } else {
+      if (user.jti) {
+        await this.redisService.blacklistToken(user.jti, ACCESS_TOKEN_TTL);
+      }
+      await this.redisService.deleteActiveJti(user.sub, user.type);
+      await this.redisService.deleteRefreshToken(user.sub, user.type);
+    }
   }
 
   // ─── Token issuers ────────────────────────────────────────────────────────
 
   private async issueCustomerTokens(customer: Customer) {
-    const oldJti = await this.redisService.getActiveJti(customer.id, 'customer');
-    if (oldJti) await this.redisService.blacklistToken(oldJti, ACCESS_TOKEN_TTL);
-
     const jti = randomUUID();
     const accessPayload: JwtPayload = { sub: customer.id, email: customer.email, type: 'customer', roles: [], jti };
     const accessToken = this.jwtService.sign(accessPayload, { expiresIn: ACCESS_TOKEN_TTL });
-    await this.redisService.saveActiveJti(customer.id, 'customer', jti, ACCESS_TOKEN_TTL);
+    await this.redisService.addCustomerSession(customer.id, jti, ACCESS_TOKEN_TTL);
 
     const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET', 'refresh_fallback');
     const refreshJti = randomUUID();
-    const refreshPayload = { sub: customer.id, email: customer.email, type: 'customer', roles: [], jti: refreshJti };
+    // sessionJti liên kết refresh token này với access token vừa phát
+    const refreshPayload: JwtPayload = { sub: customer.id, email: customer.email, type: 'customer', roles: [], jti: refreshJti, sessionJti: jti };
     const refreshToken = this.jwtService.sign(refreshPayload, { secret: refreshSecret, expiresIn: REFRESH_TOKEN_TTL });
-    await this.redisService.saveRefreshToken(customer.id, 'customer', refreshToken, REFRESH_TOKEN_TTL);
+    await this.redisService.addCustomerRefreshToken(customer.id, jti, refreshToken);
 
     return { accessToken, refreshToken };
   }
