@@ -20,7 +20,7 @@ export class JwtAuthGuard { }           // guard
 export class GlobalExceptionFilter { }  // filter
 ```
 
-### Variables & Properties — camelCase (English)
+### Variables & Properties — camelCase
 ```typescript
 const categoryId = 1;               ✓
 const danh_muc_id = 1;             ✗
@@ -29,7 +29,7 @@ this.productService.findAll()       ✓
 this.san_pham_service.findAll()     ✗
 ```
 
-### DB Column Mapping — Vietnamese ERD → English property
+### DB Column Mapping
 ```typescript
 @Entity('san_pham')
 export class Product {
@@ -144,6 +144,59 @@ export class QueryProductDto {
 }
 ```
 
+### Response DTO (REQUIRED — never return entity directly)
+
+Every API endpoint **must** return a typed Response DTO, not a raw entity. Map in the service layer.
+
+```typescript
+// dto/product-response.dto.ts
+export class ProductSummaryResponseDto {
+  @ApiProperty({ example: 1 })           id: number;
+  @ApiProperty({ example: 'Intel Core i9-14900K' }) name: string;
+  @ApiProperty({ example: 'intel-core-i9-14900k' }) slug: string;
+  @ApiProperty({ example: 'Intel' })     brandName: string;   // flattened from brand relation
+  @ApiProperty({ example: 15000000 })    salePrice: number;   // from cheapest variant
+  @ApiProperty({ example: 'https://cdn.example.com/img.jpg' }) thumbnail: string;
+  @ApiProperty({ example: 4.5 })         avgRating: number;
+  @ApiProperty({ example: 'DangBan' })   status: string;
+}
+
+export class ProductDetailResponseDto extends ProductSummaryResponseDto {
+  @ApiProperty({ example: 'Mô tả chi tiết...' })   description: string;
+  @ApiProperty({ example: 'Processors' })           categoryName: string;
+  @ApiProperty({ type: [VariantResponseDto] })      variants: VariantResponseDto[];
+}
+```
+
+Write a private mapper in the service — **never** in the controller:
+
+```typescript
+// products.service.ts
+private toSummaryDto(p: Product): ProductSummaryResponseDto {
+  return {
+    id: p.id,
+    name: p.name,
+    slug: p.slug,
+    brandName: p.brand?.name ?? '',
+    salePrice: Math.min(...p.variants.map(v => v.salePrice)),
+    thumbnail: p.images?.[0]?.url ?? '',
+    avgRating: p.avgRating,
+    status: p.status,
+  };
+}
+
+async findAll(query: QueryProductDto) {
+  const [items, total] = await this.query(query);
+  return { items: items.map(p => this.toSummaryDto(p)), total, page: query.page, limit: query.limit };
+}
+```
+
+**Rules:**
+- One Response DTO file per entity (e.g. `product-response.dto.ts`)
+- Flatten nested data if frontend needs it in a single object (`brandName` not `brand.name`)
+- Never expose DB column names (`khach_hang_id`, `ten_san_pham`) in the response
+- `@ApiProperty` required on every field of a Response DTO
+
 ---
 
 ## Entity Patterns
@@ -207,6 +260,139 @@ export class Category {
   @OneToMany(() => Category, cat => cat.parent)
   children: Category[];
 }
+```
+
+---
+
+## Data Layer & Response Rules (REQUIRED)
+
+These rules ensure the API always returns frontend-ready, structured data — never raw DB rows.
+
+### Rule 1 — Declare all relations on entities
+
+Every foreign key column **must** have a corresponding TypeORM relation decorator.
+
+```typescript
+// ✓ CORRECT — FK column + matching relation
+@Column({ name: 'san_pham_id' })
+productId: number;
+
+@ManyToOne(() => Product, product => product.variants)
+@JoinColumn({ name: 'san_pham_id' })
+product: Product;
+
+// ✗ WRONG — FK column with no relation declared
+@Column({ name: 'san_pham_id' })
+productId: number;
+// (relation missing — frontend cannot get product name without a second call)
+```
+
+Required decorators per relation type:
+
+| Relation | Decorators |
+|---|---|
+| N:1 (child → parent) | `@ManyToOne` + `@JoinColumn({ name: 'fk_col' })` |
+| 1:N (parent → children) | `@OneToMany(() => Child, child => child.parent)` |
+| 1:1 | `@OneToOne` + `@JoinColumn` on the owning side |
+| M:N | `@ManyToMany` + `@JoinTable` on the owning side |
+
+### Rule 2 — Load relations explicitly on every query
+
+Never rely on eager loading or lazy loading — always specify what you need.
+
+**Option A — `findOne` / `findAndCount` with `relations`:**
+```typescript
+// ✓ Load exactly what you need
+const product = await this.productRepo.findOne({
+  where: { slug },
+  relations: ['brand', 'category', 'variants', 'variants.images'],
+});
+```
+
+**Option B — QueryBuilder with `leftJoinAndSelect` (preferred for filters/pagination):**
+```typescript
+// ✓ QueryBuilder: joins + filter + paginate in one query
+const qb = this.productRepo.createQueryBuilder('p')
+  .leftJoinAndSelect('p.brand', 'brand')
+  .leftJoinAndSelect('p.category', 'category')
+  .leftJoinAndSelect('p.variants', 'v')
+  .leftJoinAndSelect('v.images', 'img')
+  .where('p.status = :status', { status: 'DangBan' });
+
+if (query.brandId) {
+  qb.andWhere('brand.id = :brandId', { brandId: query.brandId });
+}
+
+const [items, total] = await qb
+  .skip((query.page - 1) * query.limit)
+  .take(query.limit)
+  .getManyAndCount();
+```
+
+Use `leftJoinAndSelect` when you need the related data in the result.
+Use `leftJoin` (no `Select`) when you only need it for filtering, not in the output.
+
+### Rule 3 — Never return raw entity or raw DB columns
+
+```typescript
+// ✗ WRONG — returns { san_pham_id, ten_san_pham, ... } directly
+return await this.productRepo.find();
+
+// ✗ WRONG — controller builds the response shape
+@Get(':id')
+async findOne(@Param('id') id: number) {
+  const p = await this.productsService.findOne(id);
+  return { id: p.id, name: p.name };  // mapping belongs in service
+}
+
+// ✓ CORRECT — service maps entity → Response DTO before returning
+async findOne(id: number): Promise<ProductDetailResponseDto> {
+  const product = await this.productRepo.findOne({
+    where: { id },
+    relations: ['brand', 'category', 'variants'],
+  });
+  if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
+  return this.toDetailDto(product);
+}
+```
+
+### Rule 4 — Raw SQL: restricted & parameterized only
+
+Use raw SQL **only** when TypeORM QueryBuilder cannot express the query efficiently (e.g. complex aggregations with subqueries, FULLTEXT search scoring).
+
+```typescript
+// ✓ ALLOWED — raw SQL with parameterized values (never string interpolation)
+const rows = await this.dataSource.query(
+  `SELECT p.san_pham_id, p.ten_san_pham, COUNT(r.danh_gia_id) AS review_count
+   FROM san_pham p
+   LEFT JOIN danh_gia r ON r.san_pham_id = p.san_pham_id
+   WHERE p.danh_muc_id = ?
+   GROUP BY p.san_pham_id`,
+  [categoryId],   // always pass values as the second argument, NEVER interpolate
+);
+
+// ✗ FORBIDDEN — string interpolation = SQL injection risk
+const rows = await this.dataSource.query(
+  `SELECT * FROM san_pham WHERE danh_muc_id = ${categoryId}`,
+);
+```
+
+Map raw query results to a Response DTO before returning — never return `rows` directly.
+
+### Decision checklist
+
+```
+Need data from one table only?
+  → repository.findOne / findAndCount with where clause
+
+Need joined data or filter by relation?
+  → QueryBuilder with leftJoinAndSelect / leftJoin
+
+Complex aggregation QueryBuilder can't express?
+  → raw SQL with parameterized values, then map to DTO
+
+Always map result → Response DTO before returning from service
+Never return entity, never return raw DB columns
 ```
 
 ---

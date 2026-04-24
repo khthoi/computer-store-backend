@@ -12,6 +12,7 @@ export default registerAs(
     database: process.env.DB_NAME ?? 'computer_store',
     entities: [__dirname + '/../modules/**/entities/*.entity.{ts,js}'],
     migrations: [__dirname + '/../database/migrations/*.{ts,js}'],
+    autoLoadEntities: true,
     synchronize: process.env.NODE_ENV === 'development',
     logging: process.env.NODE_ENV === 'development',
     charset: 'utf8mb4',
