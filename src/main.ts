@@ -107,6 +107,10 @@ async function bootstrap() {
     // Phase 8 — CMS
     .addTag('CMS', 'Nội dung trang web (banners, pages, FAQ, menus, popups)')
     .addTag('Admin — CMS', 'Quản lý nội dung trang web (admin)')
+    // Phase 9 — Reports · Settings
+    .addTag('Admin — Reports', 'Báo cáo kinh doanh & phân tích (admin)')
+    .addTag('Settings', 'Cấu hình hệ thống công khai')
+    .addTag('Admin — Settings', 'Quản lý cấu hình hệ thống (admin)')
     .build();
 
   const document = SwaggerModule.createDocument(app, swaggerConfig);

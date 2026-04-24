@@ -665,5 +665,8 @@ const swaggerConfig = new DocumentBuilder()
 | `Search` | Tìm kiếm & gợi ý sản phẩm |
 | `CMS` | Nội dung trang web (banners, pages, FAQ, menus, popups) |
 | `Admin — CMS` | Quản lý nội dung trang web (admin) |
+| `Admin — Reports` | Báo cáo kinh doanh & phân tích (admin) |
+| `Settings` | Cấu hình hệ thống công khai |
+| `Admin — Settings` | Quản lý cấu hình hệ thống (admin) |
 
 > When adding a new module (Phase 9+), append the tag pair here and in `src/main.ts` before shipping.

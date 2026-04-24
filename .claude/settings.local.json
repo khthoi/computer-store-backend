@@ -100,7 +100,9 @@
       "PowerShell(Invoke-WebRequest -Uri \"http://localhost:4000/flash-sales/active\" -UseBasicParsing | Select-Object StatusCode, Content)",
       "PowerShell(cd \"D:\\\\Online PC Store System\\\\Source\\\\computer-store-backend\"; $job = Start-Job -ScriptBlock { cd \"D:\\\\Online PC Store System\\\\Source\\\\computer-store-backend\"; node dist/main 2>&1 }; Start-Sleep -Seconds 5; Invoke-WebRequest -Uri \"http://localhost:4000/flash-sales/active\" -UseBasicParsing | Select-Object StatusCode, Content)",
       "Bash(grep -A 30 \"san_pham.*Product\\\\b\\\\|#### \\\\`san_pham\\\\`\" \"D:/Online PC Store System/Source/computer-store-backend/.ai/DATABASE.md\")",
-      "mcp__ide__getDiagnostics"
+      "mcp__ide__getDiagnostics",
+      "Bash(awk '{print $NF}')",
+      "Bash(npx ts-node *)"
     ]
   }
 }

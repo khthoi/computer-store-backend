@@ -28,9 +28,9 @@ export class SupportController {
 
   @Get('tickets')
   @ApiOperation({ summary: 'Danh sách ticket của tôi' })
-  @ApiQuery({ name: 'status', required: false, enum: ['Moi', 'DangXuLy', 'ChoDongY', 'DaDong', 'MoLai'] })
-  @ApiQuery({ name: 'page', required: false, example: 1 })
-  @ApiQuery({ name: 'limit', required: false, example: 20 })
+  @ApiQuery({ name: 'status', required: false, enum: ['Moi', 'DangXuLy', 'ChoDongY', 'DaDong', 'MoLai'], description: 'Lọc theo trạng thái ticket', example: 'Moi' })
+  @ApiQuery({ name: 'page', required: false, description: 'Trang', example: 1 })
+  @ApiQuery({ name: 'limit', required: false, description: 'Số item/trang', example: 20 })
   @ApiOkResponse({
     schema: {
       example: {
@@ -53,6 +53,20 @@ export class SupportController {
   @Get('tickets/:id')
   @ApiOperation({ summary: 'Chi tiết ticket của tôi' })
   @ApiParam({ name: 'id', example: 1, description: 'ID ticket' })
+  @ApiOkResponse({
+    schema: {
+      example: {
+        id: 1,
+        ticketCode: 'TK-240601-A3B4C5',
+        issueType: 'GiaoHangChamTre',
+        priority: 'TrungBinh',
+        title: 'Đơn hàng #20 giao trễ',
+        status: 'DangXuLy',
+        orderId: 20,
+        createdAt: '2024-06-01T10:00:00.000Z',
+      },
+    },
+  })
   @ApiResponse({ status: 404, description: 'Ticket không tồn tại' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getMyTicketDetail(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
@@ -76,6 +90,21 @@ export class SupportController {
   @Get('tickets/:id/messages')
   @ApiOperation({ summary: 'Lịch sử tin nhắn ticket (chỉ hiện Reply, ẩn InternalNote)' })
   @ApiParam({ name: 'id', example: 1, description: 'ID ticket' })
+  @ApiOkResponse({
+    schema: {
+      example: [
+        {
+          id: 1,
+          ticketId: 1,
+          senderType: 'KhachHang',
+          senderId: 3,
+          content: 'Hàng giao trễ quá ạ',
+          messageType: 'Reply',
+          createdAt: '2024-06-01T10:30:00.000Z',
+        },
+      ],
+    },
+  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getMessages(@Param('id', ParseIntPipe) id: number, @Request() req: any) {
     // Verify ownership before returning messages

@@ -18,7 +18,11 @@
     "test:cov": "jest --coverage",
     "test:debug": "node --inspect-brk -r tsconfig-paths/register -r ts-node/register node_modules/.bin/jest --runInBand",
     "test:e2e": "jest --config ./test/jest-e2e.json",
-    "seed": "ts-node -r tsconfig-paths/register src/database/seeds/seed.ts"
+    "seed": "ts-node -r tsconfig-paths/register src/database/seeds/seed.ts",
+    "test:api": "ts-node -r tsconfig-paths/register --project tools/api-test/tsconfig.json tools/api-test/run.ts",
+    "test:api:auth": "ts-node -r tsconfig-paths/register --project tools/api-test/tsconfig.json tools/api-test/run.ts --suite=auth",
+    "test:api:public": "ts-node -r tsconfig-paths/register --project tools/api-test/tsconfig.json tools/api-test/run.ts --suite=public",
+    "test:api:admin": "ts-node -r tsconfig-paths/register --project tools/api-test/tsconfig.json tools/api-test/run.ts --suite=admin"
   },
   "dependencies": {
     "@nestjs/bull": "^11.0.4",
@@ -41,6 +45,7 @@
     "class-validator": "^0.15.1",
     "cloudinary": "^1.41.3",
     "cookie-parser": "^1.4.7",
+    "exceljs": "^4.4.0",
     "helmet": "^8.1.0",
     "ioredis": "^5.10.1",
     "multer": "^2.1.1",

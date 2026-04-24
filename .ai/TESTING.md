@@ -1,85 +1,140 @@
 # TESTING.md — AI Agent Testing Skills
 
-## 1. Test API with cURL
+## 1. API Test Runner (`tools/api-test`)
 
-Use cURL to send **real HTTP requests** — this tests actual network routing, CORS headers, auth flow, and cookie handling that unit tests cannot cover.
+TypeScript-native test runner — gọi live API, không mock.
 
-### Base pattern
+### Tài khoản test
+
+#### Admin / Employees
+
+| Email | Mật khẩu | Role | Trạng thái |
+|---|---|---|---|
+| `admin@pcstore.vn` | `Admin@123` | admin | DangLam |
+| `staff01@pcstore.vn` | `Staff@123` | staff | DangLam |
+| `staff02@pcstore.vn` | `Staff@123` | staff | DangLam |
+| `warehouse@pcstore.vn` | `Staff@123` | warehouse | DangLam |
+| `ketoan@pcstore.vn` | `Staff@123` | accountant | DangLam |
+| `cskh01@pcstore.vn` | `Staff@123` | support | DangLam |
+| `cskh02@pcstore.vn` | `Staff@123` | support | NghiViec |
+
+**API đăng nhập admin:** `POST http://localhost:4000/api/auth/admin/login`  
+Body: `{"email":"admin@pcstore.vn","matKhau":"Admin@123"}`
+
+#### Customers
+
+| Email | Mật khẩu | Trạng thái | Điểm |
+|---|---|---|---|
+| `nguyenvana@gmail.com` | `Admin@123` | HoatDong | 1200 |
+| `tranthib@gmail.com` | `Admin@123` | HoatDong | 850 |
+| `leminhc@gmail.com` | `Admin@123` | HoatDong | 2500 |
+| `buivanhung@gmail.com` | `Admin@123` | BiKhoa | 200 |
+
+**API đăng nhập customer:** `POST http://localhost:4000/api/auth/login`  
+Body: `{"email":"nguyenvana@gmail.com","matKhau":"Admin@123"}`
+
+---
+
+### Chạy runner
 
 ```bash
-# GET with Bearer token
-curl -s -X GET http://localhost:4000/api/<endpoint> \
-  -H "Authorization: Bearer <access_token>" \
-  -H "Content-Type: application/json" | jq .
+npm run test:api              # toàn bộ 3 suites (49 cases)
+npm run test:api:auth         # chỉ Auth suite
+npm run test:api:public       # chỉ Public Endpoints suite
+npm run test:api:admin        # chỉ Admin Endpoints suite
 
-# POST with JSON body
-curl -s -X POST http://localhost:4000/api/<endpoint> \
-  -H "Authorization: Bearer <access_token>" \
-  -H "Content-Type: application/json" \
-  -d '{"key": "value"}' | jq .
+# Filter tùy chọn
+ts-node -r tsconfig-paths/register tools/api-test/run.ts --suite=auth,admin
 ```
 
-### Auth: obtain tokens first
+> Server phải đang chạy (`npm run start:dev`) trước khi chạy runner.
 
-```bash
-# Login → captures access_token and refresh_token (HttpOnly cookie)
-curl -s -X POST http://localhost:4000/api/auth/login \
-  -H "Content-Type: application/json" \
-  -c cookies.txt \
-  -d '{"email": "admin@example.com", "matKhau": "password123"}' | jq .
+### Output mẫu
 
-# Use saved cookie jar for subsequent requests (refresh flow)
-curl -s -X POST http://localhost:4000/api/auth/refresh \
-  -b cookies.txt -c cookies.txt | jq .
+```
+  ══ PC Store API Test Runner ══
+
+  Auth
+    ✓ [200] Customer login — success (142ms)
+    ✓ [200] Admin login — success (89ms)
+    ✗ Customer login — wrong password → 401
+      → Expected HTTP 401, got 200. Body: {"statusCode":200,...}
+
+  Public Endpoints
+    ✓ [200] GET /categories — returns list (38ms)
+    ✓ [200] GET /products — returns paginated list (61ms)
+    ○ GET /search — basic keyword query  ← skipped
+
+  ────────────────────────────────────────────
+  Tests: 49  ✓ 47 passed  ✗ 1 failed  ○ 1 skipped
+  Time:  1243ms total
 ```
 
-### Test CORS (simulate browser preflight from admin frontend)
+### Thêm test case mới
 
-```bash
-# Preflight OPTIONS — server must return Allow-Origin and Allow-Methods
-curl -s -X OPTIONS http://localhost:4000/api/products \
-  -H "Origin: http://localhost:3001" \
-  -H "Access-Control-Request-Method: POST" \
-  -H "Access-Control-Request-Headers: Authorization, Content-Type" \
-  -v 2>&1 | grep -E "< (Access-Control|HTTP)"
+Tạo hoặc sửa file trong `tools/api-test/suites/`.  
+Đăng ký suite mới trong `suites/index.ts` và `run.ts`.
 
-# Actual cross-origin GET with Origin header
-curl -s -X GET http://localhost:4000/api/products \
-  -H "Origin: http://localhost:3000" \
-  -H "Authorization: Bearer <token>" | jq .
+```typescript
+{
+  name: 'POST /admin/brands — create',
+  method: 'POST',
+  path: '/admin/brands',
+  auth: 'admin',                         // 'admin' | 'customer' | 'none'
+  body: { tenThuongHieu: 'Test Brand' },
+  extract: { brandId: 'data.id' },       // lưu vào context cho cases sau
+  expect: {
+    status: 201,
+    bodyMatch: { 'data.tenThuongHieu': 'Test Brand' },  // dot-path match
+    contains: 'tenThuongHieu',
+  },
+},
+{
+  name: 'DELETE /admin/brands/:id — cleanup',
+  method: 'DELETE',
+  path: '/admin/brands/{{brandId}}',     // {{var}} inject từ extract ở trên
+  auth: 'admin',
+  expect: { status: 200 },
+},
 ```
 
-### Common flags reference
-
-| Flag | Purpose |
+| Field | Mô tả |
 |---|---|
-| `-s` | Silent (no progress bar) |
-| `-v` | Verbose — shows request + response headers |
-| `-X <METHOD>` | HTTP method |
-| `-H "key: value"` | Add request header |
-| `-d '{"json":true}'` | Request body |
-| `-b cookies.txt` | Send cookies from file |
-| `-c cookies.txt` | Save cookies to file |
-| `-o /dev/null` | Discard body (useful with `-v` for headers only) |
-| `\| jq .` | Pretty-print JSON response |
+| `auth` | `'admin'` → dùng `admin@pcstore.vn`; `'customer'` → `nguyenvana@gmail.com`. Token cache suốt session. |
+| `extract` | Trích giá trị từ response body bằng dot-path (`data.id`, `data.accessToken`) |
+| `bodyMatch` | Kiểm tra theo dot-path — không cần full match |
+| `skip: true` | Bỏ qua test case |
 
-### Rate-limit testing
+### Cấu trúc file
 
-```bash
-# Fire 20 requests quickly — expect 429 after threshold
-for i in $(seq 1 20); do
-  curl -s -o /dev/null -w "%{http_code}\n" \
-    http://localhost:4000/api/products
-done
+```
+tools/api-test/
+├── types.ts         # TestCase, TestSuite, Expect, RunContext interfaces
+├── client.ts        # fetch wrapper (Node 20 built-in fetch)
+├── auth.ts          # token cache + auto-login
+├── context.ts       # {{variable}} interpolation + dot-path extraction
+├── assert.ts        # bodyMatch deep comparison
+├── runner.ts        # runSuite / runAll
+├── reporter.ts      # colored terminal output
+├── run.ts           # CLI entry point
+└── suites/
+    ├── auth.suite.ts    — 9 cases
+    ├── public.suite.ts  — 18 cases
+    └── admin.suite.ts   — 22 cases
 ```
 
 ---
 
-## 2. Insert Fake Data via MySQL CLI
+## 2. Insert Fake Data via dbhub MCP
 
-Use the MySQL CLI to seed test data directly — faster than REST for bulk inserts and for bypassing validation when you need raw DB state.
+Use the **dbhub MCP server** to query and seed the database directly — no CLI needed. Two tools are available:
 
-### Connection info
+| Tool | Purpose |
+|---|---|
+| `mcp__dbhub__execute_sql` | Run any SQL (SELECT, INSERT, DELETE, ALTER…) |
+| `mcp__dbhub__search_objects` | Inspect schema: tables, columns, indexes, procedures |
+
+The server is pre-configured to connect to:
 
 | Parameter | Value                       |
 |-----------|-----------------------------|
@@ -89,66 +144,62 @@ Use the MySQL CLI to seed test data directly — faster than REST for bulk inser
 | Username  | root                        |
 | Password  | _(empty)_                   |
 
-### MySQL CLI path (Windows)
+### Schema inspection
 
 ```
-C:\Program Files\MySQL\MySQL Server 8.0\bin\mysql.exe
-```
-
-In bash (Git Bash / WSL):
-
-```bash
-MYSQL="/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe"
-```
-
-### Connect
-
-```bash
-# List all databases
-"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe" \
-  -u root --host=127.0.0.1 --port=3306 \
-  -e "SHOW DATABASES;"
-
 # List all tables in the database
-"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe" \
-  -u root --host=127.0.0.1 --port=3306 \
-  -e "USE \`pc-retails-store-database\`; SHOW TABLES;"
+mcp__dbhub__search_objects(object_type="table", schema="pc-retails-store-database")
 
-# Show columns for a table
-"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe" \
-  -u root --host=127.0.0.1 --port=3306 \
-  -e "USE \`pc-retails-store-database\`; DESCRIBE table_name;"
+# Show columns + types for a specific table
+mcp__dbhub__search_objects(
+  object_type="column",
+  schema="pc-retails-store-database",
+  table="table_name",
+  detail_level="full"
+)
+
+# List indexes on a table
+mcp__dbhub__search_objects(
+  object_type="index",
+  schema="pc-retails-store-database",
+  table="table_name"
+)
 ```
 
 ### Seed patterns
 
-> **Required:** always pass `--default-character-set=utf8mb4` when running files with Vietnamese text,
-> combined with `SET NAMES utf8mb4` at the top of the SQL file to avoid character encoding errors.
+Read the seed file content and pass the SQL directly to `execute_sql`. Multiple statements are separated by `;`.
 
-```bash
-# Seed via a .sql file (preferred for large datasets)
-"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe" \
-  -u root --host=127.0.0.1 --port=3306 \
-  --default-character-set=utf8mb4 \
-  < "d:/Online PC Store System/Source/computer-store-backend/src/database/seeds/test-data.sql"
+> **Required:** always include `SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;` at the top when the SQL contains Vietnamese text.
+
+```
+# Seed inline SQL
+mcp__dbhub__execute_sql(sql="
+SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
+INSERT INTO `pc-retails-store-database`.quyen (ten_quyen, mo_ta) VALUES (...);
+INSERT INTO `pc-retails-store-database`.vai_tro (ten_vai_tro) VALUES (...);
+")
+
+# For large seed files: read the file first, then pass its content to execute_sql
+# Read: src/database/seeds/test-data.sql   → Phase 1
+# Read: src/database/seeds/seed-phase2.sql → Phase 2
 ```
 
-Current seed file: `src/database/seeds/test-data.sql`
+Current seed files:
+- `src/database/seeds/test-data.sql` — Phase 1 (auth / users / employees / roles)
+- `src/database/seeds/seed-phase2.sql` — Phase 2 (categories / brands / products / media)
 
 ### Verify after insert
 
-```bash
-"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe" \
-  -u root --host=127.0.0.1 --port=3306 -e "
-USE \`pc-retails-store-database\`;
-SELECT COUNT(*) as total_permissions    FROM quyen;
-SELECT COUNT(*) as total_roles          FROM vai_tro;
-SELECT COUNT(*) as total_role_perms     FROM vai_tro_quyen;
-SELECT COUNT(*) as total_employees      FROM nhan_vien;
-SELECT COUNT(*) as total_customers      FROM khach_hang;
-SELECT COUNT(*) as total_addresses      FROM dia_chi_giao_hang;
-"
 ```
+mcp__dbhub__execute_sql(sql="
+SELECT COUNT(*) AS total_permissions FROM `pc-retails-store-database`.quyen;
+SELECT COUNT(*) AS total_roles       FROM `pc-retails-store-database`.vai_tro;
+SELECT COUNT(*) AS total_role_perms  FROM `pc-retails-store-database`.vai_tro_quyen;
+SELECT COUNT(*) AS total_employees   FROM `pc-retails-store-database`.nhan_vien;
+SELECT COUNT(*) AS total_customers   FROM `pc-retails-store-database`.khach_hang;
+SELECT COUNT(*) AS total_addresses   FROM `pc-retails-store-database`.dia_chi_giao_hang;
+")
 
 Expected counts after full seed:
 
@@ -186,23 +237,21 @@ Seed file: `src/database/seeds/seed-phase2.sql`
 
 Run in this exact order to avoid FK violations:
 
-```bash
-"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe" \
-  -u root --host=127.0.0.1 --port=3306 -e "
-USE \`pc-retails-store-database\`;
-DELETE FROM nhan_vien_vai_tro;
-DELETE FROM vai_tro_quyen;
-DELETE FROM dia_chi_giao_hang;
-DELETE FROM nhan_vien;
-DELETE FROM khach_hang;
-DELETE FROM vai_tro;
-DELETE FROM quyen;
-ALTER TABLE nhan_vien      AUTO_INCREMENT = 1;
-ALTER TABLE khach_hang     AUTO_INCREMENT = 1;
-ALTER TABLE vai_tro        AUTO_INCREMENT = 1;
-ALTER TABLE quyen          AUTO_INCREMENT = 1;
-ALTER TABLE dia_chi_giao_hang AUTO_INCREMENT = 1;
-"
+```
+mcp__dbhub__execute_sql(sql="
+DELETE FROM `pc-retails-store-database`.nhan_vien_vai_tro;
+DELETE FROM `pc-retails-store-database`.vai_tro_quyen;
+DELETE FROM `pc-retails-store-database`.dia_chi_giao_hang;
+DELETE FROM `pc-retails-store-database`.nhan_vien;
+DELETE FROM `pc-retails-store-database`.khach_hang;
+DELETE FROM `pc-retails-store-database`.vai_tro;
+DELETE FROM `pc-retails-store-database`.quyen;
+ALTER TABLE `pc-retails-store-database`.nhan_vien      AUTO_INCREMENT = 1;
+ALTER TABLE `pc-retails-store-database`.khach_hang     AUTO_INCREMENT = 1;
+ALTER TABLE `pc-retails-store-database`.vai_tro        AUTO_INCREMENT = 1;
+ALTER TABLE `pc-retails-store-database`.quyen          AUTO_INCREMENT = 1;
+ALTER TABLE `pc-retails-store-database`.dia_chi_giao_hang AUTO_INCREMENT = 1;
+")
 ```
 
 ### Generate password hash (bcrypt)
@@ -213,9 +262,8 @@ The backend uses `bcryptjs`. Run from the backend directory:
 node -e "
 const bcrypt = require('bcryptjs');
 async function main() {
-  console.log('Admin@123:   ', await bcrypt.hash('Admin@123',    10));
-  console.log('Staff@123:   ', await bcrypt.hash('Staff@123',    10));
-  console.log('Customer@123:', await bcrypt.hash('Customer@123', 10));
+  console.log('Admin@123: ', await bcrypt.hash('Admin@123', 10));
+  console.log('Staff@123: ', await bcrypt.hash('Staff@123', 10));
 }
 main();
 "
@@ -225,63 +273,34 @@ Paste the hash into the `mat_khau_hash` column when creating new records.
 
 ### Quick schema inspection
 
-```bash
-# List tables
-"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe" \
-  -u root --host=127.0.0.1 --port=3306 \
-  -e "USE \`pc-retails-store-database\`; SHOW TABLES;"
+```
+# List all tables
+mcp__dbhub__search_objects(object_type="table", schema="pc-retails-store-database")
 
 # Show columns for a table
-"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe" \
-  -u root --host=127.0.0.1 --port=3306 \
-  -e "USE \`pc-retails-store-database\`; DESCRIBE nguoi_dung;"
+mcp__dbhub__search_objects(
+  object_type="column",
+  schema="pc-retails-store-database",
+  table="nhan_vien",
+  detail_level="full"
+)
 
-# Check current row counts
-"/c/Program Files/MySQL/MySQL Server 8.0/bin/mysql.exe" \
-  -u root --host=127.0.0.1 --port=3306 -e "
-  SELECT table_name, table_rows
-  FROM information_schema.tables
-  WHERE table_schema = 'pc-retails-store-database'
-  ORDER BY table_rows DESC;
-"
+# Check current row counts across all tables
+mcp__dbhub__execute_sql(sql="
+SELECT table_name, table_rows
+FROM information_schema.tables
+WHERE table_schema = 'pc-retails-store-database'
+ORDER BY table_rows DESC;
+")
 ```
-
-### Current test accounts
-
-#### Employees (password: `Admin@123` for admin, `Staff@123` for others)
-
-| ID    | Email                    | Full name         | Role       | Status   |
-|-------|--------------------------|-------------------|------------|----------|
-| NV001 | admin@pcstore.vn         | Nguyen Van Admin  | admin      | DangLam  |
-| NV002 | staff01@pcstore.vn       | Tran Thi Lan      | staff      | DangLam  |
-| NV003 | staff02@pcstore.vn       | Le Minh Tuan      | staff      | DangLam  |
-| NV004 | warehouse@pcstore.vn     | Pham Van Kho      | warehouse  | DangLam  |
-| NV005 | ketoan@pcstore.vn        | Hoang Thi Mai     | accountant | DangLam  |
-| NV006 | cskh01@pcstore.vn        | Do Thanh Long     | support    | DangLam  |
-| NV007 | cskh02@pcstore.vn        | Vu Thi Hoa        | support    | NghiViec |
-
-#### Customers (password: `Customer@123`)
-
-| Email                    | Full name       | Status   | Verified | Points |
-|--------------------------|-----------------|----------|----------|--------|
-| nguyenvana@gmail.com     | Nguyen Van A    | HoatDong | ✓        | 1200   |
-| tranthib@gmail.com       | Tran Thi B      | HoatDong | ✓        | 850    |
-| leminhc@gmail.com        | Le Minh C       | HoatDong | ✓        | 2500   |
-| phamthid@gmail.com       | Pham Thi D      | HoatDong | ✓        | 0      |
-| hoangvane@gmail.com      | Hoang Van E     | HoatDong | ✗        | 320    |
-| dothif@gmail.com         | Do Thi F        | HoatDong | ✓        | 150    |
-| vuminh@gmail.com         | Vu Van Minh     | HoatDong | ✓        | 4800   |
-| ngothig@gmail.com        | Ngo Thi G       | HoatDong | ✓        | 0      |
-| buivanhung@gmail.com     | Bui Van Hung    | BiKhoa   | ✓        | 200    |
-| dangthii@gmail.com       | Dang Thi I      | HoatDong | ✗        | 0      |
 
 ### AI Agent guide
 
 When adding test data for a new table:
 
 1. **Inspect the table structure** before writing INSERT:
-   ```bash
-   DESCRIBE table_name;
+   ```
+   mcp__dbhub__search_objects(object_type="column", schema="pc-retails-store-database", table="table_name", detail_level="full")
    ```
 
 2. **Check FKs** — look up parent tables before inserting child rows (e.g., `khach_hang` must exist before `dia_chi_giao_hang`).
@@ -295,16 +314,17 @@ When adding test data for a new table:
 
 4. **Password hashes** must always use bcryptjs (rounds = 10) — never store plain text.
 
-5. **Run via pipe** (`< file.sql`) instead of copy-paste to preserve UTF-8 encoding.
-   - Always add `--default-character-set=utf8mb4` to the mysql CLI command.
-   - Always put `SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;` at the top of the SQL file.
+5. **Always include** `SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;` at the top of any SQL with Vietnamese text to avoid encoding issues.
 
 6. **Use SELECT subqueries** instead of hardcoded IDs when inserting junction tables:
-   ```sql
-   INSERT INTO nhan_vien_vai_tro (nhan_vien_id, vai_tro_id)
+   ```
+   mcp__dbhub__execute_sql(sql="
+   SET NAMES utf8mb4 COLLATE utf8mb4_unicode_ci;
+   INSERT INTO `pc-retails-store-database`.nhan_vien_vai_tro (nhan_vien_id, vai_tro_id)
    SELECT nv.nhan_vien_id, vt.vai_tro_id
-   FROM nhan_vien nv, vai_tro vt
+   FROM `pc-retails-store-database`.nhan_vien nv, `pc-retails-store-database`.vai_tro vt
    WHERE nv.ma_nhan_vien = 'NV001' AND vt.ten_vai_tro = 'admin';
+   ")
    ```
 
 ---
@@ -313,9 +333,9 @@ When adding test data for a new table:
 
 | Scenario | Tool |
 |---|---|
-| Test auth flow, tokens, cookies | cURL with `-c`/`-b` |
-| Verify CORS headers from browser origin | cURL OPTIONS preflight |
-| Check rate limiting response codes | cURL loop |
-| Seed bulk fake records fast | MySQL CLI |
-| Set up a specific DB state for a test | MySQL CLI |
-| Test full request → DB round-trip | cURL + MySQL verify |
+| Test endpoints với pass/fail report | `npm run test:api` (runner) |
+| Test CRUD cycle với chained context | runner với `extract` + `{{var}}` |
+| Seed bulk fake records fast | dbhub `execute_sql` |
+| Set up a specific DB state for a test | dbhub `execute_sql` |
+| Inspect table columns / indexes | dbhub `search_objects` |
+| Test full request → DB round-trip | runner + dbhub verify |

@@ -20,7 +20,7 @@ export class AdminReviewsController {
 
   @Get()
   @ApiOperation({ summary: 'Danh sách đánh giá (có thể lọc theo trạng thái, biến thể)' })
-  @ApiQuery({ name: 'status', required: false, enum: ['Pending', 'Approved', 'Rejected', 'Hidden'], description: 'Lọc theo trạng thái' })
+  @ApiQuery({ name: 'status', required: false, enum: ['Pending', 'Approved', 'Rejected', 'Hidden'], description: 'Lọc theo trạng thái', example: 'Pending' })
   @ApiQuery({ name: 'variantId', required: false, description: 'Lọc theo biến thể sản phẩm', example: 5 })
   @ApiQuery({ name: 'page', required: false, description: 'Trang', example: 1 })
   @ApiQuery({ name: 'limit', required: false, description: 'Số item/trang', example: 20 })

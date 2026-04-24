@@ -55,6 +55,10 @@ import { SearchModule } from './modules/search/search.module';
 // Phase 8 — CMS
 import { CmsModule } from './modules/cms/cms.module';
 
+// Phase 9 — Reports & Settings
+import { ReportsModule } from './modules/reports/reports.module';
+import { SettingsModule } from './modules/settings/settings.module';
+
 // Guards
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -136,6 +140,10 @@ import { RolesGuard } from './common/guards/roles.guard';
 
     // Phase 8
     CmsModule,
+
+    // Phase 9
+    ReportsModule,
+    SettingsModule,
   ],
   controllers: [AppController],
   providers: [
