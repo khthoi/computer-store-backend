@@ -9,6 +9,7 @@ import { CreateReturnDto } from './dto/create-return.dto';
 import { ProcessReturnDto } from './dto/process-return.dto';
 import { QueryReturnsDto } from './dto/query-returns.dto';
 import { LoyaltyService } from '../loyalty/loyalty.service';
+import { ReturnAssetResponseDto, ReturnRequestResponseDto } from './dto/return-response.dto';
 
 const DEFAULT_RETURN_WINDOW_DAYS = 7;
 
@@ -25,8 +26,7 @@ export class ReturnsService {
 
   // ─── Customer ─────────────────────────────────────────────────────────────
 
-  async submitReturn(dto: CreateReturnDto, customerId: number): Promise<ReturnRequest> {
-    // Validate order belongs to customer and is delivered
+  async submitReturn(dto: CreateReturnDto, customerId: number): Promise<ReturnRequestResponseDto> {
     const [order] = await this.dataSource.query(
       `SELECT don_hang_id, trang_thai_don, ngay_cap_nhat
        FROM don_hang
@@ -38,7 +38,6 @@ export class ReturnsService {
       throw new ForbiddenException('Chỉ có thể yêu cầu đổi/trả đơn hàng đã giao thành công');
     }
 
-    // Enforce return window from site_config (fallback to 7 days)
     const returnWindowDays = await this.getReturnWindowDays();
     const deliveredAt = new Date(order.ngay_cap_nhat);
     const diffDays = (Date.now() - deliveredAt.getTime()) / (1000 * 60 * 60 * 24);
@@ -46,7 +45,6 @@ export class ReturnsService {
       throw new ForbiddenException(`Đã quá ${returnWindowDays} ngày kể từ ngày giao hàng`);
     }
 
-    // Prevent duplicate pending request for same order
     const existing = await this.returnRepo.findOne({
       where: { orderId: dto.orderId, customerId, status: 'ChoDuyet' },
     });
@@ -54,7 +52,7 @@ export class ReturnsService {
       throw new BadRequestException('Đơn hàng này đã có yêu cầu đổi/trả đang chờ duyệt');
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const saved = await this.dataSource.transaction(async (manager) => {
       const returnReq = manager.create(ReturnRequest, {
         orderId: dto.orderId,
         customerId,
@@ -63,12 +61,12 @@ export class ReturnsService {
         description: dto.description ?? null,
         status: 'ChoDuyet',
       });
-      const saved = await manager.save(returnReq);
+      const result = await manager.save(returnReq);
 
       if (dto.assetIds && dto.assetIds.length > 0) {
         const assets = dto.assetIds.map((assetId, index) =>
           manager.create(ReturnAsset, {
-            returnRequestId: saved.id,
+            returnRequestId: result.id,
             assetId,
             sortOrder: index,
           }),
@@ -76,26 +74,29 @@ export class ReturnsService {
         await manager.save(assets);
       }
 
-      return saved;
+      return result;
     });
+
+    return this.toDto(saved);
   }
 
-  getMyReturns(customerId: number, query: QueryReturnsDto) {
+  async getMyReturns(customerId: number, query: QueryReturnsDto) {
     const qb = this.returnRepo.createQueryBuilder('r')
-      .where('r.khach_hang_id = :customerId', { customerId });
+      .where('r.customerId = :customerId', { customerId });
 
     if (query.status) {
-      qb.andWhere('r.trang_thai = :status', { status: query.status });
+      qb.andWhere('r.status = :status', { status: query.status });
     }
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    return qb
-      .orderBy('r.ngay_tao', 'DESC')
+    const [items, total] = await qb
+      .orderBy('r.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit)
-      .getManyAndCount()
-      .then(([items, total]) => ({ items, total, page, limit }));
+      .getManyAndCount();
+
+    return { items: items.map((r) => this.toDto(r)), total, page, limit };
   }
 
   // ─── Admin ────────────────────────────────────────────────────────────────
@@ -104,21 +105,21 @@ export class ReturnsService {
     const qb = this.returnRepo.createQueryBuilder('r');
 
     if (query.status) {
-      qb.andWhere('r.trang_thai = :status', { status: query.status });
+      qb.andWhere('r.status = :status', { status: query.status });
     }
 
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const [items, total] = await qb
-      .orderBy('r.ngay_tao', 'DESC')
+      .orderBy('r.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
 
-    return { items, total, page, limit };
+    return { items: items.map((r) => this.toDto(r)), total, page, limit };
   }
 
-  async processReturn(id: number, dto: ProcessReturnDto, employeeId: number): Promise<ReturnRequest> {
+  async processReturn(id: number, dto: ProcessReturnDto, employeeId: number): Promise<ReturnRequestResponseDto> {
     const returnReq = await this.returnRepo.findOne({ where: { id } });
     if (!returnReq) throw new NotFoundException(`Yêu cầu đổi/trả #${id} không tồn tại`);
 
@@ -130,19 +131,19 @@ export class ReturnsService {
 
     const saved = await this.returnRepo.save(returnReq);
 
-    // Side effects when completing a return
     if (dto.status === 'HoanThanh' && previousStatus !== 'HoanThanh') {
       await this.handleReturnCompletion(returnReq);
     }
 
-    return saved;
+    return this.toDto(saved);
   }
 
-  async getReturnAssets(returnRequestId: number): Promise<ReturnAsset[]> {
-    return this.assetRepo.find({
+  async getReturnAssets(returnRequestId: number): Promise<ReturnAssetResponseDto[]> {
+    const assets = await this.assetRepo.find({
       where: { returnRequestId },
       order: { sortOrder: 'ASC' },
     });
+    return assets.map((a) => this.toAssetDto(a));
   }
 
   // ─── Internal ─────────────────────────────────────────────────────────────
@@ -150,9 +151,7 @@ export class ReturnsService {
   private async handleReturnCompletion(returnReq: ReturnRequest): Promise<void> {
     if (returnReq.resolution === 'BaoHanh') return;
 
-    // Restore stock and deduct loyalty points inside one transaction
     await this.dataSource.transaction(async (manager) => {
-      // Restore stock for each order item
       const items = await manager.query(
         `SELECT phien_ban_id, so_luong FROM chi_tiet_don_hang WHERE don_hang_id = ?`,
         [returnReq.orderId],
@@ -171,7 +170,6 @@ export class ReturnsService {
         );
       }
 
-      // Deduct loyalty points earned from this order
       const [loyaltyRow] = await manager.query(
         `SELECT diem FROM loyalty_point_transaction
          WHERE loai_tham_chieu = 'don_hang' AND tham_chieu_id = ? AND loai_giao_dich = 'earn'
@@ -194,5 +192,31 @@ export class ReturnsService {
       `SELECT config_value FROM site_config WHERE config_key = 'return_window_days' LIMIT 1`,
     );
     return config ? parseInt(config.config_value, 10) : DEFAULT_RETURN_WINDOW_DAYS;
+  }
+
+  private toDto(r: ReturnRequest): ReturnRequestResponseDto {
+    return {
+      id: r.id,
+      orderId: r.orderId,
+      customerId: r.customerId,
+      requestType: r.requestType,
+      reason: r.reason,
+      description: r.description,
+      status: r.status,
+      processedById: r.processedById,
+      inspectionResult: r.inspectionResult,
+      resolution: r.resolution,
+      createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    };
+  }
+
+  private toAssetDto(a: ReturnAsset): ReturnAssetResponseDto {
+    return {
+      id: a.id,
+      returnRequestId: a.returnRequestId,
+      assetId: a.assetId,
+      sortOrder: a.sortOrder,
+    };
   }
 }

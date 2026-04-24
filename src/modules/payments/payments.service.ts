@@ -32,7 +32,7 @@ export class PaymentsService {
     let tx: Transaction;
     if (existing) {
       existing.phuongThucThanhToan = dto.phuongThucThanhToan as PhuongThucThanhToan;
-      existing.soTien = order.tongThanhToan;
+      existing.soTien = order.totalAmount;
       existing.nganHangVi = dto.nganHangVi ?? null;
       existing.trangThaiGiaoDich = TrangThaiGiaoDich.CHO;
       tx = await this.txRepo.save(existing);
@@ -41,7 +41,7 @@ export class PaymentsService {
         this.txRepo.create({
           donHangId: order.id,
           phuongThucThanhToan: dto.phuongThucThanhToan as PhuongThucThanhToan,
-          soTien: order.tongThanhToan,
+          soTien: order.totalAmount,
           nganHangVi: dto.nganHangVi ?? null,
           trangThaiGiaoDich: TrangThaiGiaoDich.CHO,
         }),
@@ -53,7 +53,7 @@ export class PaymentsService {
     }
 
     if (dto.phuongThucThanhToan === PhuongThucThanhToan.VI_DIEN_TU && dto.nganHangVi === 'VNPay') {
-      const paymentUrl = this.buildVNPayUrl(tx, order.tongThanhToan, order.maDonHang);
+      const paymentUrl = this.buildVNPayUrl(tx, order.totalAmount, order.orderCode);
       return { transaction: tx, paymentUrl };
     }
 

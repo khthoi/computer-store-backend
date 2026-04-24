@@ -37,12 +37,16 @@ export async function runSuite(suite: TestSuite, ctx: RunContext): Promise<TestR
       const duration = Date.now() - start;
 
       // Status check
-      if (res.status !== tc.expect.status) {
+      const expectedStatuses = Array.isArray(tc.expect.status)
+        ? tc.expect.status
+        : [tc.expect.status];
+      if (!expectedStatuses.includes(res.status)) {
         const snippet = JSON.stringify(res.body).slice(0, 300);
+        const expectedStr = expectedStatuses.join(' or ');
         results.push({
           suite: suite.name, name: tc.name, status: 'fail', duration,
           httpStatus: res.status,
-          error: `Expected HTTP ${tc.expect.status}, got ${res.status}. Body: ${snippet}`,
+          error: `Expected HTTP ${expectedStr}, got ${res.status}. Body: ${snippet}`,
         });
         continue;
       }

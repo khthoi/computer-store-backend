@@ -25,6 +25,7 @@ import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { AssignRolesDto } from './dto/assign-roles.dto';
 import { QueryEmployeesDto } from './dto/query-employees.dto';
+import { EmployeeResponseDto, EmployeeListResponseDto } from './dto/employee-response.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 
 @ApiTags('Admin — Employees')
@@ -37,29 +38,10 @@ export class EmployeesController {
   @Get()
   @ApiOperation({ summary: 'Danh sách nhân viên' })
   @ApiQuery({ name: 'q', required: false, description: 'Tìm theo tên hoặc email', example: 'Trần Thị B' })
-  @ApiQuery({ name: 'status', required: false, description: 'Lọc theo trạng thái', example: 'HoatDong' })
+  @ApiQuery({ name: 'status', required: false, description: 'Lọc theo trạng thái', example: 'DangLam' })
   @ApiQuery({ name: 'page', required: false, description: 'Trang hiện tại', example: 1 })
   @ApiQuery({ name: 'limit', required: false, description: 'Số bản ghi mỗi trang', example: 20 })
-  @ApiOkResponse({
-    schema: {
-      example: {
-        items: [
-          {
-            id: 2,
-            fullName: 'Trần Thị B',
-            email: 'b@store.vn',
-            phone: '0907654321',
-            roles: ['staff'],
-            status: 'HoatDong',
-            createdAt: '2024-01-10T08:00:00.000Z',
-          },
-        ],
-        total: 15,
-        page: 1,
-        limit: 20,
-      },
-    },
-  })
+  @ApiOkResponse({ type: EmployeeListResponseDto })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findAll(@Query() query: QueryEmployeesDto) {
@@ -69,18 +51,7 @@ export class EmployeesController {
   @Get(':id')
   @ApiOperation({ summary: 'Chi tiết nhân viên' })
   @ApiParam({ name: 'id', example: 2 })
-  @ApiOkResponse({
-    schema: {
-      example: {
-        id: 2,
-        fullName: 'Trần Thị B',
-        email: 'b@store.vn',
-        phone: '0907654321',
-        roles: [{ id: 1, name: 'staff' }],
-        status: 'HoatDong',
-      },
-    },
-  })
+  @ApiOkResponse({ type: EmployeeResponseDto })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   @ApiResponse({ status: 404, description: 'Nhân viên không tồn tại' })
@@ -90,12 +61,16 @@ export class EmployeesController {
 
   @Post()
   @ApiOperation({ summary: 'Tạo tài khoản nhân viên mới' })
+  @ApiOkResponse({ type: EmployeeResponseDto })
+  @ApiResponse({ status: 409, description: 'Email hoặc mã nhân viên đã tồn tại' })
   create(@Body() dto: CreateEmployeeDto) {
     return this.employeesService.create(dto);
   }
 
   @Put(':id')
   @ApiOperation({ summary: 'Cập nhật thông tin nhân viên' })
+  @ApiOkResponse({ type: EmployeeResponseDto })
+  @ApiResponse({ status: 404, description: 'Nhân viên không tồn tại' })
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateEmployeeDto) {
     return this.employeesService.update(id, dto);
   }
@@ -103,12 +78,15 @@ export class EmployeesController {
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Vô hiệu hoá nhân viên (soft delete)' })
+  @ApiResponse({ status: 404, description: 'Nhân viên không tồn tại' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.employeesService.remove(id);
   }
 
   @Put(':id/roles')
   @ApiOperation({ summary: 'Gán vai trò cho nhân viên' })
+  @ApiOkResponse({ type: EmployeeResponseDto })
+  @ApiResponse({ status: 404, description: 'Nhân viên không tồn tại' })
   assignRoles(@Param('id', ParseIntPipe) id: number, @Body() dto: AssignRolesDto) {
     return this.employeesService.assignRoles(id, dto.roleIds);
   }

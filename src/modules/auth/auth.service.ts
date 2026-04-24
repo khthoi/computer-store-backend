@@ -15,6 +15,8 @@ import { Customer } from '../users/entities/customer.entity';
 import { Employee } from '../employees/entities/employee.entity';
 import { RegisterCustomerDto } from './dto/register-customer.dto';
 import { JwtPayload } from './strategies/jwt.strategy';
+import { AuthCustomerDto } from './dto/auth-customer.dto';
+import { AuthEmployeeDto } from './dto/auth-employee.dto';
 
 const ACCESS_TOKEN_TTL = 15 * 60;       // 15 phút (giây)
 const REFRESH_TOKEN_TTL = 30 * 24 * 3600; // 30 ngày (giây)
@@ -47,7 +49,7 @@ export class AuthService {
 
   // ─── Register ─────────────────────────────────────────────────────────────
 
-  async register(dto: RegisterCustomerDto) {
+  async register(dto: RegisterCustomerDto): Promise<{ customer: AuthCustomerDto; accessToken: string; refreshToken: string }> {
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) throw new ConflictException('Email đã được đăng ký');
 
@@ -64,21 +66,21 @@ export class AuthService {
     // TODO: enqueue email verification job (Phase 6+)
 
     const tokens = await this.issueCustomerTokens(customer);
-    return { customer: this.sanitizeCustomer(customer), ...tokens };
+    return { customer: this.toCustomerDto(customer), ...tokens };
   }
 
   // ─── Login ────────────────────────────────────────────────────────────────
 
-  async loginCustomer(customer: Customer) {
+  async loginCustomer(customer: Customer): Promise<{ customer: AuthCustomerDto; accessToken: string; refreshToken: string }> {
     const tokens = await this.issueCustomerTokens(customer);
-    return { customer: this.sanitizeCustomer(customer), ...tokens };
+    return { customer: this.toCustomerDto(customer), ...tokens };
   }
 
-  async loginEmployee(employee: Employee) {
+  async loginEmployee(employee: Employee): Promise<{ employee: AuthEmployeeDto; accessToken: string; refreshToken: string }> {
     const fullEmployee = await this.employeesService.findByIdWithRoles(employee.id);
     if (!fullEmployee) throw new UnauthorizedException();
     const tokens = await this.issueEmployeeTokens(fullEmployee);
-    return { employee: this.sanitizeEmployee(fullEmployee), ...tokens };
+    return { employee: this.toEmployeeDto(fullEmployee), ...tokens };
   }
 
   // ─── Refresh Token ────────────────────────────────────────────────────────
@@ -198,15 +200,37 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  // ─── Sanitize helpers ─────────────────────────────────────────────────────
+  // ─── Response mappers ─────────────────────────────────────────────────────
 
-  private sanitizeCustomer(customer: Customer) {
-    const { matKhauHash: _h, ...rest } = customer as Customer & { matKhauHash: string };
-    return rest;
+  private toCustomerDto(customer: Customer): AuthCustomerDto {
+    return {
+      id: customer.id,
+      email: customer.email,
+      hoTen: customer.hoTen,
+      soDienThoai: customer.soDienThoai,
+      gioiTinh: customer.gioiTinh,
+      ngaySinh: customer.ngaySinh,
+      anhDaiDien: customer.anhDaiDien,
+      trangThai: customer.trangThai,
+      ngayDangKy: customer.ngayDangKy,
+      xacMinhEmail: customer.xacMinhEmail,
+      diemHienTai: customer.diemHienTai,
+      assetIdAvatar: customer.assetIdAvatar,
+    };
   }
 
-  private sanitizeEmployee(employee: Employee) {
-    const { matKhauHash: _h, ...rest } = employee as Employee & { matKhauHash: string };
-    return rest;
+  private toEmployeeDto(employee: Employee): AuthEmployeeDto {
+    return {
+      id: employee.id,
+      maNhanVien: employee.maNhanVien,
+      email: employee.email,
+      hoTen: employee.hoTen,
+      gioiTinh: employee.gioiTinh,
+      anhDaiDien: employee.anhDaiDien,
+      trangThai: employee.trangThai,
+      ngayTao: employee.ngayTao,
+      assetIdAvatar: employee.assetIdAvatar,
+      roles: employee.roles?.map((r) => r.tenVaiTro) ?? [],
+    };
   }
 }

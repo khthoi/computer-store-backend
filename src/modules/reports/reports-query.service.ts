@@ -46,8 +46,8 @@ export class ReportsQueryService {
     return this.redisService.cache(cacheKey, 300, async () => {
       const rows = await this.revenueRepo
         .createQueryBuilder('r')
-        .where('r.ngay BETWEEN :start AND :end', { start, end })
-        .orderBy('r.ngay', 'ASC')
+        .where('r.date BETWEEN :start AND :end', { start, end })
+        .orderBy('r.date', 'ASC')
         .getMany();
 
       const summary = rows.reduce(
@@ -150,7 +150,7 @@ export class ReportsQueryService {
         .addSelect('v.ten_phien_ban', 'variantName')
         .innerJoin('san_pham', 'sp', 'sp.san_pham_id = v.san_pham_id')
         .addSelect('sp.ten_san_pham', 'productName')
-        .orderBy('ih.doi', 'ASC');
+        .orderBy('ih.daysOfInventory', 'ASC');
 
       if (bucket) qb.where('ih.bucket = :bucket', { bucket });
 

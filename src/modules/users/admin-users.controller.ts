@@ -21,6 +21,7 @@ import {
 } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { QueryCustomersDto } from './dto/query-customers.dto';
+import { CustomerDetailResponseDto, CustomerListResponseDto } from './dto/customer-response.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 
 @ApiTags('Admin — Customers')
@@ -36,26 +37,7 @@ export class AdminUsersController {
   @ApiQuery({ name: 'status', required: false, description: 'Lọc theo trạng thái', example: 'HoatDong' })
   @ApiQuery({ name: 'page', required: false, description: 'Trang hiện tại', example: 1 })
   @ApiQuery({ name: 'limit', required: false, description: 'Số bản ghi mỗi trang', example: 20 })
-  @ApiOkResponse({
-    schema: {
-      example: {
-        items: [
-          {
-            id: 5,
-            fullName: 'Nguyễn Văn A',
-            email: 'a@example.com',
-            phone: '0901234567',
-            loyaltyPoints: 1200,
-            status: 'HoatDong',
-            createdAt: '2024-01-15T08:00:00.000Z',
-          },
-        ],
-        total: 120,
-        page: 1,
-        limit: 20,
-      },
-    },
-  })
+  @ApiOkResponse({ type: CustomerListResponseDto })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findAll(@Query() query: QueryCustomersDto) {
@@ -65,25 +47,12 @@ export class AdminUsersController {
   @Get(':id')
   @ApiOperation({ summary: 'Chi tiết khách hàng' })
   @ApiParam({ name: 'id', example: 5 })
-  @ApiOkResponse({
-    schema: {
-      example: {
-        id: 5,
-        fullName: 'Nguyễn Văn A',
-        email: 'a@example.com',
-        phone: '0901234567',
-        loyaltyPoints: 1200,
-        totalOrders: 8,
-        status: 'HoatDong',
-        addresses: [{ id: 1, isDefault: true, address: '123 Lê Lợi, Quận 1, TP.HCM' }],
-      },
-    },
-  })
+  @ApiOkResponse({ type: CustomerDetailResponseDto })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   @ApiResponse({ status: 404, description: 'Khách hàng không tồn tại' })
   findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.usersService.findById(id);
+    return this.usersService.findByIdWithAddresses(id);
   }
 
   @Put(':id/status')

@@ -16,6 +16,8 @@ import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterCustomerDto } from './dto/register-customer.dto';
 import { LoginDto } from './dto/login.dto';
+import { AuthLoginCustomerResponseDto, AuthLoginEmployeeResponseDto } from './dto/auth-login-response.dto';
+import { AuthTokenResponseDto } from './dto/auth-token-response.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtPayload } from './strategies/jwt.strategy';
@@ -39,6 +41,8 @@ export class AuthController {
   @Public()
   @Post('register')
   @ApiOperation({ summary: 'Đăng ký tài khoản khách hàng' })
+  @ApiOkResponse({ type: AuthLoginCustomerResponseDto, description: 'Đăng ký thành công, refresh token được set trong cookie' })
+  @ApiResponse({ status: 409, description: 'Email đã được đăng ký' })
   async register(@Body() dto: RegisterCustomerDto, @Res({ passthrough: true }) res: Response) {
     const { refreshToken, ...data } = await this.authService.register(dto);
     res.cookie(RT_COOKIE, refreshToken, RT_COOKIE_OPTIONS);
@@ -51,6 +55,8 @@ export class AuthController {
   @UseGuards(AuthGuard('local-customer'))
   @ApiOperation({ summary: 'Đăng nhập khách hàng' })
   @ApiBody({ type: LoginDto })
+  @ApiOkResponse({ type: AuthLoginCustomerResponseDto, description: 'Đăng nhập thành công, refresh token được set trong cookie' })
+  @ApiResponse({ status: 401, description: 'Email hoặc mật khẩu không đúng' })
   async loginCustomer(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const { refreshToken, ...data } = await this.authService.loginCustomer(req.user as Customer);
     res.cookie(RT_COOKIE, refreshToken, RT_COOKIE_OPTIONS);
@@ -63,6 +69,8 @@ export class AuthController {
   @UseGuards(AuthGuard('local-employee'))
   @ApiOperation({ summary: 'Đăng nhập nhân viên / admin' })
   @ApiBody({ type: LoginDto })
+  @ApiOkResponse({ type: AuthLoginEmployeeResponseDto, description: 'Đăng nhập thành công, refresh token được set trong cookie' })
+  @ApiResponse({ status: 401, description: 'Email hoặc mật khẩu không đúng' })
   async loginEmployee(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const { refreshToken, ...data } = await this.authService.loginEmployee(req.user as Employee);
     res.cookie(RT_COOKIE, refreshToken, RT_COOKIE_OPTIONS);
@@ -73,6 +81,8 @@ export class AuthController {
   @Post('refresh')
   @HttpCode(HttpStatus.OK)
   @ApiOperation({ summary: 'Cấp lại access token (đọc RT từ cookie)' })
+  @ApiOkResponse({ type: AuthTokenResponseDto, description: 'Access token mới' })
+  @ApiResponse({ status: 401, description: 'Refresh token không hợp lệ hoặc đã hết hạn' })
   async refresh(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const rt = req.cookies?.[RT_COOKIE] as string | undefined;
     if (!rt) throw new UnauthorizedException('Không có refresh token');

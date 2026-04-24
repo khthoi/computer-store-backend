@@ -12,6 +12,7 @@ import { Role } from '../roles/entities/role.entity';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { QueryEmployeesDto } from './dto/query-employees.dto';
+import { EmployeeResponseDto, EmployeeListResponseDto } from './dto/employee-response.dto';
 
 @Injectable()
 export class EmployeesService {
@@ -22,7 +23,7 @@ export class EmployeesService {
     private readonly roleRepo: Repository<Role>,
   ) {}
 
-  async findAll(query: QueryEmployeesDto): Promise<{ data: Employee[]; total: number }> {
+  async findAll(query: QueryEmployeesDto): Promise<EmployeeListResponseDto> {
     const { page = 1, limit = 20, search, trangThai } = query;
     const qb = this.employeeRepo
       .createQueryBuilder('e')
@@ -31,20 +32,20 @@ export class EmployeesService {
       .skip((page - 1) * limit)
       .take(limit);
 
-    if (trangThai) qb.andWhere('e.trang_thai = :trangThai', { trangThai });
-    if (search) qb.andWhere('(e.ho_ten LIKE :s OR e.email LIKE :s OR e.ma_nhan_vien LIKE :s)', { s: `%${search}%` });
+    if (trangThai) qb.andWhere('e.trangThai = :trangThai', { trangThai });
+    if (search) qb.andWhere('(e.hoTen LIKE :s OR e.email LIKE :s OR e.maNhanVien LIKE :s)', { s: `%${search}%` });
 
-    const [data, total] = await qb.getManyAndCount();
-    return { data, total };
+    const [employees, total] = await qb.getManyAndCount();
+    return { items: employees.map((e) => this.toDto(e)), total, page, limit };
   }
 
-  async findOne(id: number): Promise<Employee> {
+  async findOne(id: number): Promise<EmployeeResponseDto> {
     const employee = await this.employeeRepo.findOne({
       where: { id },
       relations: ['roles', 'roles.permissions'],
     });
     if (!employee) throw new NotFoundException(`Nhân viên #${id} không tồn tại`);
-    return employee;
+    return this.toDto(employee);
   }
 
   async findByEmail(email: string): Promise<Employee | null> {
@@ -59,7 +60,7 @@ export class EmployeesService {
     return this.employeeRepo.findOne({ where: { id }, relations: ['roles'] });
   }
 
-  async create(dto: CreateEmployeeDto): Promise<Employee> {
+  async create(dto: CreateEmployeeDto): Promise<EmployeeResponseDto> {
     const [emailExists, maExists] = await Promise.all([
       this.employeeRepo.findOne({ where: { email: dto.email } }),
       this.employeeRepo.findOne({ where: { maNhanVien: dto.maNhanVien } }),
@@ -82,27 +83,31 @@ export class EmployeesService {
       employee.roles = roles;
     }
 
-    return this.employeeRepo.save(employee);
+    const saved = await this.employeeRepo.save(employee);
+    return this.toDto(saved);
   }
 
-  async update(id: number, dto: UpdateEmployeeDto): Promise<Employee> {
-    const employee = await this.findOne(id);
+  async update(id: number, dto: UpdateEmployeeDto): Promise<EmployeeResponseDto> {
+    const employee = await this.employeeRepo.findOne({ where: { id }, relations: ['roles'] });
+    if (!employee) throw new NotFoundException(`Nhân viên #${id} không tồn tại`);
     Object.assign(employee, dto);
-    return this.employeeRepo.save(employee);
+    const saved = await this.employeeRepo.save(employee);
+    return this.toDto(saved);
   }
 
   async remove(id: number): Promise<void> {
-    const employee = await this.findOne(id);
-    employee.trangThai = 'NghiViec';
-    await this.employeeRepo.save(employee);
+    await this.findOne(id);
+    await this.employeeRepo.update(id, { trangThai: 'NghiViec' });
   }
 
-  async assignRoles(id: number, roleIds: number[]): Promise<Employee> {
-    const employee = await this.findOne(id);
+  async assignRoles(id: number, roleIds: number[]): Promise<EmployeeResponseDto> {
+    const employee = await this.employeeRepo.findOne({ where: { id }, relations: ['roles'] });
+    if (!employee) throw new NotFoundException(`Nhân viên #${id} không tồn tại`);
     const roles = await this.roleRepo.findBy({ id: In(roleIds) });
     if (roles.length !== roleIds.length) throw new BadRequestException('Một số role ID không hợp lệ');
     employee.roles = roles;
-    return this.employeeRepo.save(employee);
+    const saved = await this.employeeRepo.save(employee);
+    return this.toDto(saved);
   }
 
   async validatePassword(employee: Employee, matKhau: string): Promise<boolean> {
@@ -113,5 +118,20 @@ export class EmployeesService {
     });
     if (!raw) return false;
     return bcrypt.compare(matKhau, raw.matKhauHash);
+  }
+
+  private toDto(employee: Employee): EmployeeResponseDto {
+    return {
+      id: employee.id,
+      maNhanVien: employee.maNhanVien,
+      email: employee.email,
+      hoTen: employee.hoTen,
+      gioiTinh: employee.gioiTinh,
+      anhDaiDien: employee.anhDaiDien,
+      trangThai: employee.trangThai,
+      ngayTao: employee.ngayTao,
+      assetIdAvatar: employee.assetIdAvatar,
+      roles: (employee.roles ?? []).map((r) => ({ id: r.id, name: r.tenVaiTro })),
+    };
   }
 }

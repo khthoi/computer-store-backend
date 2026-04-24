@@ -3,6 +3,12 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { ProductViewHistory } from './entities/product-view-history.entity';
 import { SearchQueryDto } from './dto/search-query.dto';
+import {
+  SearchResultDto,
+  SearchResultItemDto,
+  SuggestionDto,
+  ViewHistoryItemDto,
+} from './dto/search-response.dto';
 
 const SORT_COLUMN_MAP: Record<string, string> = {
   name: 'sp.ten_san_pham',
@@ -19,7 +25,7 @@ export class SearchService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async search(query: SearchQueryDto) {
+  async search(query: SearchQueryDto): Promise<SearchResultDto> {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
     const offset = (page - 1) * limit;
@@ -56,7 +62,7 @@ export class SearchService {
       INNER JOIN phien_ban_san_pham v ON v.san_pham_id = sp.san_pham_id AND v.is_mac_dinh = true
       WHERE ${where}`;
 
-    const [[{ total }], items] = await Promise.all([
+    const [[{ total }], rows] = await Promise.all([
       this.dataSource.query(`SELECT COUNT(DISTINCT sp.san_pham_id) AS total ${baseQuery}`, params),
       this.dataSource.query(
         `SELECT sp.san_pham_id, sp.ten_san_pham, sp.Slug AS slug,
@@ -69,10 +75,24 @@ export class SearchService {
       ),
     ]);
 
-    return { items, total: Number(total), page, limit };
+    return {
+      items: rows.map((r: any): SearchResultItemDto => ({
+        id: r.san_pham_id,
+        name: r.ten_san_pham,
+        slug: r.slug,
+        avgRating: Number(r.diem_danh_gia_tb ?? 0),
+        reviewCount: Number(r.so_luot_danh_gia ?? 0),
+        variantId: r.phien_ban_id,
+        price: Number(r.gia_ban),
+        variantStatus: r.variant_status,
+      })),
+      total: Number(total),
+      page,
+      limit,
+    };
   }
 
-  async suggestions(q: string): Promise<{ id: number; name: string; slug: string }[]> {
+  async suggestions(q: string): Promise<SuggestionDto[]> {
     if (!q || q.trim().length < 2) return [];
 
     const rows = await this.dataSource.query(
@@ -84,7 +104,7 @@ export class SearchService {
        LIMIT 10`,
       [`${q.trim()}*`],
     );
-    return rows;
+    return rows as SuggestionDto[];
   }
 
   async recordView(customerId: number, variantId: number): Promise<void> {
@@ -97,11 +117,11 @@ export class SearchService {
     );
   }
 
-  async getViewHistory(customerId: number) {
+  async getViewHistory(customerId: number): Promise<ViewHistoryItemDto[]> {
     const rows = await this.dataSource.query(
       `SELECT pvh.view_history_id AS id, pvh.phien_ban_id AS variantId,
               pvh.thoi_diem_xem AS viewedAt,
-              v.ten_phien_ban AS variantName, v.gia_ban,
+              v.ten_phien_ban AS variantName, v.gia_ban AS price,
               sp.ten_san_pham AS productName, sp.Slug AS slug
        FROM product_view_history pvh
        INNER JOIN phien_ban_san_pham v ON v.phien_ban_id = pvh.phien_ban_id
@@ -111,6 +131,6 @@ export class SearchService {
        LIMIT 20`,
       [customerId],
     );
-    return rows;
+    return rows as ViewHistoryItemDto[];
   }
 }

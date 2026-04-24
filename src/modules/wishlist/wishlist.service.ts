@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Wishlist } from './entities/wishlist.entity';
 import { WishlistItem } from './entities/wishlist-item.entity';
+import { WishlistItemResponseDto, WishlistResponseDto } from './dto/wishlist-response.dto';
 
 @Injectable()
 export class WishlistService {
@@ -16,12 +17,12 @@ export class WishlistService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async getWishlist(customerId: number) {
+  async getWishlist(customerId: number): Promise<WishlistResponseDto> {
     const wishlist = await this.getOrCreate(customerId);
 
     const items = await this.itemRepo
       .createQueryBuilder('wi')
-      .where('wi.wishlist_id = :wishlistId', { wishlistId: wishlist.id })
+      .where('wi.wishlistId = :wishlistId', { wishlistId: wishlist.id })
       .getMany();
 
     if (items.length === 0) return { id: wishlist.id, items: [] };
@@ -40,22 +41,35 @@ export class WishlistService {
       [variantIds],
     );
 
-    const variantMap = new Map<number, Record<string, unknown>>(
-      variants.map((v: Record<string, unknown>) => [v.phien_ban_id as number, v]),
+    const variantMap = new Map<number, any>(
+      variants.map((v: any) => [v.phien_ban_id, v]),
     );
 
     return {
       id: wishlist.id,
-      items: items.map((item) => ({
-        id: item.id,
-        variantId: item.variantId,
-        addedAt: item.addedAt,
-        variant: variantMap.get(item.variantId) ?? null,
-      })),
+      items: items.map((item): WishlistItemResponseDto => {
+        const v = variantMap.get(item.variantId);
+        return {
+          id: item.id,
+          variantId: item.variantId,
+          addedAt: item.addedAt,
+          variant: v
+            ? {
+                variantId: v.phien_ban_id,
+                variantName: v.ten_phien_ban,
+                price: Number(v.gia_ban),
+                status: v.trang_thai,
+                productName: v.ten_san_pham,
+                slug: v.slug,
+                stock: Number(v.stock),
+              }
+            : null,
+        };
+      }),
     };
   }
 
-  async addItem(customerId: number, variantId: number): Promise<WishlistItem> {
+  async addItem(customerId: number, variantId: number): Promise<WishlistItemResponseDto> {
     const wishlist = await this.getOrCreate(customerId);
 
     const existing = await this.itemRepo.findOne({
@@ -63,8 +77,15 @@ export class WishlistService {
     });
     if (existing) throw new ConflictException('Sản phẩm đã có trong danh sách yêu thích');
 
-    const item = this.itemRepo.create({ wishlistId: wishlist.id, variantId });
-    return this.itemRepo.save(item);
+    const item = await this.itemRepo.save(
+      this.itemRepo.create({ wishlistId: wishlist.id, variantId }),
+    );
+    return {
+      id: item.id,
+      variantId: item.variantId,
+      addedAt: item.addedAt,
+      variant: null,
+    };
   }
 
   async removeItem(customerId: number, variantId: number): Promise<void> {

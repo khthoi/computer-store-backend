@@ -1,9 +1,9 @@
 import { runAll } from './runner';
 import { printHeader, printResults, printSummary, getExitCode } from './reporter';
-import { authSuite, publicSuite, adminSuite } from './suites';
+import { authSuite, publicSuite, adminSuite, phase5Suite, phase6Suite } from './suites';
 import type { TestSuite, RunContext } from './types';
 
-const ALL_SUITES: TestSuite[] = [authSuite, publicSuite, adminSuite];
+const ALL_SUITES: TestSuite[] = [authSuite, publicSuite, adminSuite, phase5Suite, phase6Suite];
 
 async function main() {
   printHeader();

@@ -9,6 +9,12 @@ import { CreateEarnRuleDto } from './dto/create-earn-rule.dto';
 import { RedeemPointsDto } from './dto/redeem-points.dto';
 import { CreateRedemptionCatalogDto } from './dto/create-redemption-catalog.dto';
 import { AdjustPointsDto } from './dto/adjust-points.dto';
+import {
+  EarnRuleResponseDto,
+  LoyaltyTransactionResponseDto,
+  LoyaltyRedemptionResponseDto,
+  RedemptionCatalogResponseDto,
+} from './dto/loyalty-response.dto';
 
 @Injectable()
 export class LoyaltyService {
@@ -26,13 +32,14 @@ export class LoyaltyService {
 
   // ─── Earn Rules ───────────────────────────────────────────────────────────
 
-  async createEarnRule(dto: CreateEarnRuleDto, createdBy: number): Promise<LoyaltyEarnRule> {
+  async createEarnRule(dto: CreateEarnRuleDto, createdBy: number): Promise<EarnRuleResponseDto> {
     const rule = this.earnRuleRepo.create({ ...dto, createdBy });
-    return this.earnRuleRepo.save(rule);
+    return this.toEarnRuleDto(await this.earnRuleRepo.save(rule));
   }
 
-  findAllEarnRules() {
-    return this.earnRuleRepo.find({ relations: ['scopes'], order: { priority: 'DESC' } });
+  async findAllEarnRules(): Promise<EarnRuleResponseDto[]> {
+    const rules = await this.earnRuleRepo.find({ relations: ['scopes'], order: { priority: 'DESC' } });
+    return rules.map((r) => this.toEarnRuleDto(r));
   }
 
   async findActiveEarnRules(): Promise<LoyaltyEarnRule[]> {
@@ -47,11 +54,11 @@ export class LoyaltyService {
       .getMany();
   }
 
-  async updateEarnRule(id: number, dto: Partial<CreateEarnRuleDto>): Promise<LoyaltyEarnRule> {
+  async updateEarnRule(id: number, dto: Partial<CreateEarnRuleDto>): Promise<EarnRuleResponseDto> {
     const rule = await this.earnRuleRepo.findOne({ where: { id }, relations: ['scopes'] });
     if (!rule) throw new NotFoundException(`Earn rule #${id} không tồn tại`);
     Object.assign(rule, dto);
-    return this.earnRuleRepo.save(rule);
+    return this.toEarnRuleDto(await this.earnRuleRepo.save(rule));
   }
 
   // ─── Point Balance ────────────────────────────────────────────────────────
@@ -64,12 +71,13 @@ export class LoyaltyService {
     return result[0]?.diem_hien_tai ?? 0;
   }
 
-  getTransactions(khachHangId: number) {
-    return this.transactionRepo.find({
+  async getTransactions(khachHangId: number): Promise<LoyaltyTransactionResponseDto[]> {
+    const rows = await this.transactionRepo.find({
       where: { khachHangId },
       order: { ngayTao: 'DESC' },
       take: 100,
     });
+    return rows.map((t) => this.toTransactionDto(t));
   }
 
   // ─── Earn Points (called when order → DaGiao) ─────────────────────────────
@@ -130,8 +138,8 @@ export class LoyaltyService {
     });
   }
 
-  async adjustPoints(dto: AdjustPointsDto): Promise<LoyaltyTransaction> {
-    return this.dataSource.transaction((manager) =>
+  async adjustPoints(dto: AdjustPointsDto): Promise<LoyaltyTransactionResponseDto> {
+    const tx = await this.dataSource.transaction((manager) =>
       this.writeTransaction(manager, {
         khachHangId: dto.khachHangId,
         loaiGiaoDich: dto.diem >= 0 ? 'earn' : 'adjust',
@@ -141,9 +149,10 @@ export class LoyaltyService {
         thamChieuId: dto.thamChieuId ?? null,
       }),
     );
+    return this.toTransactionDto(tx);
   }
 
-  // atomic write: locks khach_hang row, updates balance, inserts transaction
+  // Atomic write: locks khach_hang row, updates balance, inserts transaction
   async writeTransaction(
     manager: EntityManager,
     params: {
@@ -182,28 +191,31 @@ export class LoyaltyService {
 
   // ─── Redemption Catalog ───────────────────────────────────────────────────
 
-  async createCatalogItem(dto: CreateRedemptionCatalogDto): Promise<RedemptionCatalog> {
-    return this.catalogRepo.save(this.catalogRepo.create(dto));
+  async createCatalogItem(dto: CreateRedemptionCatalogDto): Promise<RedemptionCatalogResponseDto> {
+    const catalog = await this.catalogRepo.save(this.catalogRepo.create(dto));
+    return this.toCatalogDto(catalog);
   }
 
-  findActiveCatalog() {
+  async findActiveCatalog(): Promise<RedemptionCatalogResponseDto[]> {
     const now = new Date();
-    return this.catalogRepo
+    const list = await this.catalogRepo
       .createQueryBuilder('c')
       .where('c.la_hoat_dong = 1')
       .andWhere('(c.hieu_luc_tu IS NULL OR c.hieu_luc_tu <= :now)', { now })
       .andWhere('(c.hieu_luc_den IS NULL OR c.hieu_luc_den >= :now)', { now })
       .getMany();
+    return list.map((c) => this.toCatalogDto(c));
   }
 
-  findAllCatalog() {
-    return this.catalogRepo.find({ order: { ngayTao: 'DESC' } });
+  async findAllCatalog(): Promise<RedemptionCatalogResponseDto[]> {
+    const list = await this.catalogRepo.find({ order: { ngayTao: 'DESC' } });
+    return list.map((c) => this.toCatalogDto(c));
   }
 
   // ─── Redeem Points ────────────────────────────────────────────────────────
 
-  async redeemPoints(dto: RedeemPointsDto, khachHangId: number): Promise<LoyaltyRedemption> {
-    return this.dataSource.transaction(async (manager) => {
+  async redeemPoints(dto: RedeemPointsDto, khachHangId: number): Promise<LoyaltyRedemptionResponseDto> {
+    const redemption = await this.dataSource.transaction(async (manager) => {
       const catalog = await this.catalogRepo.findOne({ where: { id: dto.catalogId, laHoatDong: true } });
       if (!catalog) throw new NotFoundException('Phần thưởng không tồn tại hoặc không còn hiệu lực');
 
@@ -237,9 +249,73 @@ export class LoyaltyService {
         trangThai: 'completed',
       });
     });
+    return this.toRedemptionDto(redemption);
   }
 
-  getMyRedemptions(khachHangId: number) {
-    return this.redemptionRepo.find({ where: { khachHangId }, order: { ngayDoi: 'DESC' } });
+  async getMyRedemptions(khachHangId: number): Promise<LoyaltyRedemptionResponseDto[]> {
+    const list = await this.redemptionRepo.find({ where: { khachHangId }, order: { ngayDoi: 'DESC' } });
+    return list.map((r) => this.toRedemptionDto(r));
+  }
+
+  // ─── Mappers ──────────────────────────────────────────────────────────────
+
+  private toEarnRuleDto(r: LoyaltyEarnRule): EarnRuleResponseDto {
+    return {
+      id: r.id,
+      name: r.name,
+      description: r.description,
+      pointsPerUnit: r.pointsPerUnit,
+      spendPerUnit: Number(r.spendPerUnit),
+      minOrderValue: r.minOrderValue !== null ? Number(r.minOrderValue) : null,
+      maxPointsPerOrder: r.maxPointsPerOrder,
+      isActive: r.isActive,
+      priority: r.priority,
+      validFrom: r.validFrom,
+      validUntil: r.validUntil,
+      createdAt: r.createdAt,
+    };
+  }
+
+  private toTransactionDto(t: LoyaltyTransaction): LoyaltyTransactionResponseDto {
+    return {
+      id: t.id,
+      customerId: t.khachHangId,
+      transactionType: t.loaiGiaoDich,
+      points: t.diem,
+      balanceBefore: t.soDuTruoc,
+      balanceAfter: t.soDuSau,
+      description: t.moTa,
+      referenceType: t.loaiThamChieu,
+      referenceId: t.thamChieuId,
+      createdAt: t.ngayTao,
+    };
+  }
+
+  private toCatalogDto(c: RedemptionCatalog): RedemptionCatalogResponseDto {
+    return {
+      id: c.id,
+      name: c.ten,
+      description: c.moTa,
+      pointsRequired: c.diemCan,
+      isActive: c.laHoatDong,
+      stockLimit: c.gioiHanTonKho,
+      redeemed: c.soDaDoi,
+      validFrom: c.hieuLucTu,
+      validUntil: c.hieuLucDen,
+      createdAt: c.ngayTao,
+    };
+  }
+
+  private toRedemptionDto(r: LoyaltyRedemption): LoyaltyRedemptionResponseDto {
+    return {
+      id: r.id,
+      customerId: r.khachHangId,
+      catalogId: r.catalogId,
+      nameSnapshot: r.tenSnapshot,
+      pointsRedeemed: r.diemDaDoi,
+      couponCode: r.maCoupon,
+      status: r.trangThai,
+      redeemedAt: r.ngayDoi,
+    };
   }
 }

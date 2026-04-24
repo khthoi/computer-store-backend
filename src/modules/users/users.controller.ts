@@ -10,11 +10,13 @@ import {
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
+import { CustomerProfileResponseDto } from './dto/customer-response.dto';
+import { ShippingAddressResponseDto } from './dto/shipping-address-response.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 
@@ -26,19 +28,7 @@ export class UsersController {
 
   @Get('me')
   @ApiOperation({ summary: 'Thông tin profile của tôi' })
-  @ApiOkResponse({
-    schema: {
-      example: {
-        id: 5,
-        fullName: 'Nguyễn Văn A',
-        email: 'a@example.com',
-        phone: '0901234567',
-        loyaltyPoints: 1200,
-        status: 'HoatDong',
-        createdAt: '2024-01-15T08:00:00.000Z',
-      },
-    },
-  })
+  @ApiOkResponse({ type: CustomerProfileResponseDto })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getProfile(@CurrentUser() user: JwtPayload) {
     return this.usersService.getProfile(user.sub);
@@ -46,28 +36,15 @@ export class UsersController {
 
   @Put('me')
   @ApiOperation({ summary: 'Cập nhật profile' })
+  @ApiOkResponse({ type: CustomerProfileResponseDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   updateProfile(@CurrentUser() user: JwtPayload, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateProfile(user.sub, dto);
   }
 
   @Get('me/addresses')
   @ApiOperation({ summary: 'Danh sách địa chỉ giao hàng' })
-  @ApiOkResponse({
-    schema: {
-      example: [
-        {
-          id: 1,
-          fullName: 'Nguyễn Văn A',
-          phone: '0901234567',
-          address: '123 Lê Lợi',
-          ward: 'Phường Bến Nghé',
-          district: 'Quận 1',
-          province: 'TP. Hồ Chí Minh',
-          isDefault: true,
-        },
-      ],
-    },
-  })
+  @ApiOkResponse({ type: [ShippingAddressResponseDto] })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   getAddresses(@CurrentUser() user: JwtPayload) {
     return this.usersService.getAddresses(user.sub);
@@ -75,12 +52,17 @@ export class UsersController {
 
   @Post('me/addresses')
   @ApiOperation({ summary: 'Thêm địa chỉ giao hàng mới' })
+  @ApiOkResponse({ type: ShippingAddressResponseDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
   addAddress(@CurrentUser() user: JwtPayload, @Body() dto: CreateAddressDto) {
     return this.usersService.addAddress(user.sub, dto);
   }
 
   @Put('me/addresses/:id')
   @ApiOperation({ summary: 'Cập nhật địa chỉ giao hàng' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiOkResponse({ type: ShippingAddressResponseDto })
+  @ApiResponse({ status: 404, description: 'Địa chỉ không tồn tại' })
   updateAddress(
     @CurrentUser() user: JwtPayload,
     @Param('id', ParseIntPipe) id: number,
@@ -92,12 +74,17 @@ export class UsersController {
   @Delete('me/addresses/:id')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Xoá địa chỉ giao hàng' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiResponse({ status: 404, description: 'Địa chỉ không tồn tại' })
   deleteAddress(@CurrentUser() user: JwtPayload, @Param('id', ParseIntPipe) id: number) {
     return this.usersService.deleteAddress(user.sub, id);
   }
 
   @Put('me/addresses/:id/default')
   @ApiOperation({ summary: 'Đặt làm địa chỉ mặc định' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiOkResponse({ type: ShippingAddressResponseDto })
+  @ApiResponse({ status: 404, description: 'Địa chỉ không tồn tại' })
   setDefault(@CurrentUser() user: JwtPayload, @Param('id', ParseIntPipe) id: number) {
     return this.usersService.setDefaultAddress(user.sub, id);
   }

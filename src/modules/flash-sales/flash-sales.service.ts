@@ -5,6 +5,7 @@ import { FlashSale, FlashSaleStatus } from './entities/flash-sale.entity';
 import { FlashSaleItem } from './entities/flash-sale-item.entity';
 import { CreateFlashSaleDto } from './dto/create-flash-sale.dto';
 import { UpdateFlashSaleDto } from './dto/update-flash-sale.dto';
+import { FlashSaleItemResponseDto, FlashSaleResponseDto } from './dto/flash-sale-response.dto';
 
 @Injectable()
 export class FlashSalesService {
@@ -16,7 +17,7 @@ export class FlashSalesService {
     private readonly dataSource: DataSource,
   ) {}
 
-  async create(dto: CreateFlashSaleDto, createdBy: number): Promise<FlashSale> {
+  async create(dto: CreateFlashSaleDto, createdBy: number): Promise<FlashSaleResponseDto> {
     const flashSale = this.flashSaleRepo.create({
       ten: dto.ten,
       moTa: dto.moTa ?? null,
@@ -45,43 +46,47 @@ export class FlashSalesService {
     return this.findOne(saved.id);
   }
 
-  findAll() {
-    return this.flashSaleRepo.find({ relations: ['items'], order: { batDau: 'DESC' } });
+  async findAll(): Promise<FlashSaleResponseDto[]> {
+    const list = await this.flashSaleRepo.find({ relations: ['items'], order: { batDau: 'DESC' } });
+    return list.map((fs) => this.toDto(fs));
   }
 
-  async findOne(id: number): Promise<FlashSale> {
+  async findOne(id: number): Promise<FlashSaleResponseDto> {
     const fs = await this.flashSaleRepo.findOne({ where: { id }, relations: ['items'] });
     if (!fs) throw new NotFoundException(`Flash sale #${id} không tồn tại`);
-    return fs;
+    return this.toDto(fs);
   }
 
-  async findActive(): Promise<FlashSale | null> {
+  async findActive(): Promise<FlashSaleResponseDto | null> {
     const now = new Date();
-    return this.flashSaleRepo
+    const fs = await this.flashSaleRepo
       .createQueryBuilder('fs')
       .leftJoinAndSelect('fs.items', 'items')
-      .where('fs.trang_thai = :status', { status: FlashSaleStatus.DANG_DIEN_RA })
-      .andWhere('fs.bat_dau <= :now', { now })
-      .andWhere('fs.ket_thuc >= :now', { now })
-      .orderBy('fs.bat_dau', 'DESC')
+      .where('fs.trangThai = :status', { status: FlashSaleStatus.DANG_DIEN_RA })
+      .andWhere('fs.batDau <= :now', { now })
+      .andWhere('fs.ketThuc >= :now', { now })
+      .orderBy('fs.batDau', 'DESC')
       .getOne();
+    return fs ? this.toDto(fs) : null;
   }
 
+  // Internal use only — returns raw entity so callers can read giaFlash / soLuongGioiHan
   async findActiveItemForVariant(phienBanId: number): Promise<FlashSaleItem | null> {
     const now = new Date();
     return this.itemRepo
       .createQueryBuilder('fsi')
       .innerJoin('fsi.flashSale', 'fs')
-      .where('fsi.phien_ban_id = :phienBanId', { phienBanId })
-      .andWhere('fs.trang_thai = :status', { status: FlashSaleStatus.DANG_DIEN_RA })
-      .andWhere('fs.bat_dau <= :now', { now })
-      .andWhere('fs.ket_thuc >= :now', { now })
-      .andWhere('fsi.so_luong_da_ban < fsi.so_luong_gioi_han')
+      .where('fsi.phienBanId = :phienBanId', { phienBanId })
+      .andWhere('fs.trangThai = :status', { status: FlashSaleStatus.DANG_DIEN_RA })
+      .andWhere('fs.batDau <= :now', { now })
+      .andWhere('fs.ketThuc >= :now', { now })
+      .andWhere('fsi.soLuongDaBan < fsi.soLuongGioiHan')
       .getOne();
   }
 
-  async update(id: number, dto: UpdateFlashSaleDto): Promise<FlashSale> {
-    const fs = await this.findOne(id);
+  async update(id: number, dto: UpdateFlashSaleDto): Promise<FlashSaleResponseDto> {
+    const fs = await this.flashSaleRepo.findOne({ where: { id }, relations: ['items'] });
+    if (!fs) throw new NotFoundException(`Flash sale #${id} không tồn tại`);
     if (fs.trangThai === FlashSaleStatus.DANG_DIEN_RA) {
       throw new BadRequestException('Không thể sửa flash sale đang diễn ra');
     }
@@ -133,5 +138,36 @@ export class FlashSalesService {
       `UPDATE flash_sale_item SET so_luong_da_ban = GREATEST(0, so_luong_da_ban - ?) WHERE flash_sale_item_id = ?`,
       [quantity, itemId],
     );
+  }
+
+  private toDto(fs: FlashSale): FlashSaleResponseDto {
+    return {
+      id: fs.id,
+      name: fs.ten,
+      description: fs.moTa,
+      status: fs.trangThai,
+      startAt: fs.batDau,
+      endAt: fs.ketThuc,
+      bannerTitle: fs.bannerTitle,
+      bannerImageUrl: fs.bannerImageUrl,
+      assetIdBanner: fs.assetIdBanner,
+      createdBy: fs.createdBy,
+      createdAt: fs.createdAt,
+      updatedAt: fs.updatedAt,
+      items: (fs.items ?? []).map((i) => this.toItemDto(i)),
+    };
+  }
+
+  private toItemDto(i: FlashSaleItem): FlashSaleItemResponseDto {
+    return {
+      id: i.id,
+      flashSaleId: i.flashSaleId,
+      variantId: i.phienBanId,
+      flashPrice: Number(i.giaFlash),
+      originalPriceSnapshot: Number(i.giaGocSnapshot),
+      quantityLimit: i.soLuongGioiHan,
+      quantitySold: i.soLuongDaBan,
+      displayOrder: i.thuTuHienThi,
+    };
   }
 }

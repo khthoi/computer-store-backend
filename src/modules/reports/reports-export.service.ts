@@ -24,8 +24,8 @@ export class ReportsExportService {
 
     const rows = await this.revenueRepo
       .createQueryBuilder('r')
-      .where('r.ngay BETWEEN :start AND :end', { start, end })
-      .orderBy('r.ngay', 'ASC')
+      .where('r.date BETWEEN :start AND :end', { start, end })
+      .orderBy('r.date', 'ASC')
       .getMany();
 
     const wb = new ExcelJS.Workbook();

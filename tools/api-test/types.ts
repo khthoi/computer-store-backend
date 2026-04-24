@@ -2,8 +2,8 @@ export type HttpMethod = 'GET' | 'POST' | 'PUT' | 'PATCH' | 'DELETE';
 export type AuthType = 'customer' | 'admin' | 'none';
 
 export interface Expect {
-  /** HTTP status code phải khớp chính xác */
-  status: number;
+  /** HTTP status code phải khớp — number hoặc mảng các code được chấp nhận */
+  status: number | number[];
   /** Partial match theo dot-path, ví dụ: { 'data.email': 'a@b.com' } */
   bodyMatch?: Record<string, unknown>;
   /** Kiểm tra response body có chứa chuỗi này không */
