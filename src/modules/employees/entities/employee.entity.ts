@@ -28,6 +28,15 @@ export class Employee {
   @Column({ name: 'gioi_tinh', length: 20, nullable: true })
   gioiTinh: string | null; // 'Male' | 'Female' | 'Undefined'
 
+  @Column({ name: 'so_dien_thoai', length: 20, nullable: true })
+  soDienThoai: string | null;
+
+  @Column({ name: 'ngay_sinh', type: 'date', nullable: true })
+  ngaySinh: Date | null;
+
+  @Column({ name: 'ngay_vao_lam', type: 'date', nullable: true })
+  ngayVaoLam: Date | null;
+
   @Column({ name: 'mat_khau_hash', length: 255, select: false })
   matKhauHash: string;
 
@@ -40,6 +49,9 @@ export class Employee {
 
   @CreateDateColumn({ name: 'ngay_tao' })
   ngayTao: Date;
+
+  @Column({ name: 'dang_nhap_cuoi', type: 'datetime', nullable: true })
+  dangNhapCuoi: Date | null;
 
   @Column({ name: 'asset_id_avatar', nullable: true })
   assetIdAvatar: number | null;

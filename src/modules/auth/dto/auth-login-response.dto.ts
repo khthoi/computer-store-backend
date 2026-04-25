@@ -12,7 +12,7 @@ export class AuthLoginCustomerResponseDto {
 
 export class AuthLoginEmployeeResponseDto {
   @ApiProperty({ type: AuthEmployeeDto })
-  employee: AuthEmployeeDto;
+  user: AuthEmployeeDto;
 
   @ApiProperty({ example: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...' })
   accessToken: string;

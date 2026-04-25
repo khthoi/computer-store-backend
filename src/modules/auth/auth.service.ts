@@ -10,6 +10,7 @@ import * as bcrypt from 'bcryptjs';
 import { randomUUID } from 'crypto';
 import { UsersService } from '../users/users.service';
 import { EmployeesService } from '../employees/employees.service';
+import { ProfileService } from '../employees/profile.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { Customer } from '../users/entities/customer.entity';
 import { Employee } from '../employees/entities/employee.entity';
@@ -26,6 +27,7 @@ export class AuthService {
   constructor(
     private readonly usersService: UsersService,
     private readonly employeesService: EmployeesService,
+    private readonly profileService: ProfileService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
@@ -76,11 +78,16 @@ export class AuthService {
     return { customer: this.toCustomerDto(customer), ...tokens };
   }
 
-  async loginEmployee(employee: Employee): Promise<{ employee: AuthEmployeeDto; accessToken: string; refreshToken: string }> {
+  async loginEmployee(
+    employee: Employee,
+    ipAddress?: string,
+  ): Promise<{ user: AuthEmployeeDto; accessToken: string; refreshToken: string }> {
     const fullEmployee = await this.employeesService.findByIdWithRoles(employee.id);
     if (!fullEmployee) throw new UnauthorizedException();
     const tokens = await this.issueEmployeeTokens(fullEmployee);
-    return { employee: this.toEmployeeDto(fullEmployee), ...tokens };
+    // fire-and-forget: update lastLoginAt + audit log (non-blocking)
+    void this.profileService.recordLogin(employee.id, ipAddress);
+    return { user: this.toEmployeeDto(fullEmployee), ...tokens };
   }
 
   // ─── Refresh Token ────────────────────────────────────────────────────────
@@ -221,15 +228,11 @@ export class AuthService {
 
   private toEmployeeDto(employee: Employee): AuthEmployeeDto {
     return {
-      id: employee.id,
-      maNhanVien: employee.maNhanVien,
+      id: String(employee.id),
+      code: employee.maNhanVien,
       email: employee.email,
-      hoTen: employee.hoTen,
-      gioiTinh: employee.gioiTinh,
-      anhDaiDien: employee.anhDaiDien,
-      trangThai: employee.trangThai,
-      ngayTao: employee.ngayTao,
-      assetIdAvatar: employee.assetIdAvatar,
+      fullName: employee.hoTen,
+      avatar: employee.anhDaiDien ?? null,
       roles: employee.roles?.map((r) => r.tenVaiTro) ?? [],
     };
   }

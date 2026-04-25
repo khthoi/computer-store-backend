@@ -72,7 +72,8 @@ export class AuthController {
   @ApiOkResponse({ type: AuthLoginEmployeeResponseDto, description: 'Đăng nhập thành công, refresh token được set trong cookie' })
   @ApiResponse({ status: 401, description: 'Email hoặc mật khẩu không đúng' })
   async loginEmployee(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const { refreshToken, ...data } = await this.authService.loginEmployee(req.user as Employee);
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0] ?? req.ip;
+    const { refreshToken, ...data } = await this.authService.loginEmployee(req.user as Employee, ip);
     res.cookie(RT_COOKIE, refreshToken, RT_COOKIE_OPTIONS);
     return data;
   }

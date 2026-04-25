@@ -9,5 +9,5 @@ export class LoginDto {
   @ApiProperty({ example: 'Passw0rd!' })
   @IsString()
   @MinLength(1)
-  matKhau: string;
+  password: string;
 }

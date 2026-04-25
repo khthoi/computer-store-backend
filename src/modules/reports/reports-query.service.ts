@@ -80,7 +80,7 @@ export class ReportsQueryService {
         .addSelect('v.ten_phien_ban', 'variantName')
         .addSelect('sp.ten_san_pham', 'productName')
         .addSelect('SUM(od.so_luong)', 'totalSold')
-        .addSelect('SUM(od.thanh_tien_snapshot)', 'totalRevenue')
+        .addSelect('SUM(od.thanh_tien)', 'totalRevenue')
         .from('chi_tiet_don_hang', 'od')
         .innerJoin('don_hang', 'dh', 'dh.don_hang_id = od.don_hang_id')
         .innerJoin('phien_ban_san_pham', 'v', 'v.phien_ban_id = od.phien_ban_id')

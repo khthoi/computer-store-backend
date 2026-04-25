@@ -13,6 +13,7 @@ import redisConfig from './config/redis.config';
 
 // Common
 import { RedisModule } from './common/redis/redis.module';
+import { MailModule } from './modules/mail/mail.module';
 
 // Phase 1 — Xác thực & Phân quyền
 import { AuthModule } from './modules/auth/auth.module';
@@ -59,6 +60,9 @@ import { CmsModule } from './modules/cms/cms.module';
 import { ReportsModule } from './modules/reports/reports.module';
 import { SettingsModule } from './modules/settings/settings.module';
 
+// Dashboard
+import { DashboardModule } from './modules/dashboard/dashboard.module';
+
 // Guards
 import { JwtAuthGuard } from './common/guards/jwt-auth.guard';
 import { RolesGuard } from './common/guards/roles.guard';
@@ -99,6 +103,7 @@ import { RolesGuard } from './common/guards/roles.guard';
     ScheduleModule.forRoot(),
 
     RedisModule,
+    MailModule,
 
     // Phase 1
     AuthModule,
@@ -144,6 +149,8 @@ import { RolesGuard } from './common/guards/roles.guard';
     // Phase 9
     ReportsModule,
     SettingsModule,
+
+    DashboardModule,
   ],
   controllers: [AppController],
   providers: [
