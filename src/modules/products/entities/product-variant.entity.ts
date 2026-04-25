@@ -48,6 +48,9 @@ export class ProductVariant {
   @Column({ name: 'is_mac_dinh', type: 'boolean', default: false })
   isMacDinh: boolean;
 
+  @Column({ name: 'so_luong_ton', type: 'int', default: 0 })
+  soLuongTon: number;
+
   @UpdateDateColumn({ name: 'ngay_cap_nhat' })
   ngayCapNhat: Date;
 

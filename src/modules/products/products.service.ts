@@ -13,6 +13,7 @@ import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { slugify } from '../../common/helpers/slugify';
 import { BrandsService } from '../brands/brands.service';
+import { ProductListResponse, mapProductListResponse } from './dto/product-response.dto';
 
 @Injectable()
 export class ProductsService {
@@ -52,10 +53,16 @@ export class ProductsService {
   async findOne(id: number): Promise<Product> {
     const product = await this.productRepo.findOne({
       where: { id },
-      relations: ['variants', 'variants.images'],
+      relations: ['danhMuc', 'variants', 'variants.images'],
     });
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
     return product;
+  }
+
+  async findOneAdmin(id: number): Promise<ProductListResponse> {
+    const product = await this.findOne(id);
+    const brands = await this.brandsService.getProductBrands(product.id);
+    return mapProductListResponse(product, brands);
   }
 
   async findBySlug(slug: string): Promise<Product> {
@@ -157,6 +164,73 @@ export class ProductsService {
     await this.imageRepo.remove(image);
   }
 
+  // ── Clone ─────────────────────────────────────────────────────────────────
+
+  async cloneProduct(id: number, employeeId: number): Promise<import('./dto/product-response.dto').ProductListResponse> {
+    const source = await this.findOne(id);
+    const brands = await this.brandsService.getProductBrands(source.id);
+
+    const newSlug = await this.makeUniqueSlug(`${source.slug}-copy`);
+    const newMa = await this.makeUniqueMa(`${source.maSanPham}-COPY`);
+
+    const clonedVariants = source.variants.map((v, i) =>
+      this.variantRepo.create({
+        tenPhienBan: v.tenPhienBan,
+        sku: `${v.sku}-copy-${i}`,
+        giaGoc: v.giaGoc,
+        giaBan: v.giaBan,
+        trongLuong: v.trongLuong,
+        trangThai: 'An',
+        isMacDinh: i === 0,
+        soLuongTon: 0,
+      }),
+    );
+
+    const clone = this.productRepo.create({
+      tenSanPham: `Copy of ${source.tenSanPham}`,
+      maSanPham: newMa,
+      slug: newSlug,
+      danhMucId: source.danhMucId,
+      trangThai: 'Nhap',
+      nguoiTaoId: employeeId,
+      moTaNgan: source.moTaNgan,
+      variants: clonedVariants,
+    });
+
+    const saved = await this.productRepo.save(clone);
+    if (brands.length > 0) {
+      await this.brandsService.setProductBrands(saved.id, brands.map((b) => b.id));
+    }
+    return this.findOneAdmin(saved.id);
+  }
+
+  async cloneVariant(productId: number, variantId: number): Promise<import('./dto/product-response.dto').VariantListResponse> {
+    const variant = await this.variantRepo.findOne({
+      where: { id: variantId, sanPhamId: productId },
+      relations: ['images'],
+    });
+    if (!variant) throw new NotFoundException('Biến thể không tồn tại');
+
+    const newSku = await this.makeUniqueSku(`${variant.sku}-copy`);
+
+    const clone = this.variantRepo.create({
+      sanPhamId: productId,
+      tenPhienBan: `Copy of ${variant.tenPhienBan}`,
+      sku: newSku,
+      giaGoc: variant.giaGoc,
+      giaBan: variant.giaBan,
+      trongLuong: variant.trongLuong,
+      trangThai: 'An',
+      isMacDinh: false,
+      soLuongTon: 0,
+    });
+
+    const saved = await this.variantRepo.save(clone);
+    const full = await this.variantRepo.findOne({ where: { id: saved.id }, relations: ['images'] });
+    const { mapVariantListResponse } = await import('./dto/product-response.dto');
+    return mapVariantListResponse(full!);
+  }
+
   // ── Helpers ───────────────────────────────────────────────────────────────
 
   private async assertSlugUnique(slug: string): Promise<void> {
@@ -167,5 +241,32 @@ export class ProductsService {
   private async assertMaUnique(maSanPham: string): Promise<void> {
     const exists = await this.productRepo.findOne({ where: { maSanPham } });
     if (exists) throw new ConflictException(`Mã sản phẩm "${maSanPham}" đã tồn tại`);
+  }
+
+  private async makeUniqueSlug(base: string): Promise<string> {
+    let slug = base;
+    let i = 1;
+    while (await this.productRepo.findOne({ where: { slug } })) {
+      slug = `${base}-${i++}`;
+    }
+    return slug;
+  }
+
+  private async makeUniqueMa(base: string): Promise<string> {
+    let ma = base.slice(0, 255);
+    let i = 1;
+    while (await this.productRepo.findOne({ where: { maSanPham: ma } })) {
+      ma = `${base.slice(0, 250)}-${i++}`;
+    }
+    return ma;
+  }
+
+  private async makeUniqueSku(base: string): Promise<string> {
+    let sku = base.slice(0, 100);
+    let i = 1;
+    while (await this.variantRepo.findOne({ where: { sku } })) {
+      sku = `${base.slice(0, 95)}-${i++}`;
+    }
+    return sku;
   }
 }

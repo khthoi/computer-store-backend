@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Brand } from './entities/brand.entity';
 import { ProductBrand } from './entities/product-brand.entity';
 import { CreateBrandDto } from './dto/create-brand.dto';
@@ -57,6 +57,23 @@ export class BrandsService {
     const ids = links.map((l) => l.thuongHieuId);
     if (!ids.length) return [];
     return this.brandRepo.createQueryBuilder('b').whereInIds(ids).getMany();
+  }
+
+  async getBrandMapForProducts(sanPhamIds: number[]): Promise<Map<number, Brand[]>> {
+    if (!sanPhamIds.length) return new Map();
+    const links = await this.productBrandRepo.find({ where: { sanPhamId: In(sanPhamIds) } });
+    if (!links.length) return new Map();
+    const brandIds = [...new Set(links.map((l) => l.thuongHieuId))];
+    const brands = await this.brandRepo.findBy({ id: In(brandIds) });
+    const brandById = new Map(brands.map((b) => [b.id, b]));
+    const result = new Map<number, Brand[]>();
+    for (const link of links) {
+      const b = brandById.get(link.thuongHieuId);
+      if (!b) continue;
+      if (!result.has(link.sanPhamId)) result.set(link.sanPhamId, []);
+      result.get(link.sanPhamId)!.push(b);
+    }
+    return result;
   }
 
   async setProductBrands(sanPhamId: number, thuongHieuIds: number[]): Promise<void> {

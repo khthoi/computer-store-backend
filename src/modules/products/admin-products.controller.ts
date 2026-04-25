@@ -130,7 +130,7 @@ export class AdminProductsController {
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   @ApiResponse({ status: 404, description: 'Sản phẩm không tồn tại' })
   findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.productsService.findOne(id);
+    return this.productsService.findOneAdmin(id);
   }
 
   @Post()
@@ -153,6 +153,21 @@ export class AdminProductsController {
   }
 
   // ── Variants ──────────────────────────────────────────────────────────────
+
+  @Post(':id/clone')
+  @ApiOperation({ summary: 'Nhân bản sản phẩm (tạo bản sao trạng thái Nhap)' })
+  cloneProduct(@Param('id', ParseIntPipe) id: number, @CurrentUser() user: JwtPayload) {
+    return this.productsService.cloneProduct(id, user.sub);
+  }
+
+  @Post(':productId/variants/:variantId/clone')
+  @ApiOperation({ summary: 'Nhân bản biến thể (tạo bản sao trạng thái An)' })
+  cloneVariant(
+    @Param('productId', ParseIntPipe) productId: number,
+    @Param('variantId', ParseIntPipe) variantId: number,
+  ) {
+    return this.productsService.cloneVariant(productId, variantId);
+  }
 
   @Post(':id/variants')
   @ApiOperation({ summary: 'Thêm biến thể cho sản phẩm' })

@@ -5,9 +5,12 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  ManyToOne,
+  JoinColumn,
   Index,
 } from 'typeorm';
 import { ProductVariant } from './product-variant.entity';
+import { Category } from '../../categories/entities/category.entity';
 
 @Entity('san_pham')
 @Index('idx_sp_danhmuc', ['danhMucId'])
@@ -56,6 +59,10 @@ export class Product {
 
   @UpdateDateColumn({ name: 'ngay_cap_nhat' })
   ngayCapNhat: Date;
+
+  @ManyToOne(() => Category, { nullable: true, eager: false })
+  @JoinColumn({ name: 'danh_muc_id' })
+  danhMuc: Category | null;
 
   @OneToMany(() => ProductVariant, (v) => v.product, { cascade: true })
   variants: ProductVariant[];
