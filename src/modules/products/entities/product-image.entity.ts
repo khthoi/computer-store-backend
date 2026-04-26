@@ -8,6 +8,11 @@ import {
 } from 'typeorm';
 import { ProductVariant } from './product-variant.entity';
 
+export enum LoaiAnh {
+  AnhChinh = 'AnhChinh',
+  AnhPhu = 'AnhPhu',
+}
+
 @Entity('hinh_anh_san_pham')
 @Index('idx_hasp_phienban', ['phienBanId'])
 export class ProductImage {
@@ -20,8 +25,8 @@ export class ProductImage {
   @Column({ name: 'url_hinh_anh', length: 500 })
   urlHinhAnh: string;
 
-  @Column({ name: 'loai_anh', length: 20, default: 'AnhPhu' })
-  loaiAnh: string; // 'AnhChinh' | 'AnhPhu' | 'Anh360'
+  @Column({ name: 'loai_anh', type: 'enum', enum: LoaiAnh, default: LoaiAnh.AnhPhu })
+  loaiAnh: LoaiAnh;
 
   @Column({ name: 'thu_tu', type: 'smallint', default: 0 })
   thuTu: number;

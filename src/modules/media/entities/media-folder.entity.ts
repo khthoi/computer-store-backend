@@ -31,6 +31,9 @@ export class MediaFolder {
   @Column({ name: 'is_active', default: true })
   isActive: boolean;
 
+  @Column({ name: 'pham_vi', length: 10, default: 'public' })
+  phamVi: string; // 'public' | 'private'
+
   @CreateDateColumn({ name: 'ngay_tao' })
   ngayTao: Date;
 

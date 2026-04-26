@@ -67,6 +67,9 @@ export class MediaAsset {
   @Column({ name: 'trang_thai', length: 20, default: 'active' })
   trangThai: string; // 'active' | 'archived'
 
+  @Column({ name: 'pham_vi', length: 10, default: 'public' })
+  phamVi: string; // 'public' | 'private'
+
   @Column({ name: 'nguoi_upload_id' })
   nguoiUploadId: number;
 

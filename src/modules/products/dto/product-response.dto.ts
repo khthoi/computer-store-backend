@@ -1,5 +1,6 @@
 import { Product } from '../entities/product.entity';
 import { ProductVariant } from '../entities/product-variant.entity';
+import { ProductImage } from '../entities/product-image.entity';
 import { Brand } from '../../brands/entities/brand.entity';
 
 // ─── Status maps ────────────────────────────────────────────────────────────
@@ -71,6 +72,7 @@ export interface ProductListResponse {
   category: string;
   categoryId: string;
   brands: string[];
+  brandIds: string[];
   totalStock: number;
   status: 'published' | 'draft' | 'archived';
   variants: VariantListResponse[];
@@ -80,6 +82,79 @@ export interface ProductListResponse {
   updatedAt: string;
   averageRating: number | null;
   reviewCount: number;
+}
+
+// ─── Variant admin detail response ───────────────────────────────────────────
+
+const DETAIL_STATUS_MAP: Record<string, 'visible' | 'hidden' | 'out_of_stock'> = {
+  HienThi: 'visible',
+  An: 'hidden',
+  HetHang: 'out_of_stock',
+};
+
+const IMAGE_TYPE_MAP: Record<string, 'main' | 'gallery'> = {
+  AnhChinh: 'main',
+  AnhPhu: 'gallery',
+};
+
+export interface ImageMediaResponse {
+  id: string;
+  variantId: string;
+  url: string;
+  assetId: string | null;
+  type: 'main' | 'gallery';
+  order: number;
+  altText?: string;
+}
+
+export interface VariantAdminDetail {
+  id: string;
+  productId: string;
+  name: string;
+  sku: string;
+  isDefault: boolean;
+  originalPrice: number;
+  salePrice: number;
+  weight: number | undefined;
+  status: 'visible' | 'hidden' | 'out_of_stock';
+  updatedAt: string;
+  description: string;
+  specificationGroups: unknown[];
+  media: ImageMediaResponse[];
+}
+
+export function mapImageToMedia(img: ProductImage): ImageMediaResponse {
+  return {
+    id: String(img.id),
+    variantId: String(img.phienBanId),
+    url: img.urlHinhAnh,
+    assetId: img.assetId != null ? String(img.assetId) : null,
+    type: IMAGE_TYPE_MAP[img.loaiAnh] ?? 'gallery',
+    order: img.thuTu,
+    ...(img.altText && { altText: img.altText }),
+  };
+}
+
+export function mapVariantAdminDetail(variant: ProductVariant, specGroups: unknown[]): VariantAdminDetail {
+  const images = (variant.images ?? [])
+    .sort((a, b) => a.thuTu - b.thuTu)
+    .map(mapImageToMedia);
+
+  return {
+    id: String(variant.id),
+    productId: String(variant.sanPhamId),
+    name: variant.tenPhienBan,
+    sku: variant.sku,
+    isDefault: variant.isMacDinh,
+    originalPrice: Number(variant.giaGoc),
+    salePrice: Number(variant.giaBan),
+    weight: variant.trongLuong != null ? Number(variant.trongLuong) : undefined,
+    status: DETAIL_STATUS_MAP[variant.trangThai] ?? 'hidden',
+    updatedAt: variant.ngayCapNhat?.toISOString() ?? new Date().toISOString(),
+    description: variant.moTaChiTiet ?? '',
+    specificationGroups: specGroups,
+    media: images,
+  };
 }
 
 export function mapProductListResponse(product: Product, brands: Brand[]): ProductListResponse {
@@ -94,6 +169,7 @@ export function mapProductListResponse(product: Product, brands: Brand[]): Produ
     category: product.danhMuc?.tenDanhMuc ?? '',
     categoryId: String(product.danhMuc?.id ?? ''),
     brands: brands.map((b) => b.tenThuongHieu),
+    brandIds: brands.map((b) => String(b.id)),
     totalStock,
     status: mapProductStatus(product.trangThai),
     variants,

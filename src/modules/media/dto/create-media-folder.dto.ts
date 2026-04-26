@@ -35,4 +35,9 @@ export class CreateMediaFolderDto {
   @IsOptional()
   @IsBoolean()
   isActive?: boolean;
+
+  @ApiPropertyOptional({ enum: ['public', 'private'], default: 'public', description: 'public: hiển thị trong thư viện media; private: chỉ dùng nội bộ (avatar, chat...)' })
+  @IsOptional()
+  @IsIn(['public', 'private'])
+  phamVi?: string;
 }

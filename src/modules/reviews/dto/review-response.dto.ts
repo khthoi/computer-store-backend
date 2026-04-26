@@ -45,6 +45,29 @@ export class ReviewResponseDto {
 
   @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
   updatedAt: Date;
+
+  // ── Joined fields (populated by admin list endpoint) ──────────────────────
+
+  @ApiPropertyOptional({ example: 'Laptop Gaming ASUS ROG' })
+  tenSanPham?: string | null;
+
+  @ApiPropertyOptional({ example: 'RAM 16GB / RTX 4060' })
+  tenPhienBan?: string | null;
+
+  @ApiPropertyOptional({ example: 'https://example.com/img.jpg' })
+  anhPhienBan?: string | null;
+
+  @ApiPropertyOptional({ example: 'Nguyễn Văn An' })
+  khachHangTen?: string | null;
+
+  @ApiPropertyOptional({ example: 'https://example.com/avatar.jpg' })
+  khachHangAvatar?: string | null;
+
+  @ApiPropertyOptional({ example: 'DH-2024-000301' })
+  maDonHang?: string | null;
+
+  @ApiPropertyOptional({ example: 'Admin Hệ thống' })
+  nguoiDuyetTen?: string | null;
 }
 
 export class ReviewMessageResponseDto {

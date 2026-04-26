@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   ParseIntPipe,
   HttpCode,
   HttpStatus,
@@ -101,6 +102,16 @@ export class AdminSpecificationsController {
   @ApiOperation({ summary: 'Xoá loại thông số' })
   removeType(@Param('id', ParseIntPipe) id: number) {
     return this.specsService.removeType(id);
+  }
+
+  // ── Spec template for a category (used when creating a new variant) ─────────
+
+  @Get('template')
+  @ApiOperation({ summary: 'Template thông số kỹ thuật theo danh mục (kể cả kế thừa từ cha)' })
+  getSpecTemplate(@Query('categoryId') categoryId?: string) {
+    const id = parseInt(categoryId ?? '', 10);
+    if (isNaN(id)) return [];
+    return this.specsService.getSpecTemplateForCategory(id);
   }
 
   // ── Category ↔ Group links ────────────────────────────────────────────────

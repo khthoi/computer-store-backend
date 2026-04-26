@@ -47,6 +47,9 @@ export class AdminMediaController {
       properties: {
         file: { type: 'string', format: 'binary' },
         folder: { type: 'string', example: 'pc-store/products', description: 'Đường dẫn thư mục (phải khớp với cấu hình)' },
+        thuMucId: { type: 'number', description: 'ID thư mục (thay thế cho folder path)' },
+        altText: { type: 'string', description: 'Alt text cho hình ảnh' },
+        caption: { type: 'string', description: 'Caption/mô tả file' },
       },
       required: ['file'],
     },
@@ -59,8 +62,16 @@ export class AdminMediaController {
     @UploadedFile() file: Express.Multer.File,
     @CurrentUser() user: JwtPayload,
     @Body('folder') folder?: string,
+    @Body('thuMucId') thuMucId?: string,
+    @Body('altText') altText?: string,
+    @Body('caption') caption?: string,
   ) {
-    return this.mediaService.upload(file, user.sub, folder);
+    return this.mediaService.upload(file, user.sub, {
+      folderPath: folder,
+      thuMucId: thuMucId ? Number(thuMucId) : undefined,
+      altText,
+      caption,
+    });
   }
 
   // ── Folder Configuration (static routes first to avoid :id conflicts) ─────

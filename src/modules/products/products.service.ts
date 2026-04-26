@@ -5,10 +5,11 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository } from 'typeorm';
+import { In, Repository } from 'typeorm';
 import { Product } from './entities/product.entity';
 import { ProductVariant } from './entities/product-variant.entity';
-import { ProductImage } from './entities/product-image.entity';
+import { ProductImage, LoaiAnh } from './entities/product-image.entity';
+import { SpecValue } from '../specifications/entities/spec-value.entity';
 import { CreateProductDto } from './dto/create-product.dto';
 import { UpdateProductDto } from './dto/update-product.dto';
 import { slugify } from '../../common/helpers/slugify';
@@ -21,6 +22,7 @@ export class ProductsService {
     @InjectRepository(Product) private readonly productRepo: Repository<Product>,
     @InjectRepository(ProductVariant) private readonly variantRepo: Repository<ProductVariant>,
     @InjectRepository(ProductImage) private readonly imageRepo: Repository<ProductImage>,
+    @InjectRepository(SpecValue) private readonly specValueRepo: Repository<SpecValue>,
     private readonly brandsService: BrandsService,
   ) {}
 
@@ -90,19 +92,24 @@ export class ProductsService {
     }
 
     const { variants: _v, brandIds, ...rest } = dto;
-    Object.assign(product, rest);
-    const saved = await this.productRepo.save(product);
+    if (Object.keys(rest).length) await this.productRepo.update(id, rest);
     if (brandIds !== undefined) {
-      await this.brandsService.setProductBrands(saved.id, brandIds ?? []);
+      await this.brandsService.setProductBrands(id, brandIds ?? []);
     }
-    return saved;
+    return this.findOne(id);
   }
 
   async remove(id: number): Promise<void> {
     const product = await this.findOne(id);
-    // Soft delete: đặt trang_thai = NgungBan nếu đã có đơn hàng
-    product.trangThai = 'NgungBan';
-    await this.productRepo.save(product);
+    const variantIds = product.variants.map((v) => v.id);
+    if (variantIds.length > 0) {
+      await this.specValueRepo
+        .createQueryBuilder()
+        .delete()
+        .where('phien_ban_id IN (:...ids)', { ids: variantIds })
+        .execute();
+    }
+    await this.productRepo.remove(product);
   }
 
   // ── Variants ──────────────────────────────────────────────────────────────
@@ -143,13 +150,49 @@ export class ProductsService {
   }
 
   async removeVariant(variantId: number): Promise<void> {
-    const variant = await this.variantRepo.findOne({ where: { id: variantId } });
+    const variant = await this.variantRepo.findOne({ where: { id: variantId }, relations: ['images'] });
     if (!variant) throw new NotFoundException('Biến thể không tồn tại');
-    variant.trangThai = 'An';
-    await this.variantRepo.save(variant);
+    await this.specValueRepo.delete({ phienBanId: variantId });
+    await this.variantRepo.remove(variant);
   }
 
   // ── Images ────────────────────────────────────────────────────────────────
+
+  async findVariantWithImages(productId: number, variantId: number): Promise<ProductVariant> {
+    const variant = await this.variantRepo.findOne({
+      where: { id: variantId, sanPhamId: productId },
+      relations: ['images'],
+    });
+    if (!variant) throw new NotFoundException('Biến thể không tồn tại');
+    return variant;
+  }
+
+  async findVariantImages(variantId: number): Promise<ProductImage[]> {
+    const variant = await this.variantRepo.findOne({
+      where: { id: variantId },
+      relations: ['images'],
+    });
+    if (!variant) throw new NotFoundException('Biến thể không tồn tại');
+    return (variant.images ?? []).sort((a, b) => a.thuTu - b.thuTu);
+  }
+
+  async saveVariantMedia(variantId: number, items: import('./dto/save-variant-media.dto').MediaItemDto[]): Promise<void> {
+    const TYPE_MAP: Record<string, LoaiAnh> = { main: LoaiAnh.AnhChinh, gallery: LoaiAnh.AnhPhu };
+    await this.imageRepo.delete({ phienBanId: variantId });
+    if (!items.length) return;
+    await this.imageRepo.save(
+      items.map((m) =>
+        this.imageRepo.create({
+          phienBanId: variantId,
+          urlHinhAnh: m.url,
+          assetId: m.assetId != null ? Number(m.assetId) : null,
+          loaiAnh: TYPE_MAP[m.type] ?? LoaiAnh.AnhPhu,
+          thuTu: m.order,
+          altText: m.altText ?? null,
+        }),
+      ),
+    );
+  }
 
   async addImage(phienBanId: number, data: Partial<ProductImage>): Promise<ProductImage> {
     const variant = await this.variantRepo.findOne({ where: { id: phienBanId } });
@@ -173,16 +216,20 @@ export class ProductsService {
     const newSlug = await this.makeUniqueSlug(`${source.slug}-copy`);
     const newMa = await this.makeUniqueMa(`${source.maSanPham}-COPY`);
 
-    const clonedVariants = source.variants.map((v, i) =>
-      this.variantRepo.create({
-        tenPhienBan: v.tenPhienBan,
-        sku: `${v.sku}-copy-${i}`,
-        giaGoc: v.giaGoc,
-        giaBan: v.giaBan,
-        trongLuong: v.trongLuong,
-        trangThai: 'An',
-        isMacDinh: i === 0,
-        soLuongTon: 0,
+    const clonedVariants = await Promise.all(
+      source.variants.map(async (v, i) => {
+        const sku = await this.makeUniqueSku(`${v.sku}-copy`);
+        return this.variantRepo.create({
+          tenPhienBan: v.tenPhienBan,
+          sku,
+          giaGoc: v.giaGoc,
+          giaBan: v.giaBan,
+          trongLuong: v.trongLuong,
+          moTaChiTiet: v.moTaChiTiet,
+          trangThai: 'An',
+          isMacDinh: i === 0,
+          soLuongTon: 0,
+        });
       }),
     );
 
@@ -201,6 +248,22 @@ export class ProductsService {
     if (brands.length > 0) {
       await this.brandsService.setProductBrands(saved.id, brands.map((b) => b.id));
     }
+
+    // Copy specs and images for each variant
+    const sourceIds = source.variants.map((v) => v.id);
+    const allSpecs = sourceIds.length ? await this.specValueRepo.find({ where: { phienBanId: In(sourceIds) } }) : [];
+    for (let i = 0; i < source.variants.length; i++) {
+      const sv = source.variants[i];
+      const newId = saved.variants[i].id;
+      const specs = allSpecs.filter((s) => s.phienBanId === sv.id);
+      if (specs.length) {
+        await this.specValueRepo.save(specs.map(({ id: _i, phienBanId: _p, ...s }) => this.specValueRepo.create({ ...s, phienBanId: newId })));
+      }
+      if (sv.images?.length) {
+        await this.imageRepo.save(sv.images.map(({ id: _i, phienBanId: _p, variant: _v, ...img }) => this.imageRepo.create({ ...img, phienBanId: newId })));
+      }
+    }
+
     return this.findOneAdmin(saved.id);
   }
 
@@ -220,12 +283,26 @@ export class ProductsService {
       giaGoc: variant.giaGoc,
       giaBan: variant.giaBan,
       trongLuong: variant.trongLuong,
+      moTaChiTiet: variant.moTaChiTiet,
       trangThai: 'An',
       isMacDinh: false,
       soLuongTon: 0,
     });
 
     const saved = await this.variantRepo.save(clone);
+
+    const specs = await this.specValueRepo.find({ where: { phienBanId: variantId } });
+    if (specs.length) {
+      await this.specValueRepo.save(
+        specs.map(({ id: _i, phienBanId: _p, ...s }) => this.specValueRepo.create({ ...s, phienBanId: saved.id })),
+      );
+    }
+    if (variant.images?.length) {
+      await this.imageRepo.save(
+        variant.images.map(({ id: _i, phienBanId: _p, variant: _v, ...img }) => this.imageRepo.create({ ...img, phienBanId: saved.id })),
+      );
+    }
+
     const full = await this.variantRepo.findOne({ where: { id: saved.id }, relations: ['images'] });
     const { mapVariantListResponse } = await import('./dto/product-response.dto');
     return mapVariantListResponse(full!);

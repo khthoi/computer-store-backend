@@ -443,6 +443,46 @@ export class ProductsService {
 }
 ```
 
+### Hard delete with orphan cleanup
+
+When hard-deleting an entity that has child records pointing to it via a plain FK column (no TypeORM cascade), manually delete those children first, then remove the parent.
+
+```typescript
+// ✓ Products example — SpecValue.phienBanId is a plain @Column, no cascade
+async remove(id: number): Promise<void> {
+  const product = await this.findOne(id);   // loads variants via relations: ['variants']
+  const variantIds = product.variants.map((v) => v.id);
+  if (variantIds.length > 0) {
+    // Delete spec values before variants to avoid FK constraint errors
+    await this.specValueRepo
+      .createQueryBuilder()
+      .delete()
+      .where('phien_ban_id IN (:...ids)', { ids: variantIds })
+      .execute();
+  }
+  await this.productRepo.remove(product);   // TypeORM entity cascade removes variants + images
+}
+
+// ✓ Variant example — spec values and images cleaned up before removing
+async removeVariant(variantId: number): Promise<void> {
+  const variant = await this.variantRepo.findOne({
+    where: { id: variantId },
+    relations: ['images'],
+  });
+  if (!variant) throw new NotFoundException('Biến thể không tồn tại');
+  await this.specValueRepo.delete({ phienBanId: variantId });
+  await this.variantRepo.remove(variant);   // entity cascade removes images
+}
+```
+
+**Checklist before hard-deleting any entity:**
+1. Identify every table whose FK column points to this entity (grep `phien_ban_id`, `san_pham_id`, etc.)
+2. For each child table: does the TypeORM relation have `cascade: ['remove']` or `onDelete: 'CASCADE'`?
+   - Yes → TypeORM/DB handles it automatically
+   - No → delete children manually before removing the parent
+
+---
+
 ### Cross-module usage — inject via exported service
 ```typescript
 // In orders.service.ts — use StockService from inventory module
@@ -512,6 +552,43 @@ export class AdminProductsController {
 healthCheck() {
   return { status: 'ok' };
 }
+```
+
+### CRITICAL — Route Declaration Order
+
+NestJS matches routes top-to-bottom. **Static-prefix routes must be declared BEFORE parameterized routes** (`:id`, `:slug`) in the same controller class, or the parameterized handler will shadow them.
+
+```typescript
+// ✗ WRONG — DELETE /admin/products/variants/123 matches ':id' first
+//   ParseIntPipe tries to parse "variants" → throws 400, never reaches removeVariant
+@Delete(':id')
+remove(@Param('id', ParseIntPipe) id: number) { ... }
+
+@Delete('variants/:variantId')         // never reached
+removeVariant(...) { ... }
+
+
+// ✓ CORRECT — specific prefix declared first
+@Delete('variants/:variantId')
+removeVariant(@Param('variantId', ParseIntPipe) variantId: number) { ... }
+
+@Delete(':id')
+remove(@Param('id', ParseIntPipe) id: number) { ... }
+```
+
+**Rule:** for every controller with both `variants/:variantId` and `:id` routes, declare all `variants/...` handlers before any `:id` handlers, and add a comment block separator so the order is explicit and preserved during future edits:
+
+```typescript
+// ── Sub-resource routes (declared before :id to avoid NestJS shadowing) ──
+@Delete('variants/:variantId')
+removeVariant(...) { }
+
+@Put('variants/:variantId')
+updateVariant(...) { }
+
+// ── Top-level resource routes ─────────────────────────────────────────────
+@Delete(':id')
+remove(...) { }
 ```
 
 ---

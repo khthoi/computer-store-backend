@@ -20,6 +20,8 @@ import { CreateProductDto, CreateVariantDto } from './dto/create-product.dto';
 import { UpdateProductDto, UpdateVariantDto } from './dto/update-product.dto';
 import { QueryProductDto } from './dto/query-product.dto';
 import { SaveSpecValuesDto } from '../specifications/dto/save-spec-values.dto';
+import { SaveVariantMediaDto } from './dto/save-variant-media.dto';
+import { mapVariantAdminDetail, mapImageToMedia } from './dto/product-response.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
@@ -90,6 +92,24 @@ export class AdminProductsController {
     return this.searchService.findAll(query);
   }
 
+  @Get(':productId/variants/:variantId')
+  @ApiOperation({ summary: 'Chi tiết đầy đủ một biến thể (bao gồm thông số kỹ thuật và media)' })
+  async findVariantAdmin(
+    @Param('productId', ParseIntPipe) productId: number,
+    @Param('variantId', ParseIntPipe) variantId: number,
+  ) {
+    const variant = await this.productsService.findVariantWithImages(productId, variantId);
+    const specGroups = await this.specsService.getSpecGroupsForVariant(variantId);
+    return mapVariantAdminDetail(variant, specGroups);
+  }
+
+  @Get('variants/:variantId/images')
+  @ApiOperation({ summary: 'Danh sách hình ảnh của biến thể' })
+  async findVariantImages(@Param('variantId', ParseIntPipe) variantId: number) {
+    const images = await this.productsService.findVariantImages(variantId);
+    return images.map(mapImageToMedia);
+  }
+
   @Get(':id')
   @ApiOperation({ summary: 'Chi tiết sản phẩm theo ID' })
   @ApiParam({ name: 'id', description: 'ID của sản phẩm', example: 1 })
@@ -145,14 +165,29 @@ export class AdminProductsController {
     return this.productsService.update(id, dto);
   }
 
+  // ── Variant-level routes (defined before :id to avoid NestJS shadowing) ───
+
+  @Delete('variants/:variantId')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Xoá vĩnh viễn biến thể' })
+  removeVariant(@Param('variantId', ParseIntPipe) variantId: number) {
+    return this.productsService.removeVariant(variantId);
+  }
+
+  @Put('variants/:variantId')
+  @ApiOperation({ summary: 'Cập nhật biến thể' })
+  updateVariant(@Param('variantId', ParseIntPipe) variantId: number, @Body() dto: UpdateVariantDto) {
+    return this.productsService.updateVariant(variantId, dto);
+  }
+
+  // ── Product-level routes ──────────────────────────────────────────────────
+
   @Delete(':id')
   @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Ẩn sản phẩm (soft delete → NgungBan)' })
+  @ApiOperation({ summary: 'Xoá vĩnh viễn sản phẩm và tất cả biến thể' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.productsService.remove(id);
   }
-
-  // ── Variants ──────────────────────────────────────────────────────────────
 
   @Post(':id/clone')
   @ApiOperation({ summary: 'Nhân bản sản phẩm (tạo bản sao trạng thái Nhap)' })
@@ -175,12 +210,6 @@ export class AdminProductsController {
     return this.productsService.addVariant(id, dto);
   }
 
-  @Put('variants/:variantId')
-  @ApiOperation({ summary: 'Cập nhật biến thể' })
-  updateVariant(@Param('variantId', ParseIntPipe) variantId: number, @Body() dto: UpdateVariantDto) {
-    return this.productsService.updateVariant(variantId, dto);
-  }
-
   @Patch(':id/variants/:variantId/set-default')
   @ApiOperation({ summary: 'Đặt biến thể làm mặc định hiển thị trên listing/card' })
   setDefaultVariant(
@@ -188,13 +217,6 @@ export class AdminProductsController {
     @Param('variantId', ParseIntPipe) variantId: number,
   ) {
     return this.productsService.setDefaultVariant(id, variantId);
-  }
-
-  @Delete('variants/:variantId')
-  @HttpCode(HttpStatus.NO_CONTENT)
-  @ApiOperation({ summary: 'Ẩn biến thể' })
-  removeVariant(@Param('variantId', ParseIntPipe) variantId: number) {
-    return this.productsService.removeVariant(variantId);
   }
 
   // ── Spec Values ───────────────────────────────────────────────────────────
@@ -206,5 +228,17 @@ export class AdminProductsController {
     @Body() dto: SaveSpecValuesDto,
   ) {
     return this.specsService.saveSpecValues(variantId, dto);
+  }
+
+  // ── Media ─────────────────────────────────────────────────────────────────
+
+  @Put(':productId/variants/:variantId/media')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Lưu danh sách media cho biến thể (replace all)' })
+  async saveVariantMedia(
+    @Param('variantId', ParseIntPipe) variantId: number,
+    @Body() dto: SaveVariantMediaDto,
+  ) {
+    return this.productsService.saveVariantMedia(variantId, dto.media);
   }
 }

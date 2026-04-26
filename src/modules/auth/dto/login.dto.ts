@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsEmail, IsString, MinLength } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsBoolean, IsEmail, IsOptional, IsString, MinLength } from 'class-validator';
 
 export class LoginDto {
   @ApiProperty({ example: 'user@gmail.com' })
@@ -10,4 +10,9 @@ export class LoginDto {
   @IsString()
   @MinLength(1)
   password: string;
+
+  @ApiPropertyOptional({ example: false, description: 'Duy trì đăng nhập (refresh token 30 ngày). Mặc định false = session cookie (1 ngày).' })
+  @IsOptional()
+  @IsBoolean()
+  rememberMe?: boolean;
 }

@@ -13,7 +13,8 @@ export class MediaFolderService {
   ) {}
 
   async findAll(onlyActive = false): Promise<MediaFolder[]> {
-    const where = onlyActive ? { isActive: true } : {};
+    const where: Record<string, unknown> = { phamVi: 'public' };
+    if (onlyActive) where['isActive'] = true;
     return this.repo.find({ where, order: { thuTu: 'ASC', tenHienThi: 'ASC' } });
   }
 
@@ -37,6 +38,7 @@ export class MediaFolderService {
       loaiChoPhep: dto.loaiChoPhep ?? 'all',
       thuTu: dto.thuTu ?? 0,
       isActive: dto.isActive ?? true,
+      phamVi: dto.phamVi ?? 'public',
     });
     return this.repo.save(folder);
   }

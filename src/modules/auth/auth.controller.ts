@@ -25,13 +25,14 @@ import { Customer } from '../users/entities/customer.entity';
 import { Employee } from '../employees/entities/employee.entity';
 
 const RT_COOKIE = 'refresh_token';
-const RT_COOKIE_OPTIONS = {
+const RT_COOKIE_BASE = {
   httpOnly: true,
   secure: process.env.NODE_ENV === 'production',
   sameSite: 'lax' as const,
-  maxAge: 30 * 24 * 60 * 60 * 1000, // 30 ngày (ms)
   path: '/api/auth',
 };
+const RT_COOKIE_OPTIONS = { ...RT_COOKIE_BASE, maxAge: 30 * 24 * 60 * 60 * 1000 };
+const RT_COOKIE_SESSION = RT_COOKIE_BASE; // không có maxAge → session cookie, hết khi đóng browser
 
 @ApiTags('Auth')
 @Controller('auth')
@@ -58,8 +59,9 @@ export class AuthController {
   @ApiOkResponse({ type: AuthLoginCustomerResponseDto, description: 'Đăng nhập thành công, refresh token được set trong cookie' })
   @ApiResponse({ status: 401, description: 'Email hoặc mật khẩu không đúng' })
   async loginCustomer(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
-    const { refreshToken, ...data } = await this.authService.loginCustomer(req.user as Customer);
-    res.cookie(RT_COOKIE, refreshToken, RT_COOKIE_OPTIONS);
+    const rememberMe = Boolean((req.body as { rememberMe?: boolean })?.rememberMe);
+    const { refreshToken, ...data } = await this.authService.loginCustomer(req.user as Customer, rememberMe);
+    res.cookie(RT_COOKIE, refreshToken, rememberMe ? RT_COOKIE_OPTIONS : RT_COOKIE_SESSION);
     return data;
   }
 

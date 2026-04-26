@@ -103,7 +103,10 @@ src/modules/<feature>/
 3. **GlobalValidationPipe** with `whitelist: true, forbidNonWhitelisted: true, transform: true`.
 4. **No comments explaining WHAT** — only WHY (non-obvious constraints, workarounds).
 5. **No extra abstractions** — three similar lines is better than a premature helper.
-6. **Soft delete** for entities linked to orders (use `is_active = false` or `trang_thai`).
+6. **Delete strategy by entity type:**
+   - Products / Variants → **hard delete** (order items snapshot price/name at purchase time; frontend guard prevents delete if active orders exist). Before hard-deleting a product: delete its SpecValues first (orphan cleanup). Before hard-deleting a variant: delete its SpecValues + Images first.
+   - Customers → **soft delete** (`trang_thai = 'BiKhoa'`) — never hard delete if any order exists.
+   - Orders → never delete.
 7. **Snapshot fields** — when placing an order, snapshot `ten_san_pham`, `SKU`, `gia_tai_thoi_diem` into order items.
 8. **Redis TTL** for permission cache (10 min), site_config cache, token blacklist.
 

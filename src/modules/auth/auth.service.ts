@@ -19,8 +19,19 @@ import { JwtPayload } from './strategies/jwt.strategy';
 import { AuthCustomerDto } from './dto/auth-customer.dto';
 import { AuthEmployeeDto } from './dto/auth-employee.dto';
 
-const ACCESS_TOKEN_TTL = 15 * 60;       // 15 phút (giây)
-const REFRESH_TOKEN_TTL = 30 * 24 * 3600; // 30 ngày (giây)
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const ACCESS_EXPIRES_IN: any = process.env.JWT_EXPIRES_IN ?? '5h';
+
+function parseTtlSeconds(val: string): number {
+  const m = val.match(/^(\d+)(s|m|h|d)$/);
+  if (!m) return 18000;
+  const units: Record<string, number> = { s: 1, m: 60, h: 3600, d: 86400 };
+  return parseInt(m[1], 10) * (units[m[2]] ?? 1);
+}
+
+const ACCESS_TOKEN_TTL = parseTtlSeconds(ACCESS_EXPIRES_IN);
+const REFRESH_TOKEN_TTL = parseTtlSeconds(process.env.JWT_REFRESH_EXPIRES_IN ?? '30d');
+const REFRESH_SHORT_TOKEN_TTL = parseTtlSeconds(process.env.JWT_REFRESH_SHORT_TTL ?? '1d');
 
 @Injectable()
 export class AuthService {
@@ -73,8 +84,8 @@ export class AuthService {
 
   // ─── Login ────────────────────────────────────────────────────────────────
 
-  async loginCustomer(customer: Customer): Promise<{ customer: AuthCustomerDto; accessToken: string; refreshToken: string }> {
-    const tokens = await this.issueCustomerTokens(customer);
+  async loginCustomer(customer: Customer, rememberMe = false): Promise<{ customer: AuthCustomerDto; accessToken: string; refreshToken: string }> {
+    const tokens = await this.issueCustomerTokens(customer, rememberMe);
     return { customer: this.toCustomerDto(customer), ...tokens };
   }
 
@@ -122,7 +133,7 @@ export class AuthService {
 
     const newJti = randomUUID();
     const accessPayload: JwtPayload = { sub: payload.sub, email: payload.email, type: 'customer', roles: [], jti: newJti };
-    const accessToken = this.jwtService.sign(accessPayload, { expiresIn: ACCESS_TOKEN_TTL });
+    const accessToken = this.jwtService.sign(accessPayload, { expiresIn: ACCESS_EXPIRES_IN });
     await this.redisService.addCustomerSession(payload.sub, newJti, ACCESS_TOKEN_TTL);
 
     const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET', 'refresh_fallback');
@@ -145,7 +156,7 @@ export class AuthService {
 
     const jti = randomUUID();
     const accessPayload: JwtPayload = { sub: payload.sub, email: payload.email, type: payload.type, roles: payload.roles, jti };
-    const accessToken = this.jwtService.sign(accessPayload, { expiresIn: ACCESS_TOKEN_TTL });
+    const accessToken = this.jwtService.sign(accessPayload, { expiresIn: ACCESS_EXPIRES_IN });
     await this.redisService.saveActiveJti(payload.sub, payload.type, jti, ACCESS_TOKEN_TTL);
 
     return { accessToken };
@@ -172,17 +183,19 @@ export class AuthService {
 
   // ─── Token issuers ────────────────────────────────────────────────────────
 
-  private async issueCustomerTokens(customer: Customer) {
+  private async issueCustomerTokens(customer: Customer, rememberMe = false) {
+    const refreshTtl = rememberMe ? REFRESH_TOKEN_TTL : REFRESH_SHORT_TOKEN_TTL;
+
     const jti = randomUUID();
     const accessPayload: JwtPayload = { sub: customer.id, email: customer.email, type: 'customer', roles: [], jti };
-    const accessToken = this.jwtService.sign(accessPayload, { expiresIn: ACCESS_TOKEN_TTL });
+    const accessToken = this.jwtService.sign(accessPayload, { expiresIn: ACCESS_EXPIRES_IN });
     await this.redisService.addCustomerSession(customer.id, jti, ACCESS_TOKEN_TTL);
 
     const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET', 'refresh_fallback');
     const refreshJti = randomUUID();
     // sessionJti liên kết refresh token này với access token vừa phát
     const refreshPayload: JwtPayload = { sub: customer.id, email: customer.email, type: 'customer', roles: [], jti: refreshJti, sessionJti: jti };
-    const refreshToken = this.jwtService.sign(refreshPayload, { secret: refreshSecret, expiresIn: REFRESH_TOKEN_TTL });
+    const refreshToken = this.jwtService.sign(refreshPayload, { secret: refreshSecret, expiresIn: refreshTtl });
     await this.redisService.addCustomerRefreshToken(customer.id, jti, refreshToken);
 
     return { accessToken, refreshToken };
@@ -195,7 +208,7 @@ export class AuthService {
     const jti = randomUUID();
     const roles = employee.roles?.map((r) => r.tenVaiTro) ?? [];
     const accessPayload: JwtPayload = { sub: employee.id, email: employee.email, type: 'employee', roles, jti };
-    const accessToken = this.jwtService.sign(accessPayload, { expiresIn: ACCESS_TOKEN_TTL });
+    const accessToken = this.jwtService.sign(accessPayload, { expiresIn: ACCESS_EXPIRES_IN });
     await this.redisService.saveActiveJti(employee.id, 'employee', jti, ACCESS_TOKEN_TTL);
 
     const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET', 'refresh_fallback');

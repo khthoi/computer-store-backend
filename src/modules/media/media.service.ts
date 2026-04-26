@@ -26,11 +26,29 @@ export class MediaService {
     });
   }
 
-  async upload(file: Express.Multer.File, employeeId: number, folderPath?: string): Promise<MediaAsset> {
-    let targetFolder = folderPath ?? 'pc-store/misc';
+  async upload(
+    file: Express.Multer.File,
+    employeeId: number,
+    options?: { folderPath?: string; thuMucId?: number; altText?: string; caption?: string },
+  ): Promise<MediaAsset> {
+    const { folderPath, thuMucId: thuMucIdParam, altText, caption } = options ?? {};
+    let targetFolder = 'pc-store/misc';
     let thuMucId: number | null = null;
+    let phamVi = 'public';
 
-    if (folderPath) {
+    if (thuMucIdParam) {
+      const configured = await this.folderService.findOne(thuMucIdParam);
+      if (configured.loaiChoPhep !== 'all') {
+        const fileType = file.mimetype.startsWith('image/') ? 'image'
+          : file.mimetype.startsWith('video/') ? 'video' : 'raw';
+        if (configured.loaiChoPhep !== fileType) {
+          throw new BadRequestException(`Thư mục này chỉ chấp nhận loại file: ${configured.loaiChoPhep}`);
+        }
+      }
+      targetFolder = configured.duongDan;
+      thuMucId = configured.id;
+      phamVi = configured.phamVi ?? 'public';
+    } else if (folderPath) {
       const configured = await this.folderService.findByPath(folderPath);
       if (!configured) {
         throw new BadRequestException(`Thư mục "${folderPath}" không được cấu hình. Chọn thư mục hợp lệ từ danh sách.`);
@@ -44,6 +62,7 @@ export class MediaService {
       }
       targetFolder = configured.duongDan;
       thuMucId = configured.id;
+      phamVi = configured.phamVi ?? 'public';
     }
 
     const result = await this.uploadToCloudinary(file, targetFolder);
@@ -62,9 +81,12 @@ export class MediaService {
       kichThuocByte: file.size,
       chieuRong: (result.width as number) ?? null,
       chieuCao: (result.height as number) ?? null,
+      altText: altText ?? null,
+      caption: caption ?? null,
       thuMuc: targetFolder,
       thuMucId,
       trangThai: 'active',
+      phamVi,
       nguoiUploadId: employeeId,
     });
 
@@ -72,15 +94,17 @@ export class MediaService {
   }
 
   async findAll(query: QueryMediaDto) {
-    const { page = 1, limit = 20, search, loaiFile, trangThai } = query;
+    const { page = 1, limit = 20, search, loaiFile, trangThai, thuMucId } = query;
     const qb = this.repo.createQueryBuilder('a')
       .orderBy('a.ngayUpload', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
 
+    qb.andWhere('a.phamVi = :phamVi', { phamVi: 'public' });
     if (search) qb.andWhere('a.tenFileGoc LIKE :s', { s: `%${search}%` });
     if (loaiFile) qb.andWhere('a.loaiFile = :loaiFile', { loaiFile });
     if (trangThai) qb.andWhere('a.trangThai = :trangThai', { trangThai });
+    if (thuMucId) qb.andWhere('a.thuMucId = :thuMucId', { thuMucId });
 
     const [items, total] = await qb.getManyAndCount();
     return { items, total, page, limit };

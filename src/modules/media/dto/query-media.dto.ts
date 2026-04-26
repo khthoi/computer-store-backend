@@ -1,4 +1,5 @@
-import { IsOptional, IsString, IsIn } from 'class-validator';
+import { IsOptional, IsString, IsIn, IsInt } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 
@@ -14,4 +15,10 @@ export class QueryMediaDto extends PaginationDto {
   @IsString()
   @IsIn(['active', 'archived'])
   trangThai?: string;
+
+  @ApiPropertyOptional({ description: 'Lọc theo ID thư mục' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  thuMucId?: number;
 }

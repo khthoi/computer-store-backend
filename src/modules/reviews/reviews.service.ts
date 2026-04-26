@@ -85,24 +85,62 @@ export class ReviewsService {
   // ─── Admin ────────────────────────────────────────────────────────────────
 
   async findAll(query: QueryReviewsDto) {
-    const qb = this.reviewRepo.createQueryBuilder('r');
-
-    if (query.status) {
-      qb.andWhere('r.status = :status', { status: query.status });
-    }
-    if (query.variantId) {
-      qb.andWhere('r.variantId = :variantId', { variantId: query.variantId });
-    }
-
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
-    const [items, total] = await qb
-      .orderBy('r.createdAt', 'DESC')
-      .skip((page - 1) * limit)
-      .take(limit)
-      .getManyAndCount();
+    const offset = (page - 1) * limit;
 
-    return { items: items.map((r) => this.toDto(r)), total, page, limit };
+    const conditions: string[] = [];
+    const params: (string | number)[] = [];
+
+    if (query.status) {
+      conditions.push('r.review_status = ?');
+      params.push(query.status);
+    }
+    if (query.variantId) {
+      conditions.push('r.phien_ban_id = ?');
+      params.push(query.variantId);
+    }
+
+    const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
+
+    const [rows, [{ total }]] = await Promise.all([
+      this.dataSource.query(
+        `SELECT
+          r.review_id, r.phien_ban_id, r.khach_hang_id, r.don_hang_id,
+          r.rating, r.tieu_de, r.noi_dung, r.review_status,
+          r.nguoi_duyet_id, r.ly_do_tu_choi, r.da_phan_hoi, r.helpful_count,
+          r.duyet_tai, r.created_at, r.updated_at,
+          sp.ten_san_pham, v.ten_phien_ban,
+          (SELECT url_hinh_anh FROM hinh_anh_san_pham
+           WHERE phien_ban_id = v.phien_ban_id AND loai_anh = 'AnhChinh'
+           ORDER BY thu_tu ASC LIMIT 1) AS anh_phien_ban,
+          kh.ho_ten AS khach_hang_ten, kh.anh_dai_dien AS khach_hang_avatar,
+          dh.ma_don_hang, nv.ho_ten AS nguoi_duyet_ten
+         FROM danh_gia_san_pham r
+         INNER JOIN phien_ban_san_pham v ON v.phien_ban_id = r.phien_ban_id
+         INNER JOIN san_pham sp ON sp.san_pham_id = v.san_pham_id
+         INNER JOIN khach_hang kh ON kh.khach_hang_id = r.khach_hang_id
+         INNER JOIN don_hang dh ON dh.don_hang_id = r.don_hang_id
+         LEFT JOIN nhan_vien nv ON nv.nhan_vien_id = r.nguoi_duyet_id
+         ${where}
+         ORDER BY r.created_at DESC
+         LIMIT ? OFFSET ?`,
+        [...params, limit, offset],
+      ),
+      this.dataSource.query(
+        `SELECT COUNT(*) AS total FROM danh_gia_san_pham r ${where}`,
+        params,
+      ),
+    ]);
+
+    const totalPages = Math.ceil(Number(total) / limit);
+    return {
+      data: (rows as any[]).map((r) => this.toRichDto(r)),
+      total: Number(total),
+      page,
+      limit,
+      totalPages,
+    };
   }
 
   async approveReview(id: number, employeeId: number): Promise<ReviewResponseDto> {
@@ -206,6 +244,33 @@ export class ReviewsService {
        WHERE san_pham_id = ?`,
       [agg.avg_rating ?? 0, agg.cnt ?? 0, agg.san_pham_id],
     );
+  }
+
+  private toRichDto(row: any): ReviewResponseDto {
+    return {
+      id: row.review_id,
+      variantId: row.phien_ban_id,
+      customerId: row.khach_hang_id,
+      orderId: row.don_hang_id,
+      rating: row.rating,
+      title: row.tieu_de ?? null,
+      content: row.noi_dung ?? null,
+      status: row.review_status,
+      hasReply: !!row.da_phan_hoi,
+      helpfulCount: row.helpful_count ?? 0,
+      approvedById: row.nguoi_duyet_id ?? null,
+      rejectReason: row.ly_do_tu_choi ?? null,
+      approvedAt: row.duyet_tai ?? null,
+      createdAt: row.created_at,
+      updatedAt: row.updated_at,
+      tenSanPham: row.ten_san_pham ?? null,
+      tenPhienBan: row.ten_phien_ban ?? null,
+      anhPhienBan: row.anh_phien_ban ?? null,
+      khachHangTen: row.khach_hang_ten ?? null,
+      khachHangAvatar: row.khach_hang_avatar ?? null,
+      maDonHang: row.ma_don_hang ?? null,
+      nguoiDuyetTen: row.nguoi_duyet_ten ?? null,
+    };
   }
 
   private toDto(review: ProductReview): ReviewResponseDto {
