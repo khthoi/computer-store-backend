@@ -36,7 +36,7 @@ export class EmployeesService {
     if (search) qb.andWhere('(e.hoTen LIKE :s OR e.email LIKE :s OR e.maNhanVien LIKE :s)', { s: `%${search}%` });
 
     const [employees, total] = await qb.getManyAndCount();
-    return { items: employees.map((e) => this.toDto(e)), total, page, limit };
+    return { items: employees.map((e) => this.toDto(e)), total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findOne(id: number): Promise<EmployeeResponseDto> {

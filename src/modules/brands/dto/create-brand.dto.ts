@@ -12,6 +12,12 @@ export class CreateBrandDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  @MaxLength(200)
+  slug?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   @MaxLength(500)
   logo?: string;
 
@@ -25,6 +31,12 @@ export class CreateBrandDto {
   @IsOptional()
   @IsIn(['HienThi', 'An'])
   trangThai?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  websiteUrl?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

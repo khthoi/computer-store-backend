@@ -1,4 +1,4 @@
-import { Controller, Get, Put, Param, Query, Body, ParseIntPipe } from '@nestjs/common';
+import { Controller, Get, Put, Patch, Post, Param, Query, Body, NotFoundException } from '@nestjs/common';
 import {
   ApiTags,
   ApiOperation,
@@ -11,6 +11,11 @@ import {
 import { OrdersService } from './orders.service';
 import { QueryOrderDto } from './dto/query-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
+import { UpdateOrderShippingDto } from './dto/update-order-shipping.dto';
+import { AddOrderNoteDto } from './dto/add-order-note.dto';
+import { ProcessRefundDto } from './dto/process-refund.dto';
+import { SettleRefundDto } from './dto/settle-refund.dto';
+import { RejectRefundDto } from './dto/reject-refund.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 
@@ -52,7 +57,7 @@ export class AdminOrdersController {
 
   @Get(':id')
   @ApiOperation({ summary: '[Admin] Chi tiết đơn hàng' })
-  @ApiParam({ name: 'id', example: 101 })
+  @ApiParam({ name: 'id', example: 'ORD-20240315-0001' })
   @ApiOkResponse({
     schema: {
       example: {
@@ -78,17 +83,90 @@ export class AdminOrdersController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   @ApiResponse({ status: 404, description: 'Đơn hàng không tồn tại' })
-  findOne(@Param('id', ParseIntPipe) id: number) {
-    return this.ordersService.findOne(id);
+  findOne(@Param('id') id: string) {
+    return this.ordersService.findOneAdmin(id);
+  }
+
+  @Get(':id/transaction')
+  @ApiOperation({ summary: '[Admin] Thông tin giao dịch của đơn hàng' })
+  @ApiParam({ name: 'id', example: 'ORD-20240315-0001' })
+  @ApiResponse({ status: 200, description: 'Thông tin giao dịch' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy giao dịch' })
+  async findTransaction(@Param('id') id: string) {
+    const tx = await this.ordersService.findTransactionByOrderCode(id);
+    if (!tx) throw new NotFoundException('Không tìm thấy giao dịch');
+    return tx;
   }
 
   @Put(':id/status')
   @ApiOperation({ summary: '[Admin] Cập nhật trạng thái đơn hàng' })
   updateStatus(
-    @Param('id', ParseIntPipe) id: number,
+    @Param('id') id: string,
     @Body() dto: UpdateOrderStatusDto,
     @CurrentUser('sub') adminId: number,
   ) {
-    return this.ordersService.updateStatus(id, dto, adminId);
+    return this.ordersService.updateStatusAdmin(id, dto, adminId);
+  }
+
+  @Patch(':id/shipping')
+  @ApiOperation({ summary: '[Admin] Cập nhật thông tin vận chuyển (carrier, tracking, estimated delivery)' })
+  @ApiParam({ name: 'id', example: 'ORD-20240315-0001' })
+  updateShipping(@Param('id') id: string, @Body() dto: UpdateOrderShippingDto) {
+    return this.ordersService.updateShippingAdmin(id, dto);
+  }
+
+  @Post(':id/notes')
+  @ApiOperation({ summary: '[Admin] Thêm ghi chú nội bộ cho đơn hàng' })
+  @ApiParam({ name: 'id', example: 'ORD-20240315-0001' })
+  addNote(
+    @Param('id') id: string,
+    @Body() dto: AddOrderNoteDto,
+    @CurrentUser('sub') adminId: number,
+  ) {
+    return this.ordersService.addNoteAdmin(id, dto, adminId);
+  }
+
+  @Post(':id/refunds')
+  @ApiOperation({ summary: '[Admin] Xử lý hoàn tiền cho đơn hàng' })
+  @ApiParam({ name: 'id', example: 'ORD-20240315-0001' })
+  processRefund(
+    @Param('id') id: string,
+    @Body() dto: ProcessRefundDto,
+    @CurrentUser('sub') adminId: number,
+  ) {
+    return this.ordersService.processRefundAdmin(id, dto, adminId);
+  }
+
+  @Patch(':id/refunds/:refundId/settle')
+  @ApiOperation({ summary: '[Admin] Xác nhận hoàn tiền thành công (Track A manual settlement)' })
+  @ApiParam({ name: 'id', example: 'ORD-20240315-0001' })
+  @ApiParam({ name: 'refundId', example: 5 })
+  settleRefund(
+    @Param('id') id: string,
+    @Param('refundId') refundId: string,
+    @Body() dto: SettleRefundDto,
+    @CurrentUser('sub') adminId: number,
+  ) {
+    return this.ordersService.settleRefundAdmin(id, Number(refundId), dto, adminId);
+  }
+
+  @Patch(':id/refunds/:refundId/reject')
+  @ApiOperation({ summary: '[Admin] Đánh dấu hoàn tiền thất bại/từ chối (Track A manual settlement)' })
+  @ApiParam({ name: 'id', example: 'ORD-20240315-0001' })
+  @ApiParam({ name: 'refundId', example: 5 })
+  rejectRefund(
+    @Param('id') id: string,
+    @Param('refundId') refundId: string,
+    @Body() dto: RejectRefundDto,
+    @CurrentUser('sub') adminId: number,
+  ) {
+    return this.ordersService.rejectRefundAdmin(id, Number(refundId), dto, adminId);
+  }
+
+  @Get(':id/return-requests')
+  @ApiOperation({ summary: '[Admin] Danh sách yêu cầu đổi trả của đơn hàng' })
+  @ApiParam({ name: 'id', example: 'ORD-20240315-0001' })
+  getReturnRequests(@Param('id') id: string) {
+    return this.ordersService.getReturnRequestsForOrder(id);
   }
 }

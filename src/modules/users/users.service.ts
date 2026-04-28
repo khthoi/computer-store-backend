@@ -108,7 +108,7 @@ export class UsersService {
       take: limit,
       order: { ngayDangKy: 'DESC' },
     });
-    return { items: customers.map((c) => this.toListItemDto(c)), total, page, limit };
+    return { items: customers.map((c) => this.toListItemDto(c)), total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findByIdWithAddresses(id: number): Promise<CustomerDetailResponseDto> {

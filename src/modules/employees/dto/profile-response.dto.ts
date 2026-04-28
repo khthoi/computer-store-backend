@@ -49,6 +49,14 @@ export class ProfileDataDto {
   @ApiProperty({ type: [AuditLogEntryDto] }) auditLogs: AuditLogEntryDto[];
 }
 
+export class PaginatedAuditLogDto {
+  @ApiProperty({ type: [AuditLogEntryDto] }) items: AuditLogEntryDto[];
+  @ApiProperty({ example: 200 }) total: number;
+  @ApiProperty({ example: 1 }) page: number;
+  @ApiProperty({ example: 20 }) limit: number;
+  @ApiProperty({ example: 10 }) totalPages: number;
+}
+
 export class AvatarResponseDto {
   @ApiProperty({ example: 'https://res.cloudinary.com/...' }) avatarUrl: string;
 }

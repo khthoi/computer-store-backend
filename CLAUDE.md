@@ -96,6 +96,46 @@ src/modules/<feature>/
     └── <entity>.entity.ts
 ```
 
+### `allowedSortBy` Pattern — Search Services
+
+Mỗi `*-search.service.ts` xử lý sort phải dùng **allowlist dict** thay vì dùng `sortBy` thẳng vào `orderBy` (ngăn SQL injection và đảm bảo alias khớp với frontend).
+
+```ts
+// ✗ SAI — truyền thẳng sortBy vào query, dễ inject + không map alias
+qb.orderBy(`p.${sortBy}`, sortOrder);
+
+// ✓ ĐÚNG — allowlist + frontend-facing aliases
+const allowedSortBy: Record<string, string> = {
+  // Backend-native keys (Vietnamese property names)
+  ngayTao:     'p.ngayTao',
+  ngayCapNhat: 'p.ngayCapNhat',
+  tenSanPham:  'p.tenSanPham',
+  // Frontend-facing aliases — phải khớp với column key của DataTable
+  name:        'p.tenSanPham',
+  updatedAt:   'p.ngayCapNhat',
+  createdAt:   'p.ngayTao',
+};
+const orderCol = allowedSortBy[sortBy] ?? 'p.ngayCapNhat'; // default = updatedAt
+qb.orderBy(orderCol, sortOrder.toUpperCase() as 'ASC' | 'DESC');
+```
+
+**Aggregate sort** (field tính toán từ bảng join, ví dụ `totalStock`):
+```ts
+if (sortBy === 'totalStock') {
+  qb.addSelect(
+    '(SELECT COALESCE(SUM(_pv.so_luong_ton), 0) FROM phien_ban_san_pham _pv WHERE _pv.san_pham_id = p.id)',
+    'total_stock_calc',
+  );
+  qb.orderBy('total_stock_calc', sortOrder.toUpperCase() as 'ASC' | 'DESC');
+} else {
+  qb.orderBy(allowedSortBy[sortBy] ?? 'p.ngayCapNhat', ...);
+}
+```
+
+**Rule:** Frontend `DataTable` dùng `column.key` làm `sortBy` — key là tiếng Anh. Backend phải có alias khớp trong `allowedSortBy`. Thiếu alias → sort âm thầm fallback về default, không báo lỗi.
+
+---
+
 ### Code Rules
 
 1. **No raw SQL** — use TypeORM QueryBuilder or repository methods.

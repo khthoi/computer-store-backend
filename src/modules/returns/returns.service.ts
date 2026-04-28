@@ -5,6 +5,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { ReturnRequest } from './entities/return-request.entity';
 import { ReturnAsset } from './entities/return-asset.entity';
+import { ReturnRequestItem } from './entities/return-request-item.entity';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { ProcessReturnDto } from './dto/process-return.dto';
 import { QueryReturnsDto } from './dto/query-returns.dto';
@@ -20,6 +21,8 @@ export class ReturnsService {
     private readonly returnRepo: Repository<ReturnRequest>,
     @InjectRepository(ReturnAsset)
     private readonly assetRepo: Repository<ReturnAsset>,
+    @InjectRepository(ReturnRequestItem)
+    private readonly returnItemRepo: Repository<ReturnRequestItem>,
     private readonly loyaltyService: LoyaltyService,
     private readonly dataSource: DataSource,
   ) {}
@@ -52,6 +55,29 @@ export class ReturnsService {
       throw new BadRequestException('Đơn hàng này đã có yêu cầu đổi/trả đang chờ duyệt');
     }
 
+    if (dto.requestType === 'TraHang' && (!dto.items || dto.items.length === 0)) {
+      throw new BadRequestException('Yêu cầu trả hàng phải chỉ định ít nhất một sản phẩm');
+    }
+
+    // Validate that requested variants belong to the order
+    if (dto.items && dto.items.length > 0) {
+      const variantIds = dto.items.map((i) => i.variantId);
+      const orderItems: Array<{ phien_ban_id: number; so_luong: number }> = await this.dataSource.query(
+        `SELECT phien_ban_id, so_luong FROM chi_tiet_don_hang WHERE don_hang_id = ? AND phien_ban_id IN (?)`,
+        [dto.orderId, variantIds],
+      );
+      const orderItemMap = new Map(orderItems.map((r) => [r.phien_ban_id, r.so_luong]));
+      for (const item of dto.items) {
+        const orderedQty = orderItemMap.get(item.variantId);
+        if (orderedQty === undefined) {
+          throw new BadRequestException(`Phiên bản sản phẩm ${item.variantId} không thuộc đơn hàng này`);
+        }
+        if (item.quantity > orderedQty) {
+          throw new BadRequestException(`Phiên bản ${item.variantId}: số lượng yêu cầu (${item.quantity}) vượt quá số lượng đã đặt (${orderedQty})`);
+        }
+      }
+    }
+
     const saved = await this.dataSource.transaction(async (manager) => {
       const returnReq = manager.create(ReturnRequest, {
         orderId: dto.orderId,
@@ -72,6 +98,17 @@ export class ReturnsService {
           }),
         );
         await manager.save(assets);
+      }
+
+      if (dto.items && dto.items.length > 0) {
+        const items = dto.items.map((item) =>
+          manager.create(ReturnRequestItem, {
+            yeuCauId: result.id,
+            phienBanId: item.variantId,
+            soLuong: item.quantity,
+          }),
+        );
+        await manager.save(items);
       }
 
       return result;
@@ -96,7 +133,7 @@ export class ReturnsService {
       .take(limit)
       .getManyAndCount();
 
-    return { items: items.map((r) => this.toDto(r)), total, page, limit };
+    return { items: items.map((r) => this.toDto(r)), total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   // ─── Admin ────────────────────────────────────────────────────────────────
@@ -116,7 +153,7 @@ export class ReturnsService {
       .take(limit)
       .getManyAndCount();
 
-    return { items: items.map((r) => this.toDto(r)), total, page, limit };
+    return { items: items.map((r) => this.toDto(r)), total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async processReturn(id: number, dto: ProcessReturnDto, employeeId: number): Promise<ReturnRequestResponseDto> {

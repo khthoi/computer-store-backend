@@ -46,7 +46,7 @@ export class PromotionsService {
     if (query.search) qb.andWhere('p.name LIKE :search', { search: `%${query.search}%` });
 
     const [data, total] = await qb.getManyAndCount();
-    return { data, total, page, limit };
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findOne(id: number): Promise<Promotion> {

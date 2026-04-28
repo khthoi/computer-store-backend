@@ -316,13 +316,14 @@ export class ProfileService {
 
   // ─── GET /admin/me/audit-logs ──────────────────────────────────────────────
 
-  async getAuditLogs(employeeId: number, limit = 50): Promise<AuditLogEntryDto[]> {
-    const logs = await this.auditLogRepo.find({
+  async getAuditLogs(employeeId: number, page = 1, limit = 20) {
+    const [logs, total] = await this.auditLogRepo.findAndCount({
       where: { employeeId },
       order: { createdAt: 'DESC' },
+      skip: (page - 1) * limit,
       take: limit,
     });
-    return logs.map((l) => this.toAuditLogDto(l));
+    return { items: logs.map((l) => this.toAuditLogDto(l)), total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   // ─── Called by AuthService on login ────────────────────────────────────────

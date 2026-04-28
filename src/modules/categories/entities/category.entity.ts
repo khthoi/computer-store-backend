@@ -43,6 +43,9 @@ export class Category {
   @Column({ name: 'trang_thai', length: 10, default: 'Hien' })
   trangThai: string; // 'Hien' | 'An'
 
+  @Column({ name: 'mo_ta', type: 'text', nullable: true })
+  moTa: string | null;
+
   @Column({ name: 'badge_text', length: 30, nullable: true })
   badgeText: string | null;
 
@@ -54,6 +57,9 @@ export class Category {
 
   @Column({ name: 'asset_id', nullable: true })
   assetId: number | null;
+
+  @Column({ name: 'image_alt', length: 200, nullable: true })
+  imageAlt: string | null;
 
   @ManyToOne(() => Category, (c) => c.children, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'danh_muc_cha_id' })

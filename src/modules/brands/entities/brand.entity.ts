@@ -9,6 +9,10 @@ export class Brand {
   @Index('uq_th_ten', { unique: true })
   tenThuongHieu: string;
 
+  @Column({ length: 200, nullable: true })
+  @Index('uq_th_slug', { unique: true })
+  slug: string | null;
+
   @Column({ length: 500, nullable: true })
   logo: string | null;
 
@@ -17,6 +21,9 @@ export class Brand {
 
   @Column({ name: 'trang_thai', length: 10, default: 'HienThi' })
   trangThai: string; // 'HienThi' | 'An'
+
+  @Column({ name: 'website_url', length: 500, nullable: true })
+  websiteUrl: string | null;
 
   @Column({ name: 'asset_id_logo', nullable: true })
   assetIdLogo: number | null;

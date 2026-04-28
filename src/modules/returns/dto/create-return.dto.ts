@@ -1,7 +1,20 @@
 import {
-  IsInt, IsString, IsEnum, IsOptional, IsArray, MaxLength,
+  IsInt, IsString, IsEnum, IsOptional, IsArray, MaxLength, Min, ValidateNested,
 } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+class ReturnItemDto {
+  @ApiProperty({ example: 12, description: 'ID phiên bản sản phẩm muốn trả' })
+  @IsInt()
+  @Min(1)
+  variantId: number;
+
+  @ApiProperty({ example: 1, description: 'Số lượng muốn trả' })
+  @IsInt()
+  @Min(1)
+  quantity: number;
+}
 
 export class CreateReturnDto {
   @ApiProperty({ example: 15, description: 'ID đơn hàng muốn đổi/trả' })
@@ -27,4 +40,14 @@ export class CreateReturnDto {
   @IsArray()
   @IsInt({ each: true })
   assetIds?: number[];
+
+  @ApiPropertyOptional({
+    type: [ReturnItemDto],
+    description: 'Danh sách phiên bản sản phẩm và số lượng muốn trả/hoàn tiền. Bắt buộc khi requestType = TraHang',
+  })
+  @IsOptional()
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => ReturnItemDto)
+  items?: ReturnItemDto[];
 }

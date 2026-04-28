@@ -98,8 +98,11 @@ export class AdminProductsController {
     @Param('productId', ParseIntPipe) productId: number,
     @Param('variantId', ParseIntPipe) variantId: number,
   ) {
-    const variant = await this.productsService.findVariantWithImages(productId, variantId);
-    const specGroups = await this.specsService.getSpecGroupsForVariant(variantId);
+    const [variant, categoryId] = await Promise.all([
+      this.productsService.findVariantWithImages(productId, variantId),
+      this.productsService.findProductCategoryId(productId),
+    ]);
+    const specGroups = await this.specsService.getSpecGroupsForVariantMerged(variantId, categoryId);
     return mapVariantAdminDetail(variant, specGroups);
   }
 

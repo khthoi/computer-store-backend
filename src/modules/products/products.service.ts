@@ -61,6 +61,12 @@ export class ProductsService {
     return product;
   }
 
+  async findProductCategoryId(productId: number): Promise<number> {
+    const product = await this.productRepo.findOne({ where: { id: productId }, select: ['id', 'danhMucId'] });
+    if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
+    return product.danhMucId;
+  }
+
   async findOneAdmin(id: number): Promise<ProductListResponse> {
     const product = await this.findOne(id);
     const brands = await this.brandsService.getProductBrands(product.id);

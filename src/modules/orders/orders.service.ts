@@ -8,23 +8,50 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
 import { Order, TrangThaiDon } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
-import { OrderStatusHistory } from './entities/order-status-history.entity';
 import { CheckoutDto, PhuongThucThanhToan } from './dto/checkout.dto';
 import { QueryOrderDto } from './dto/query-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { CartService } from '../cart/cart.service';
 import { InventoryService } from '../inventory/inventory.service';
-import { OrderItemResponseDto, OrderResponseDto } from './dto/order-response.dto';
+import { OrderItemResponseDto, OrderResponseDto, AdminOrderSummaryDto, mapToAdminOrderSummary, AdminOrderDetailDto, mapToAdminOrderDetail, mapToTransaction, NoteRow, RefundRow, ActivityLogRow } from './dto/order-response.dto';
+import { OrderActivityLogService } from './order-activity-log.service';
+import { OrderActivityStatus } from './entities/order-activity-log.entity';
+import { UpdateOrderShippingDto } from './dto/update-order-shipping.dto';
+import { AddOrderNoteDto } from './dto/add-order-note.dto';
+import { ProcessRefundDto } from './dto/process-refund.dto';
+import { SettleRefundDto } from './dto/settle-refund.dto';
+import { RejectRefundDto } from './dto/reject-refund.dto';
+import { OrdersRefundService } from './orders-refund.service';
+import { OrdersReturnsQueryService } from './orders-returns-query.service';
+
+const STATUS_ACTIONS: Partial<Record<TrangThaiDon, string>> = {
+  [TrangThaiDon.DA_XAC_NHAN]: 'Xác nhận đơn hàng',
+  [TrangThaiDon.DONG_GOI]:    'Đóng gói đơn hàng',
+  [TrangThaiDon.DANG_GIAO]:   'Bàn giao đơn vị vận chuyển',
+  [TrangThaiDon.DA_GIAO]:     'Giao hàng thành công',
+  [TrangThaiDon.DA_HUY]:      'Hủy đơn hàng',
+  [TrangThaiDon.HOAN_TRA]:    'Chuyển trạng thái hoàn trả',
+};
+
+const ORDER_STATUS_TO_ACTIVITY: Partial<Record<TrangThaiDon, OrderActivityStatus>> = {
+  [TrangThaiDon.CHO_XAC_NHAN]: OrderActivityStatus.CHO_XU_LY,
+  [TrangThaiDon.DA_XAC_NHAN]:  OrderActivityStatus.DA_XAC_NHAN,
+  [TrangThaiDon.DONG_GOI]:     OrderActivityStatus.DANG_CHUAN_BI_HANG,
+  [TrangThaiDon.DANG_GIAO]:    OrderActivityStatus.DANG_GIAO,
+  [TrangThaiDon.DA_GIAO]:      OrderActivityStatus.DA_GIAO,
+};
 
 @Injectable()
 export class OrdersService {
   constructor(
     @InjectRepository(Order) private orderRepo: Repository<Order>,
     @InjectRepository(OrderItem) private itemRepo: Repository<OrderItem>,
-    @InjectRepository(OrderStatusHistory) private historyRepo: Repository<OrderStatusHistory>,
     private dataSource: DataSource,
     private cartService: CartService,
     private inventoryService: InventoryService,
+    private ordersRefundService: OrdersRefundService,
+    private ordersReturnsQueryService: OrdersReturnsQueryService,
+    private activityLogService: OrderActivityLogService,
   ) {}
 
   async checkout(userId: number, dto: CheckoutDto): Promise<{ order: OrderResponseDto; paymentUrl?: string }> {
@@ -90,6 +117,8 @@ export class OrdersService {
         khachHangId: userId,
         diaChiGiaoHangId: dto.diaChiGiaoHangId,
         phuongThucVanChuyen: dto.phuongThucVanChuyen as any,
+        phuongThucThanhToan: dto.phuongThucThanhToan,
+        trangThaiThanhToan: 'ChuaThanhToan',
         phiVanChuyen,
         tongTienHang,
         soTienGiamGia,
@@ -105,14 +134,13 @@ export class OrdersService {
       );
       await manager.save(OrderItem, items);
 
-      await manager.save(
-        OrderStatusHistory,
-        manager.create(OrderStatusHistory, {
-          donHangId: savedOrder.id,
-          trangThaiMoi: TrangThaiDon.CHO_XAC_NHAN,
-          trangThaiCu: null,
-          ghiChu: 'Đơn hàng được tạo',
-        }),
+      await this.activityLogService.log(
+        manager,
+        savedOrder.id,
+        { name: 'Khách hàng', role: 'Khách hàng' },
+        'Đặt hàng',
+        `Đơn hàng được tạo qua kênh website`,
+        OrderActivityStatus.CHO_XU_LY,
       );
 
       for (const item of cart.items) {
@@ -129,7 +157,7 @@ export class OrdersService {
 
       const fullOrder = await manager.findOne(Order, {
         where: { id: savedOrder.id },
-        relations: ['items', 'statusHistory'],
+        relations: ['items'],
       });
 
       return { order: this.toDto(fullOrder!) };
@@ -147,13 +175,15 @@ export class OrdersService {
     if (query.trangThai) qb.andWhere('o.trangThaiDon = :tt', { tt: query.trangThai });
 
     const [data, total] = await qb.getManyAndCount();
-    return { data: data.map((o) => this.toDto(o)), total, page: query.page ?? 1, limit: query.limit ?? 10 };
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 10;
+    return { data: data.map((o) => this.toDto(o)), total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findOne(id: number, userId?: number): Promise<OrderResponseDto> {
     const order = await this.orderRepo.findOne({
       where: { id },
-      relations: ['items', 'statusHistory'],
+      relations: ['items'],
     });
     if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
     if (userId && order.khachHangId !== userId) throw new ForbiddenException();
@@ -161,7 +191,7 @@ export class OrdersService {
   }
 
   async cancelOrder(id: number, userId: number): Promise<OrderResponseDto> {
-    const order = await this.orderRepo.findOne({ where: { id }, relations: ['items', 'statusHistory'] });
+    const order = await this.orderRepo.findOne({ where: { id }, relations: ['items'] });
     if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
     if (order.khachHangId !== userId) throw new ForbiddenException();
     if (order.trangThaiDon !== TrangThaiDon.CHO_XAC_NHAN) {
@@ -172,25 +202,196 @@ export class OrdersService {
   }
 
   async updateStatus(id: number, dto: UpdateOrderStatusDto, adminId: number): Promise<OrderResponseDto> {
-    const order = await this.orderRepo.findOne({ where: { id }, relations: ['items', 'statusHistory'] });
+    const order = await this.orderRepo.findOne({ where: { id }, relations: ['items'] });
     if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
     this.validateStatusTransition(order.trangThaiDon, dto.trangThai);
     const updated = await this.changeStatus(order, dto.trangThai, adminId, dto.ghiChu, dto.trangThai === TrangThaiDon.DA_HUY);
     return this.toDto(updated);
   }
 
-  async findAllAdmin(query: QueryOrderDto) {
-    const qb = this.orderRepo
-      .createQueryBuilder('o')
-      .orderBy('o.ngayDatHang', 'DESC')
-      .skip(((query.page ?? 1) - 1) * (query.limit ?? 10))
-      .take(query.limit ?? 10);
-
-    if (query.trangThai) qb.andWhere('o.trangThaiDon = :tt', { tt: query.trangThai });
-
-    const [data, total] = await qb.getManyAndCount();
-    return { data: data.map((o) => this.toDto(o)), total, page: query.page ?? 1, limit: query.limit ?? 10 };
+  async updateStatusAdmin(orderCode: string, dto: UpdateOrderStatusDto, adminId: number): Promise<OrderResponseDto> {
+    const order = await this.orderRepo.findOne({ where: { maDonHang: orderCode }, relations: ['items'] });
+    if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
+    this.validateStatusTransition(order.trangThaiDon, dto.trangThai);
+    const updated = await this.changeStatus(order, dto.trangThai, adminId, dto.ghiChu, dto.trangThai === TrangThaiDon.DA_HUY);
+    return this.toDto(updated);
   }
+
+  async findAllAdmin(query: QueryOrderDto): Promise<{ data: AdminOrderSummaryDto[]; total: number; page: number; limit: number; totalPages: number }> {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    const sortBy = query.sortBy ?? 'createdAt';
+    const sortOrder = (query.sortOrder?.toUpperCase() === 'ASC' ? 'ASC' : 'DESC') as 'ASC' | 'DESC';
+
+    const allowedSortBy: Record<string, string> = {
+      id:            'o.id',
+      createdAt:     'o.ngayDatHang',
+      status:        'o.trangThaiDon',
+      paymentStatus: 'o.trangThaiThanhToan',
+      grandTotal:    'o.tongThanhToan',
+      customerName:  'kh.ho_ten',
+    };
+
+    const needsCustomerJoin = !!query.q || sortBy === 'customerName';
+
+    const qb = this.orderRepo.createQueryBuilder('o');
+    if (needsCustomerJoin) {
+      qb.leftJoin('khach_hang', 'kh', 'kh.khach_hang_id = o.khach_hang_id');
+    }
+    if (query.trangThai) qb.andWhere('o.trangThaiDon = :tt', { tt: query.trangThai });
+    if (query.trangThaiThanhToan) qb.andWhere('o.trangThaiThanhToan = :tttt', { tttt: query.trangThaiThanhToan });
+    if (query.q) {
+      qb.andWhere(
+        '(o.ma_don_hang LIKE :q OR kh.ho_ten LIKE :q OR kh.so_dien_thoai LIKE :q)',
+        { q: `%${query.q}%` },
+      );
+    }
+
+    const orderCol = allowedSortBy[sortBy] ?? 'o.ngayDatHang';
+    qb.orderBy(orderCol, sortOrder);
+
+    const total = await qb.getCount();
+    // Use offset/limit instead of skip/take to avoid TypeORM's special pagination
+    // path (triggered by skip/take + joinAttributes), which crashes on raw-joined
+    // table aliases (alias.metadata is null → TypeError on findColumnWithPropertyPath).
+    const orders = await qb.offset((page - 1) * limit).limit(limit).getMany();
+
+    if (!orders.length) {
+      return { data: [], total, page, limit, totalPages: Math.ceil(total / limit) };
+    }
+
+    const orderIds = orders.map((o) => o.id);
+    const customerIds = [...new Set(orders.map((o) => o.khachHangId))];
+
+    const customers: Array<{ khach_hang_id: number; ho_ten: string; so_dien_thoai: string | null }> =
+      await this.dataSource.query(
+        `SELECT khach_hang_id, ho_ten, so_dien_thoai FROM khach_hang WHERE khach_hang_id IN (?)`,
+        [customerIds],
+      );
+    const customerMap = new Map(customers.map((c) => [c.khach_hang_id, c]));
+
+    const counts: Array<{ don_hang_id: number; cnt: string }> = await this.dataSource.query(
+      `SELECT don_hang_id, COUNT(*) AS cnt FROM chi_tiet_don_hang WHERE don_hang_id IN (?) GROUP BY don_hang_id`,
+      [orderIds],
+    );
+    const countMap = new Map(counts.map((c) => [Number(c.don_hang_id), Number(c.cnt)]));
+
+    const data = orders.map((o) =>
+      mapToAdminOrderSummary(o, customerMap.get(o.khachHangId) ?? null, countMap.get(o.id) ?? 0),
+    );
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async findOneAdmin(orderCode: string): Promise<AdminOrderDetailDto> {
+    const order = await this.orderRepo.findOne({ where: { maDonHang: orderCode } });
+    if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
+
+    const [customers, addresses, lineItems, notes, refunds, activityLogs] = await Promise.all([
+      this.dataSource.query(
+        `SELECT ho_ten, email, so_dien_thoai FROM khach_hang WHERE khach_hang_id = ?`,
+        [order.khachHangId],
+      ),
+      this.dataSource.query(
+        `SELECT ho_ten_nguoi_nhan, so_dien_thoai_nhan, dia_chi_chi_tiet, quan_huyen, tinh_thanh_pho
+         FROM dia_chi_giao_hang WHERE dia_chi_id = ?`,
+        [order.diaChiGiaoHangId],
+      ),
+      this.dataSource.query(
+        `SELECT ct.chi_tiet_id, ct.phien_ban_id,
+                COALESCE(pbsp.san_pham_id, 0) AS san_pham_id,
+                ct.so_luong, ct.gia_tai_thoi_diem, ct.ten_san_pham_snapshot, ct.sku_snapshot,
+                pbsp.ten_phien_ban,
+                pbsp.gia_goc,
+                (SELECT url_hinh_anh FROM hinh_anh_san_pham
+                 WHERE phien_ban_id = ct.phien_ban_id ORDER BY thu_tu ASC LIMIT 1) AS thumbnail_url
+         FROM chi_tiet_don_hang ct
+         LEFT JOIN phien_ban_san_pham pbsp ON pbsp.phien_ban_id = ct.phien_ban_id
+         WHERE ct.don_hang_id = ?`,
+        [order.id],
+      ),
+      this.dataSource.query(
+        `SELECT * FROM ghi_chu_don_hang WHERE don_hang_id = ? ORDER BY ngay_tao ASC`,
+        [order.id],
+      ) as Promise<NoteRow[]>,
+      this.dataSource.query(
+        `SELECT * FROM hoan_tien_don_hang WHERE don_hang_id = ? ORDER BY ngay_tao ASC`,
+        [order.id],
+      ) as Promise<RefundRow[]>,
+      this.dataSource.query(
+        `SELECT nhat_ky_id, ten_nguoi_thuc_hien, vai_tro, nguoi_thuc_hien_id, hanh_dong, chi_tiet, trang_thai_don, thoi_diem
+         FROM nhat_ky_don_hang WHERE don_hang_id = ? ORDER BY thoi_diem ASC`,
+        [order.id],
+      ) as Promise<ActivityLogRow[]>,
+    ]);
+
+    return mapToAdminOrderDetail(order, customers[0] ?? null, addresses[0] ?? null, lineItems, notes, refunds, activityLogs);
+  }
+
+  async findTransactionByOrderCode(orderCode: string) {
+    const rows = await this.dataSource.query(
+      `SELECT gd.giao_dich_id, gd.don_hang_id, gd.phuong_thuc_thanh_toan, gd.so_tien,
+              gd.trang_thai_giao_dich, gd.ma_giao_dich_ngoai, gd.ngan_hang_vi,
+              gd.thoi_diem_thanh_toan, gd.ngay_tao, gd.ghi_chu_loi
+       FROM giao_dich gd
+       JOIN don_hang dh ON dh.don_hang_id = gd.don_hang_id
+       WHERE dh.ma_don_hang = ?
+       LIMIT 1`,
+      [orderCode],
+    );
+    if (!rows.length) return null;
+    return mapToTransaction(rows[0]);
+  }
+
+  async updateShippingAdmin(orderCode: string, dto: UpdateOrderShippingDto): Promise<AdminOrderDetailDto> {
+    const order = await this.orderRepo.findOne({ where: { maDonHang: orderCode } });
+    if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
+    if (dto.carrier !== undefined) order.carrier = dto.carrier;
+    if (dto.trackingNumber !== undefined) order.trackingNumber = dto.trackingNumber;
+    if (dto.estimatedDelivery !== undefined) {
+      order.estimatedDelivery = dto.estimatedDelivery ? new Date(dto.estimatedDelivery) : null;
+    }
+    await this.orderRepo.save(order);
+    return this.findOneAdmin(orderCode);
+  }
+
+  async addNoteAdmin(orderCode: string, dto: AddOrderNoteDto, adminId?: number) {
+    const order = await this.orderRepo.findOne({ where: { maDonHang: orderCode } });
+    if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
+    const result: { insertId: number } = await this.dataSource.query(
+      `INSERT INTO ghi_chu_don_hang (don_hang_id, nhan_vien_id, ten_tac_gia, vai_tro_tac_gia, noi_dung)
+       VALUES (?, ?, ?, ?, ?)`,
+      [order.id, adminId ?? null, dto.authorName, dto.authorRole, dto.text],
+    );
+    const [row]: NoteRow[] = await this.dataSource.query(
+      `SELECT * FROM ghi_chu_don_hang WHERE ghi_chu_id = ?`,
+      [result.insertId],
+    );
+    return {
+      id:         String(row.ghi_chu_id),
+      authorName: row.ten_tac_gia,
+      authorRole: row.vai_tro_tac_gia,
+      authorId:   row.nhan_vien_id != null ? String(row.nhan_vien_id) : undefined,
+      text:       row.noi_dung,
+      createdAt:  (row.ngay_tao instanceof Date ? row.ngay_tao : new Date(row.ngay_tao)).toISOString(),
+    };
+  }
+
+  async processRefundAdmin(orderCode: string, dto: ProcessRefundDto, adminId?: number) {
+    return this.ordersRefundService.processRefundAdmin(orderCode, dto, adminId);
+  }
+
+  async settleRefundAdmin(orderCode: string, refundId: number, dto: SettleRefundDto, adminId?: number) {
+    return this.ordersRefundService.settleRefundAdmin(orderCode, refundId, dto, adminId);
+  }
+
+  async rejectRefundAdmin(orderCode: string, refundId: number, dto: RejectRefundDto, adminId?: number) {
+    return this.ordersRefundService.rejectRefundAdmin(orderCode, refundId, dto, adminId);
+  }
+
+  async getReturnRequestsForOrder(orderCode: string) {
+    return this.ordersReturnsQueryService.getReturnRequestsForOrder(orderCode);
+  }
+
 
   private async changeStatus(
     order: Order,
@@ -204,15 +405,15 @@ export class OrdersService {
       order.trangThaiDon = newStatus;
       await manager.save(Order, order);
 
-      await manager.save(
-        OrderStatusHistory,
-        manager.create(OrderStatusHistory, {
-          donHangId: order.id,
-          trangThaiMoi: newStatus,
-          trangThaiCu: oldStatus,
-          nguoiCapNhatId: updaterId,
-          ghiChu: ghiChu ?? null,
-        }),
+      const actor = updaterId
+        ? await this.activityLogService.resolveEmployeeActor(manager, updaterId)
+        : { name: 'Khách hàng', role: 'Khách hàng' };
+
+      await this.activityLogService.log(
+        manager, order.id, actor,
+        STATUS_ACTIONS[newStatus] ?? 'Cập nhật trạng thái đơn hàng',
+        ghiChu ?? undefined,
+        ORDER_STATUS_TO_ACTIVITY[newStatus] ?? null,
       );
 
       if (newStatus === TrangThaiDon.DA_XAC_NHAN) {
@@ -234,6 +435,11 @@ export class OrdersService {
             });
           }
         }
+        await this.activityLogService.log(
+          manager, order.id, actor,
+          'Xuất kho hàng hóa',
+          `Đã xuất ${confirmedItems.length} sản phẩm cho đơn hàng ${order.maDonHang}`,
+        );
       }
 
       if (restoreStock) {
@@ -260,11 +466,16 @@ export class OrdersService {
             });
           }
         }
+        await this.activityLogService.log(
+          manager, order.id, actor,
+          'Hoàn kho hàng hóa',
+          `Đã hoàn kho ${items.length} sản phẩm về kho`,
+        );
       }
 
       return manager.findOne(Order, {
         where: { id: order.id },
-        relations: ['items', 'statusHistory'],
+        relations: ['items'],
       }) as Promise<Order>;
     });
   }

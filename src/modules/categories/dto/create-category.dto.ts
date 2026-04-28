@@ -62,6 +62,11 @@ export class CreateCategoryDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
+  moTa?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
   @MaxLength(30)
   badgeText?: string;
 
@@ -83,4 +88,10 @@ export class CreateCategoryDto {
   @IsInt()
   @Min(1)
   assetId?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  imageAlt?: string;
 }

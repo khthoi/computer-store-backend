@@ -18,7 +18,7 @@ export class ProductsSearchService {
     private readonly brandsService: BrandsService,
   ) {}
 
-  async findAll(query: QueryProductDto): Promise<{ data: ProductListResponse[]; total: number }> {
+  async findAll(query: QueryProductDto): Promise<{ data: ProductListResponse[]; total: number; page: number; limit: number; totalPages: number }> {
     const {
       page = 1,
       limit = 20,
@@ -83,10 +83,24 @@ export class ProductsSearchService {
 
     const allowedSortBy: Record<string, string> = {
       ngayTao: 'p.ngayTao',
+      ngayCapNhat: 'p.ngayCapNhat',
       tenSanPham: 'p.tenSanPham',
+      // Frontend-facing aliases (ProductsTable column keys)
+      name: 'p.tenSanPham',
+      updatedAt: 'p.ngayCapNhat',
+      createdAt: 'p.ngayTao',
     };
-    const orderCol = allowedSortBy[sortBy] ?? 'p.ngayTao';
-    qb.orderBy(orderCol, sortOrder as 'ASC' | 'DESC');
+
+    if (sortBy === 'totalStock') {
+      qb.addSelect(
+        '(SELECT COALESCE(SUM(_pv.so_luong_ton), 0) FROM phien_ban_san_pham _pv WHERE _pv.san_pham_id = p.id)',
+        'total_stock_calc',
+      );
+      qb.orderBy('total_stock_calc', sortOrder.toUpperCase() as 'ASC' | 'DESC');
+    } else {
+      const orderCol = allowedSortBy[sortBy] ?? 'p.ngayCapNhat';
+      qb.orderBy(orderCol, sortOrder.toUpperCase() as 'ASC' | 'DESC');
+    }
 
     const [items, total] = await qb.getManyAndCount();
 
@@ -94,6 +108,6 @@ export class ProductsSearchService {
     const brandMap = await this.brandsService.getBrandMapForProducts(productIds);
 
     const data = items.map((p) => mapProductListResponse(p, brandMap.get(p.id) ?? []));
-    return { data, total };
+    return { data, total, page, limit: effectiveLimit, totalPages: Math.ceil(total / effectiveLimit) };
   }
 }

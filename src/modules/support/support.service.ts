@@ -67,7 +67,7 @@ export class SupportService {
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount()
-      .then(([items, total]) => ({ items, total, page, limit }));
+      .then(([items, total]) => ({ items, total, page, limit, totalPages: Math.ceil(total / limit) }));
   }
 
   async getMyTicketDetail(ticketId: number, customerId: number): Promise<SupportTicket> {
@@ -124,7 +124,7 @@ export class SupportService {
       .take(limit)
       .getManyAndCount();
 
-    return { items, total, page, limit };
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async getTicketDetail(ticketId: number): Promise<SupportTicket> {

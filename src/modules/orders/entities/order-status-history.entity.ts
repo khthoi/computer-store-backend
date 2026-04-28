@@ -3,12 +3,12 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
-  ManyToOne,
-  JoinColumn,
   Index,
 } from 'typeorm';
-import { Order, TrangThaiDon } from './order.entity';
+import { TrangThaiDon } from './order.entity';
 
+// Retained for existing DB data only — no longer written to or registered in TypeORM.
+// Use OrderActivityLog (nhat_ky_don_hang) for all new activity tracking.
 @Entity('lich_su_trang_thai_don')
 @Index('idx_lsttd_donhang', ['donHangId'])
 export class OrderStatusHistory {
@@ -18,7 +18,6 @@ export class OrderStatusHistory {
   @Column({ name: 'don_hang_id' })
   donHangId: number;
 
-  // Dùng varchar thay enum để tránh bug TypeORM+MariaDB với ALTER TABLE enum
   @Column({ name: 'trang_thai_moi', type: 'varchar', length: 30 })
   trangThaiMoi: TrangThaiDon;
 
@@ -33,8 +32,4 @@ export class OrderStatusHistory {
 
   @CreateDateColumn({ name: 'thoi_diem' })
   thoiDiem: Date;
-
-  @ManyToOne(() => Order, (o) => o.statusHistory, { onDelete: 'CASCADE' })
-  @JoinColumn({ name: 'don_hang_id' })
-  order: Order;
 }

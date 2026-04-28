@@ -26,7 +26,7 @@ export class SupportTicket {
   @Column({ name: 'muc_do_uu_tien', length: 20, default: 'TrungBinh' })
   priority: 'Cao' | 'TrungBinh' | 'Thap';
 
-  @Column({ name: 'tieu_de', length: 500 })
+  @Column({ name: 'tieu_de', type: 'text' })
   title: string;
 
   @Column({ name: 'mo_ta', type: 'text' })

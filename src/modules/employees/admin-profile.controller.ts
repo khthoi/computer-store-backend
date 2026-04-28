@@ -30,6 +30,7 @@ import {
   ProfileDataDto,
   NhanVienProfileDto,
   AuditLogEntryDto,
+  PaginatedAuditLogDto,
   AvatarResponseDto,
 } from './dto/profile-response.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -111,10 +112,18 @@ export class AdminProfileController {
   }
 
   @Get('audit-logs')
-  @ApiOperation({ summary: 'Lịch sử hoạt động của nhân viên đang đăng nhập' })
-  @ApiOkResponse({ type: [AuditLogEntryDto] })
-  getAuditLogs(@CurrentUser() user: JwtPayload): Promise<AuditLogEntryDto[]> {
-    return this.profileService.getAuditLogs(user.sub);
+  @ApiOperation({ summary: 'Lịch sử hoạt động của nhân viên đang đăng nhập (có phân trang)' })
+  @ApiQuery({ name: 'page', required: false, example: 1, description: 'Số trang (mặc định 1)' })
+  @ApiQuery({ name: 'limit', required: false, example: 20, description: 'Số bản ghi mỗi trang (mặc định 20, tối đa 100)' })
+  @ApiOkResponse({ type: PaginatedAuditLogDto })
+  getAuditLogs(
+    @CurrentUser() user: JwtPayload,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const p = Math.max(1, parseInt(page ?? '1', 10) || 1);
+    const l = Math.min(100, Math.max(1, parseInt(limit ?? '20', 10) || 20));
+    return this.profileService.getAuditLogs(user.sub, p, l);
   }
 }
 

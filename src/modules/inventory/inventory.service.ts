@@ -34,7 +34,9 @@ export class InventoryService {
     if (query.lowStockOnly) qb.andWhere('tk.so_luong_ton < tk.nguong_canh_bao');
 
     const [data, total] = await qb.getManyAndCount();
-    return { data, total, page: query.page ?? 1, limit: query.limit ?? 20 };
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
+    return { data, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   findStockByVariant(phienBanId: number) {

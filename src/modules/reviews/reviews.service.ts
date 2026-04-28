@@ -100,10 +100,23 @@ export class ReviewsService {
       conditions.push('r.phien_ban_id = ?');
       params.push(query.variantId);
     }
+    if (query.rating) {
+      conditions.push('r.rating = ?');
+      params.push(query.rating);
+    }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    const [rows, [{ total }]] = await Promise.all([
+    // Base conditions without rating for stats (stats always reflect full variant, not filtered by rating)
+    const statsConditions: string[] = [];
+    const statsParams: (string | number)[] = [];
+    if (query.variantId) {
+      statsConditions.push('r.phien_ban_id = ?');
+      statsParams.push(query.variantId);
+    }
+    const statsWhere = statsConditions.length > 0 ? `WHERE ${statsConditions.join(' AND ')}` : '';
+
+    const [rows, [{ total }], statsRows] = await Promise.all([
       this.dataSource.query(
         `SELECT
           r.review_id, r.phien_ban_id, r.khach_hang_id, r.don_hang_id,
@@ -131,7 +144,40 @@ export class ReviewsService {
         `SELECT COUNT(*) AS total FROM danh_gia_san_pham r ${where}`,
         params,
       ),
+      this.dataSource.query(
+        `SELECT
+          COUNT(*) AS tongDanhGia,
+          SUM(CASE WHEN r.review_status = 'Approved' THEN 1 ELSE 0 END) AS daDuyet,
+          SUM(CASE WHEN r.review_status = 'Pending'  THEN 1 ELSE 0 END) AS choDuyet,
+          SUM(CASE WHEN r.review_status = 'Rejected' THEN 1 ELSE 0 END) AS tuChoi,
+          SUM(CASE WHEN r.review_status = 'Hidden'   THEN 1 ELSE 0 END) AS daAn,
+          ROUND(AVG(r.rating), 1) AS tbRating,
+          SUM(CASE WHEN r.rating = 5 THEN 1 ELSE 0 END) AS r5,
+          SUM(CASE WHEN r.rating = 4 THEN 1 ELSE 0 END) AS r4,
+          SUM(CASE WHEN r.rating = 3 THEN 1 ELSE 0 END) AS r3,
+          SUM(CASE WHEN r.rating = 2 THEN 1 ELSE 0 END) AS r2,
+          SUM(CASE WHEN r.rating = 1 THEN 1 ELSE 0 END) AS r1
+         FROM danh_gia_san_pham r ${statsWhere}`,
+        statsParams,
+      ),
     ]);
+
+    const s = statsRows[0] ?? {};
+    const stats = {
+      tongDanhGia: Number(s.tongDanhGia ?? 0),
+      daDuyet:     Number(s.daDuyet     ?? 0),
+      choDuyet:    Number(s.choDuyet    ?? 0),
+      tuChoi:      Number(s.tuChoi      ?? 0),
+      daAn:        Number(s.daAn        ?? 0),
+      tbRating:    Number(s.tbRating    ?? 0),
+      phanBoRating: {
+        '5': Number(s.r5 ?? 0),
+        '4': Number(s.r4 ?? 0),
+        '3': Number(s.r3 ?? 0),
+        '2': Number(s.r2 ?? 0),
+        '1': Number(s.r1 ?? 0),
+      },
+    };
 
     const totalPages = Math.ceil(Number(total) / limit);
     return {
@@ -140,6 +186,7 @@ export class ReviewsService {
       page,
       limit,
       totalPages,
+      stats,
     };
   }
 

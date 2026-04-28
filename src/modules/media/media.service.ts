@@ -107,7 +107,7 @@ export class MediaService {
     if (thuMucId) qb.andWhere('a.thuMucId = :thuMucId', { thuMucId });
 
     const [items, total] = await qb.getManyAndCount();
-    return { items, total, page, limit };
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findOne(id: number): Promise<MediaAsset> {

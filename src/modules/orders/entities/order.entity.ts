@@ -8,7 +8,6 @@ import {
   Index,
 } from 'typeorm';
 import { OrderItem } from './order-item.entity';
-import { OrderStatusHistory } from './order-status-history.entity';
 
 export enum TrangThaiDon {
   CHO_XAC_NHAN = 'ChoTT',
@@ -78,8 +77,23 @@ export class Order {
   @Column({ name: 'tong_thanh_toan', type: 'decimal', precision: 18, scale: 2 })
   tongThanhToan: number;
 
+  @Column({ name: 'phuong_thuc_thanh_toan', length: 30, nullable: true })
+  phuongThucThanhToan: string | null;
+
+  @Column({ name: 'trang_thai_thanh_toan', length: 30, default: 'ChuaThanhToan' })
+  trangThaiThanhToan: string;
+
   @Column({ name: 'ghi_chu_khach', type: 'text', nullable: true })
   ghiChuKhach: string | null;
+
+  @Column({ name: 'carrier', length: 100, nullable: true })
+  carrier: string | null;
+
+  @Column({ name: 'tracking_number', length: 200, nullable: true })
+  trackingNumber: string | null;
+
+  @Column({ name: 'estimated_delivery', type: 'date', nullable: true })
+  estimatedDelivery: Date | null;
 
   @CreateDateColumn({ name: 'ngay_dat_hang' })
   ngayDatHang: Date;
@@ -89,7 +103,4 @@ export class Order {
 
   @OneToMany(() => OrderItem, (item) => item.order, { cascade: true })
   items: OrderItem[];
-
-  @OneToMany(() => OrderStatusHistory, (h) => h.order, { cascade: true })
-  statusHistory: OrderStatusHistory[];
 }

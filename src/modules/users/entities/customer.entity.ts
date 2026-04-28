@@ -53,6 +53,9 @@ export class Customer {
   @Column({ name: 'diem_hien_tai', default: 0 })
   diemHienTai: number;
 
+  @Column({ name: 'so_du_vi', type: 'decimal', precision: 18, scale: 2, default: 0 })
+  soDuVi: number;
+
   @Column({ name: 'asset_id_avatar', nullable: true })
   assetIdAvatar: number | null;
 

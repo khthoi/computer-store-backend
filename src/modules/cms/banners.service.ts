@@ -22,7 +22,7 @@ export class BannersService {
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
-    return { items, total, page, limit };
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   async findPublic(position: string) {

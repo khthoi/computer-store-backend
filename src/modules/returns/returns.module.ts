@@ -2,6 +2,7 @@ import { Module } from '@nestjs/common';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ReturnRequest } from './entities/return-request.entity';
 import { ReturnAsset } from './entities/return-asset.entity';
+import { ReturnRequestItem } from './entities/return-request-item.entity';
 import { ReturnsService } from './returns.service';
 import { ReturnsController } from './returns.controller';
 import { AdminReturnsController } from './admin-returns.controller';
@@ -9,7 +10,7 @@ import { LoyaltyModule } from '../loyalty/loyalty.module';
 
 @Module({
   imports: [
-    TypeOrmModule.forFeature([ReturnRequest, ReturnAsset]),
+    TypeOrmModule.forFeature([ReturnRequest, ReturnAsset, ReturnRequestItem]),
     LoyaltyModule,
   ],
   controllers: [ReturnsController, AdminReturnsController],

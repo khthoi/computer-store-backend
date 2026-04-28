@@ -5,6 +5,7 @@ import { Brand } from './entities/brand.entity';
 import { ProductBrand } from './entities/product-brand.entity';
 import { CreateBrandDto } from './dto/create-brand.dto';
 import { UpdateBrandDto } from './dto/update-brand.dto';
+import { BrandResponseDto, mapBrandToDto } from './dto/brand-response.dto';
 
 @Injectable()
 export class BrandsService {
@@ -15,34 +16,56 @@ export class BrandsService {
     private readonly productBrandRepo: Repository<ProductBrand>,
   ) {}
 
-  async findAll(): Promise<Brand[]> {
-    return this.brandRepo.find({ order: { tenThuongHieu: 'ASC' } });
-  }
-
-  async findOne(id: number): Promise<Brand> {
+  private async findEntityById(id: number): Promise<Brand> {
     const brand = await this.brandRepo.findOne({ where: { id } });
     if (!brand) throw new NotFoundException('Thương hiệu không tồn tại');
     return brand;
   }
 
-  async create(dto: CreateBrandDto): Promise<Brand> {
-    const exists = await this.brandRepo.findOne({ where: { tenThuongHieu: dto.tenThuongHieu } });
-    if (exists) throw new ConflictException('Tên thương hiệu đã tồn tại');
-    return this.brandRepo.save(this.brandRepo.create(dto));
+  async findAll(): Promise<BrandResponseDto[]> {
+    const brands = await this.brandRepo.find({ order: { tenThuongHieu: 'ASC' } });
+    if (!brands.length) return [];
+
+    const ids = brands.map((b) => b.id);
+    const counts = await this.productBrandRepo
+      .createQueryBuilder('pb')
+      .select('pb.thuongHieuId', 'id')
+      .addSelect('COUNT(*)', 'cnt')
+      .where('pb.thuongHieuId IN (:...ids)', { ids })
+      .groupBy('pb.thuongHieuId')
+      .getRawMany();
+
+    const countMap = new Map(counts.map((c) => [Number(c.id), Number(c.cnt)]));
+    return brands.map((b) => mapBrandToDto(b, countMap.get(b.id) ?? 0));
   }
 
-  async update(id: number, dto: UpdateBrandDto): Promise<Brand> {
-    const brand = await this.findOne(id);
+  async findOne(id: number): Promise<BrandResponseDto> {
+    const brand = await this.findEntityById(id);
+    const cnt = await this.productBrandRepo.count({ where: { thuongHieuId: id } });
+    return mapBrandToDto(brand, cnt);
+  }
+
+  async create(dto: CreateBrandDto): Promise<BrandResponseDto> {
+    const exists = await this.brandRepo.findOne({ where: { tenThuongHieu: dto.tenThuongHieu } });
+    if (exists) throw new ConflictException('Tên thương hiệu đã tồn tại');
+    const brand = await this.brandRepo.save(this.brandRepo.create(dto));
+    return mapBrandToDto(brand, 0);
+  }
+
+  async update(id: number, dto: UpdateBrandDto): Promise<BrandResponseDto> {
+    const brand = await this.findEntityById(id);
     if (dto.tenThuongHieu && dto.tenThuongHieu !== brand.tenThuongHieu) {
       const exists = await this.brandRepo.findOne({ where: { tenThuongHieu: dto.tenThuongHieu } });
       if (exists) throw new ConflictException('Tên thương hiệu đã tồn tại');
     }
     Object.assign(brand, dto);
-    return this.brandRepo.save(brand);
+    const saved = await this.brandRepo.save(brand);
+    const cnt = await this.productBrandRepo.count({ where: { thuongHieuId: id } });
+    return mapBrandToDto(saved, cnt);
   }
 
   async remove(id: number): Promise<void> {
-    const brand = await this.findOne(id);
+    const brand = await this.findEntityById(id);
     const linked = await this.productBrandRepo.count({ where: { thuongHieuId: id } });
     if (linked > 0) {
       brand.trangThai = 'An';

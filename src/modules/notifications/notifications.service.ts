@@ -44,7 +44,7 @@ export class NotificationsService {
       where: { customerId, isRead: false },
     });
 
-    return { items, total, page, limit, unreadCount };
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit), unreadCount };
   }
 
   async markRead(id: number, customerId: number): Promise<Notification> {
