@@ -4,7 +4,10 @@ import {
   Column,
   CreateDateColumn,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Order } from '../../orders/entities/order.entity';
 
 export enum PhuongThucThanhToan {
   COD = 'COD',
@@ -30,6 +33,10 @@ export class Transaction {
 
   @Column({ name: 'don_hang_id' })
   donHangId: number;
+
+  @ManyToOne(() => Order, { nullable: false, eager: false })
+  @JoinColumn({ name: 'don_hang_id' })
+  donHang: Order;
 
   @Column({
     name: 'phuong_thuc_thanh_toan',

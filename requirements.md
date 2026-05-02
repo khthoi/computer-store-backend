@@ -1,0 +1,1 @@
+/inventory/stock-in/new

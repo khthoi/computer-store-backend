@@ -8,6 +8,7 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { MediaFolder } from './media-folder.entity';
+import { Employee } from '../../employees/entities/employee.entity';
 
 @Entity('media_asset')
 export class MediaAsset {
@@ -21,7 +22,7 @@ export class MediaAsset {
   @Column({ name: 'cloudinary_ver' })
   cloudinaryVer: number;
 
-  @Column({ name: 'url_goc', length: 1000 })
+  @Column({ name: 'url_goc', type: 'text' })
   urlGoc: string;
 
   @Column({ name: 'ten_file_goc', length: 255 })
@@ -42,10 +43,10 @@ export class MediaAsset {
   @Column({ name: 'chieu_cao', nullable: true })
   chieuCao: number | null;
 
-  @Column({ name: 'alt_text', length: 500, nullable: true })
+  @Column({ name: 'alt_text', type: 'text', nullable: true })
   altText: string | null;
 
-  @Column({ length: 1000, nullable: true })
+  @Column({ type: 'text', nullable: true })
   caption: string | null;
 
   @Column({ name: 'thu_muc', length: 255, nullable: true })
@@ -72,6 +73,10 @@ export class MediaAsset {
 
   @Column({ name: 'nguoi_upload_id' })
   nguoiUploadId: number;
+
+  @ManyToOne(() => Employee, { nullable: false, eager: false })
+  @JoinColumn({ name: 'nguoi_upload_id' })
+  nguoiUpload: Employee;
 
   @CreateDateColumn({ name: 'ngay_upload' })
   ngayUpload: Date;

@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { BuildSlot } from './build-slot.entity';
 
 @Entity('buildpc_quy_tac_tuong_thich')
 export class CompatibilityRule {
@@ -11,11 +12,19 @@ export class CompatibilityRule {
   @Column({ name: 'slot_nguon_id' })
   slotNguonId: number;
 
+  @ManyToOne(() => BuildSlot, { nullable: false, eager: false })
+  @JoinColumn({ name: 'slot_nguon_id' })
+  slotNguon: BuildSlot;
+
   @Column({ name: 'ma_kt_nguon', length: 50 })
   maKtNguon: string;
 
   @Column({ name: 'slot_dich_id', nullable: true })
   slotDichId: number | null;
+
+  @ManyToOne(() => BuildSlot, { nullable: true, eager: false })
+  @JoinColumn({ name: 'slot_dich_id' })
+  slotDich: BuildSlot | null;
 
   @Column({ name: 'ma_kt_dich', length: 50 })
   maKtDich: string;

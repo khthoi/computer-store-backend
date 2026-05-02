@@ -1,7 +1,7 @@
 import { Type } from 'class-transformer';
 import {
   IsInt, IsString, IsOptional, IsArray, ValidateNested,
-  IsNumber, Min, MaxLength, IsNotEmpty,
+  IsNumber, Min, MaxLength, IsNotEmpty, IsDateString,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -31,9 +31,10 @@ export class CreateImportReceiptDto {
   @IsInt()
   nhaCungCapId: number;
 
-  @ApiProperty()
-  @IsInt()
-  khoId: number;
+  @ApiPropertyOptional({ example: '2025-05-20' })
+  @IsDateString()
+  @IsOptional()
+  ngayDuKien?: string;
 
   @ApiPropertyOptional()
   @IsString()

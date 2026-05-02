@@ -1,14 +1,21 @@
 import {
-  Controller, Get, Put, Body, Param, ParseIntPipe, Request, Query,
+  Controller, Get, Put, Post, Patch, Body, Param, ParseIntPipe, Request, Query,
 } from '@nestjs/common';
 import {
   ApiTags, ApiOperation, ApiOkResponse, ApiResponse,
   ApiBearerAuth, ApiParam, ApiQuery,
 } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ReturnsService } from './returns.service';
 import { QueryReturnsDto } from './dto/query-returns.dto';
 import { ProcessReturnDto } from './dto/process-return.dto';
+import {
+  ProcessRefundResolutionDto,
+  ProcessExchangeResolutionDto,
+  ProcessWarrantyReturnDto,
+  UpdateWarrantyStatusDto,
+} from './dto/process-resolution.dto';
 
 @ApiTags('Admin — Returns')
 @ApiBearerAuth()
@@ -43,13 +50,20 @@ export class AdminReturnsController {
     return this.returnsService.findAll(query);
   }
 
+  @Get(':id')
+  @ApiOperation({ summary: 'Chi tiết yêu cầu đổi/trả (kèm items, resolution record, ảnh bằng chứng)' })
+  @ApiParam({ name: 'id', example: 1, description: 'ID yêu cầu đổi/trả' })
+  @ApiOkResponse({ description: 'Chi tiết yêu cầu đổi/trả' })
+  @ApiResponse({ status: 404, description: 'Yêu cầu không tồn tại' })
+  findOne(@Param('id', ParseIntPipe) id: number) {
+    return this.returnsService.findOne(id);
+  }
+
   @Put(':id/status')
-  @ApiOperation({ summary: 'Xử lý yêu cầu đổi/trả — duyệt, từ chối, hoàn thành' })
+  @ApiOperation({ summary: 'Duyệt / từ chối / cập nhật trạng thái yêu cầu đổi/trả' })
   @ApiParam({ name: 'id', example: 1, description: 'ID yêu cầu đổi/trả' })
   @ApiResponse({ status: 200, description: 'Trạng thái đã được cập nhật' })
   @ApiResponse({ status: 404, description: 'Yêu cầu không tồn tại' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   processReturn(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: ProcessReturnDto,
@@ -67,9 +81,81 @@ export class AdminReturnsController {
       example: [{ id: 1, returnRequestId: 1, assetId: 12, sortOrder: 0 }],
     },
   })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   getAssets(@Param('id', ParseIntPipe) id: number) {
     return this.returnsService.getReturnAssets(id);
+  }
+
+  // ─── Xử lý hoàn tiền ──────────────────────────────────────────────────────
+
+  @Post(':id/process-refund')
+  @ApiOperation({ summary: 'Thực hiện hoàn tiền — chạy trong DB transaction đầy đủ' })
+  @ApiParam({ name: 'id', example: 1, description: 'ID yêu cầu đổi/trả' })
+  @ApiResponse({ status: 201, description: 'Hoàn tiền thành công' })
+  @ApiResponse({ status: 400, description: 'Trạng thái yêu cầu không hợp lệ' })
+  @ApiResponse({ status: 404, description: 'Yêu cầu không tồn tại' })
+  processRefund(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ProcessRefundResolutionDto,
+    @CurrentUser('sub') employeeId: number,
+  ) {
+    return this.returnsService.processRefund(id, dto, employeeId);
+  }
+
+  // ─── Xử lý đổi hàng ───────────────────────────────────────────────────────
+
+  @Post(':id/process-exchange')
+  @ApiOperation({ summary: 'Xuất hàng thay thế — tạo đơn hàng đổi mới và trừ tồn kho' })
+  @ApiParam({ name: 'id', example: 1, description: 'ID yêu cầu đổi/trả' })
+  @ApiResponse({ status: 201, description: 'Đơn đổi hàng đã được tạo' })
+  processExchange(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ProcessExchangeResolutionDto,
+    @CurrentUser('sub') employeeId: number,
+  ) {
+    return this.returnsService.processExchange(id, dto, employeeId);
+  }
+
+  @Patch('resolutions/:resolutionId/confirm-delivered')
+  @ApiOperation({ summary: 'Xác nhận khách đã nhận được hàng đổi — hoàn tất quy trình đổi hàng' })
+  @ApiParam({ name: 'resolutionId', example: 1 })
+  confirmExchangeDelivered(
+    @Param('resolutionId', ParseIntPipe) resolutionId: number,
+    @CurrentUser('sub') employeeId: number,
+  ) {
+    return this.returnsService.confirmExchangeDelivered(resolutionId, employeeId);
+  }
+
+  // ─── Xử lý bảo hành ───────────────────────────────────────────────────────
+
+  @Post(':id/init-warranty')
+  @ApiOperation({ summary: 'Khởi tạo bản ghi bảo hành khi nhận hàng từ khách' })
+  @ApiParam({ name: 'id', example: 1, description: 'ID yêu cầu đổi/trả' })
+  initWarranty(
+    @Param('id', ParseIntPipe) id: number,
+    @Body('phieuNhapKhoId') phieuNhapKhoId: number | null,
+    @CurrentUser('sub') employeeId: number,
+  ) {
+    return this.returnsService.initWarrantyResolution(id, phieuNhapKhoId ?? null, employeeId);
+  }
+
+  @Patch('resolutions/:resolutionId/warranty-status')
+  @ApiOperation({ summary: 'Cập nhật trạng thái bảo hành (mã hãng, ngày gửi/nhận, kết quả)' })
+  @ApiParam({ name: 'resolutionId', example: 1 })
+  updateWarrantyStatus(
+    @Param('resolutionId', ParseIntPipe) resolutionId: number,
+    @Body() dto: UpdateWarrantyStatusDto,
+  ) {
+    return this.returnsService.updateWarrantyStatus(resolutionId, dto);
+  }
+
+  @Post(':id/process-warranty')
+  @ApiOperation({ summary: 'Trả hàng bảo hành lại khách — trừ tồn kho và hoàn tất quy trình' })
+  @ApiParam({ name: 'id', example: 1, description: 'ID yêu cầu đổi/trả' })
+  processWarranty(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: ProcessWarrantyReturnDto,
+    @CurrentUser('sub') employeeId: number,
+  ) {
+    return this.returnsService.processWarranty(id, dto, employeeId);
   }
 }

@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { HomepageSection } from './homepage-section.entity';
+import { ProductVariant } from '../../products/entities/product-variant.entity';
 
 @Entity('homepage_section_item')
 export class HomepageSectionItem {
@@ -11,6 +12,10 @@ export class HomepageSectionItem {
 
   @Column({ name: 'phien_ban_id' })
   variantId: number;
+
+  @ManyToOne(() => ProductVariant, { nullable: false, eager: false })
+  @JoinColumn({ name: 'phien_ban_id' })
+  variant: ProductVariant;
 
   @Column({ name: 'sort_order', default: 0 })
   sortOrder: number;

@@ -7,6 +7,7 @@ import {
   Index,
 } from 'typeorm';
 import { ProductVariant } from './product-variant.entity';
+import { MediaAsset } from '../../media/entities/media-asset.entity';
 
 export enum LoaiAnh {
   AnhChinh = 'AnhChinh',
@@ -22,7 +23,7 @@ export class ProductImage {
   @Column({ name: 'phien_ban_id' })
   phienBanId: number;
 
-  @Column({ name: 'url_hinh_anh', length: 500 })
+  @Column({ name: 'url_hinh_anh', type: 'text' })
   urlHinhAnh: string;
 
   @Column({ name: 'loai_anh', type: 'enum', enum: LoaiAnh, default: LoaiAnh.AnhPhu })
@@ -36,6 +37,10 @@ export class ProductImage {
 
   @Column({ name: 'asset_id', nullable: true })
   assetId: number | null;
+
+  @ManyToOne(() => MediaAsset, { nullable: true, eager: false })
+  @JoinColumn({ name: 'asset_id' })
+  asset: MediaAsset | null;
 
   @ManyToOne(() => ProductVariant, (v) => v.images, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'phien_ban_id' })

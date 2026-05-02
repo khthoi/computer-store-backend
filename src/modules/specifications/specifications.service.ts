@@ -323,8 +323,10 @@ export class SpecificationsService {
   }
 
   async saveSpecValues(phienBanId: number, dto: SaveSpecValuesDto): Promise<SpecValue[]> {
+    const filled = dto.specs.filter((item) => item.giaTriThongSo?.trim());
     await this.valueRepo.delete({ phienBanId });
-    return this.valueRepo.save(dto.specs.map((item) => this.valueRepo.create({ phienBanId, ...item })));
+    if (!filled.length) return [];
+    return this.valueRepo.save(filled.map((item) => this.valueRepo.create({ phienBanId, ...item })));
   }
 
   async getSpecTemplateForCategory(categoryId: number) {

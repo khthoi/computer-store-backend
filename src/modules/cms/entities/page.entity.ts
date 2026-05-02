@@ -4,7 +4,10 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Employee } from '../../employees/entities/employee.entity';
 
 @Entity('trang_noi_dung')
 export class Page {
@@ -49,8 +52,16 @@ export class Page {
   @Column({ name: 'nguoi_tao_id', nullable: true })
   createdById: number | null;
 
+  @ManyToOne(() => Employee, { nullable: true, eager: false })
+  @JoinColumn({ name: 'nguoi_tao_id' })
+  createdBy: Employee | null;
+
   @Column({ name: 'nguoi_cap_nhat_id', nullable: true })
   updatedById: number | null;
+
+  @ManyToOne(() => Employee, { nullable: true, eager: false })
+  @JoinColumn({ name: 'nguoi_cap_nhat_id' })
+  updatedBy: Employee | null;
 
   @CreateDateColumn({ name: 'ngay_tao' })
   createdAt: Date;

@@ -1,4 +1,5 @@
-import { IsString, IsEmail, IsOptional, IsIn, MaxLength, IsNotEmpty } from 'class-validator';
+import { IsString, IsEmail, IsOptional, IsIn, IsInt, MaxLength, IsNotEmpty, Min, Max } from 'class-validator';
+import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class CreateSupplierDto {
@@ -6,7 +7,7 @@ export class CreateSupplierDto {
   @IsString()
   @IsNotEmpty()
   @MaxLength(300)
-  tenNhaCungCap: string;
+  name: string;
 
   @ApiPropertyOptional()
   @IsEmail()
@@ -17,22 +18,35 @@ export class CreateSupplierDto {
   @IsString()
   @IsOptional()
   @MaxLength(20)
-  soDienThoai?: string;
+  phone?: string;
 
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   @MaxLength(500)
-  diaChi?: string;
+  address?: string;
 
   @ApiPropertyOptional()
   @IsString()
   @IsOptional()
   @MaxLength(255)
-  nguoiLienHe?: string;
+  contactName?: string;
 
-  @ApiPropertyOptional({ enum: ['DangHopTac', 'NgungHopTac'] })
-  @IsIn(['DangHopTac', 'NgungHopTac'])
+  @ApiPropertyOptional({ enum: ['active', 'inactive'] })
+  @IsIn(['active', 'inactive'])
   @IsOptional()
-  trangThai?: string;
+  status?: string;
+
+  @ApiPropertyOptional({ default: 7, minimum: 1, maximum: 365 })
+  @IsInt()
+  @Min(1)
+  @Max(365)
+  @IsOptional()
+  @Type(() => Number)
+  leadTimeDays?: number;
+
+  @ApiPropertyOptional()
+  @IsString()
+  @IsOptional()
+  notes?: string;
 }

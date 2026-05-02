@@ -4,7 +4,11 @@ import {
   Column,
   CreateDateColumn,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Order } from './order.entity';
+import { Employee } from '../../employees/entities/employee.entity';
 
 export enum OrderActivityStatus {
   CHO_XU_LY          = 'ChoXuLy',
@@ -25,6 +29,10 @@ export class OrderActivityLog {
   @Column({ name: 'don_hang_id' })
   donHangId: number;
 
+  @ManyToOne(() => Order, { nullable: false, eager: false })
+  @JoinColumn({ name: 'don_hang_id' })
+  donHang: Order;
+
   @Column({ name: 'ten_nguoi_thuc_hien', length: 100 })
   actorName: string;
 
@@ -33,6 +41,10 @@ export class OrderActivityLog {
 
   @Column({ name: 'nguoi_thuc_hien_id', nullable: true })
   actorId: number | null;
+
+  @ManyToOne(() => Employee, { nullable: true, eager: false })
+  @JoinColumn({ name: 'nguoi_thuc_hien_id' })
+  actor: Employee | null;
 
   @Column({ name: 'hanh_dong', length: 200 })
   action: string;

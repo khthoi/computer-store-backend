@@ -7,6 +7,7 @@ import {
   Index,
 } from 'typeorm';
 import { Order } from './order.entity';
+import { ProductVariant } from '../../products/entities/product-variant.entity';
 
 @Entity('chi_tiet_don_hang')
 @Index('idx_ctdh_donhang', ['donHangId'])
@@ -19,6 +20,10 @@ export class OrderItem {
 
   @Column({ name: 'phien_ban_id' })
   phienBanId: number;
+
+  @ManyToOne(() => ProductVariant, { nullable: false, eager: false })
+  @JoinColumn({ name: 'phien_ban_id' })
+  phienBan: ProductVariant;
 
   @Column({ name: 'so_luong' })
   soLuong: number;

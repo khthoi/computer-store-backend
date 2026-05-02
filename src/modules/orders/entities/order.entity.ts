@@ -6,8 +6,13 @@ import {
   UpdateDateColumn,
   OneToMany,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { OrderItem } from './order-item.entity';
+import { Customer } from '../../users/entities/customer.entity';
+import { ShippingAddress } from '../../users/entities/shipping-address.entity';
+import { Employee } from '../../employees/entities/employee.entity';
 
 export enum TrangThaiDon {
   CHO_XAC_NHAN = 'ChoTT',
@@ -40,11 +45,23 @@ export class Order {
   @Column({ name: 'khach_hang_id' })
   khachHangId: number;
 
+  @ManyToOne(() => Customer, { nullable: false, eager: false })
+  @JoinColumn({ name: 'khach_hang_id' })
+  khachHang: Customer;
+
   @Column({ name: 'dia_chi_giao_hang_id' })
   diaChiGiaoHangId: number;
 
+  @ManyToOne(() => ShippingAddress, { nullable: false, eager: false })
+  @JoinColumn({ name: 'dia_chi_giao_hang_id' })
+  diaChiGiaoHang: ShippingAddress;
+
   @Column({ name: 'nhan_vien_xu_ly_id', nullable: true })
   nhanVienXuLyId: number | null;
+
+  @ManyToOne(() => Employee, { nullable: true, eager: false })
+  @JoinColumn({ name: 'nhan_vien_xu_ly_id' })
+  nhanVienXuLy: Employee | null;
 
   @Column({
     name: 'trang_thai_don',

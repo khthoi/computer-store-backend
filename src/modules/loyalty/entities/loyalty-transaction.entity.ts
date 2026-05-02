@@ -1,4 +1,5 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index, ManyToOne, JoinColumn } from 'typeorm';
+import { Customer } from '../../users/entities/customer.entity';
 
 @Entity('loyalty_point_transaction')
 @Index('idx_lpt_khachhang', ['khachHangId'])
@@ -9,6 +10,10 @@ export class LoyaltyTransaction {
 
   @Column({ name: 'khach_hang_id' })
   khachHangId: number;
+
+  @ManyToOne(() => Customer, { nullable: false, eager: false })
+  @JoinColumn({ name: 'khach_hang_id' })
+  khachHang: Customer;
 
   @Column({ name: 'loai_giao_dich', length: 20 })
   loaiGiaoDich: 'earn' | 'redeem' | 'expire' | 'adjust';

@@ -1,7 +1,11 @@
 import {
   Entity, PrimaryGeneratedColumn, Column,
   CreateDateColumn, UpdateDateColumn, Index,
+  ManyToOne, JoinColumn,
 } from 'typeorm';
+import { Customer } from '../../users/entities/customer.entity';
+import { Order } from '../../orders/entities/order.entity';
+import { Employee } from '../../employees/entities/employee.entity';
 
 @Entity('ticket_khieu_nai')
 @Index('idx_ticket_customer', ['customerId'])
@@ -17,8 +21,16 @@ export class SupportTicket {
   @Column({ name: 'khach_hang_id' })
   customerId: number;
 
+  @ManyToOne(() => Customer, { nullable: false, eager: false })
+  @JoinColumn({ name: 'khach_hang_id' })
+  customer: Customer;
+
   @Column({ name: 'don_hang_id', nullable: true })
   orderId: number | null;
+
+  @ManyToOne(() => Order, { nullable: true, eager: false })
+  @JoinColumn({ name: 'don_hang_id' })
+  order: Order | null;
 
   @Column({ name: 'loai_van_de', length: 30 })
   issueType: string;
@@ -40,6 +52,10 @@ export class SupportTicket {
 
   @Column({ name: 'nhan_vien_phu_trach_id', nullable: true })
   assignedToId: number | null;
+
+  @ManyToOne(() => Employee, { nullable: true, eager: false })
+  @JoinColumn({ name: 'nhan_vien_phu_trach_id' })
+  assignedTo: Employee | null;
 
   @Column({ name: 'first_response_at', type: 'timestamp', nullable: true })
   firstResponseAt: Date | null;

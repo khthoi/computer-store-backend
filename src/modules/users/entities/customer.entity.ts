@@ -6,8 +6,11 @@ import {
   UpdateDateColumn,
   OneToMany,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { ShippingAddress } from './shipping-address.entity';
+import { MediaAsset } from '../../media/entities/media-asset.entity';
 
 @Entity('khach_hang')
 @Index('idx_kh_trangthai_ngay', ['trangThai', 'ngayDangKy'])
@@ -35,7 +38,7 @@ export class Customer {
   @Column({ length: 10, nullable: true })
   gioiTinh: string | null; // 'Nam' | 'Nu' | 'Khac'
 
-  @Column({ name: 'anh_dai_dien', length: 500, nullable: true })
+  @Column({ name: 'anh_dai_dien', type: 'text', nullable: true })
   anhDaiDien: string | null;
 
   @Column({ name: 'trang_thai', length: 30, default: 'HoatDong' })
@@ -58,6 +61,10 @@ export class Customer {
 
   @Column({ name: 'asset_id_avatar', nullable: true })
   assetIdAvatar: number | null;
+
+  @ManyToOne(() => MediaAsset, { nullable: true, eager: false })
+  @JoinColumn({ name: 'asset_id_avatar' })
+  avatar: MediaAsset | null;
 
   @OneToMany(() => ShippingAddress, (addr) => addr.customer, { cascade: true })
   addresses: ShippingAddress[];

@@ -12,6 +12,9 @@ export class ReturnAssetResponseDto {
 
   @ApiProperty({ example: 0 })
   sortOrder: number;
+
+  @ApiPropertyOptional({ example: 'https://res.cloudinary.com/demo/image/upload/sample.jpg' })
+  assetUrl?: string;
 }
 
 export class ReturnRequestResponseDto {

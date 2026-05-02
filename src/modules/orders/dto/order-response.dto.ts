@@ -166,46 +166,19 @@ export interface AdminOrderDetailDto {
     id: string; timestamp: string; actorName: string; actorRole: string;
     actorId?: string; action: string; detail?: string; orderStatus?: string;
   }>;
-  refunds: Array<{
-    id: string; createdAt: string; method: string; amount: number;
-    status: string; items: unknown[]; processedBy: string;
-    processedById?: string; externalRef?: string; settledAt?: string;
-    bank?: string; errorNote?: string; returnRequestId?: number;
-  }>;
 }
 
 interface DetailCustomerRow { ho_ten: string; email: string; so_dien_thoai: string | null }
 interface DetailAddressRow { ho_ten_nguoi_nhan: string; so_dien_thoai_nhan: string; dia_chi_chi_tiet: string; quan_huyen: string; tinh_thanh_pho: string }
-interface DetailLineItemRow { chi_tiet_id: number; phien_ban_id: number; san_pham_id: number; so_luong: number; gia_tai_thoi_diem: number; ten_san_pham_snapshot: string; sku_snapshot: string; ten_phien_ban: string | null; gia_goc: number | null; thumbnail_url: string | null }
+interface DetailLineItemRow { chi_tiet_id: number; phien_ban_id: number; san_pham_id: number; so_luong: number; gia_tai_thoi_diem: number; ten_san_pham_snapshot: string; sku_snapshot: string; ten_phien_ban: string | null; ten_san_pham: string | null; gia_goc: number | null; thumbnail_url: string | null }
 export interface NoteRow { ghi_chu_id: number; nhan_vien_id: number | null; ten_tac_gia: string; vai_tro_tac_gia: string; noi_dung: string; ngay_tao: Date }
 export interface ActivityLogRow { nhat_ky_id: number; ten_nguoi_thuc_hien: string; vai_tro: string; nguoi_thuc_hien_id: number | null; hanh_dong: string; chi_tiet: string | null; trang_thai_don: string | null; thoi_diem: Date }
-export interface RefundRow {
-  nguoi_xu_ly_id: number | null;
-  hoan_tien_id: number;
-  giao_dich_id: number | null;
-  phuong_thuc: string;
-  phuong_thuc_thuc_te: string;
-  so_tien: string;
-  items_json: string;
-  nguoi_xu_ly: string;
-  trang_thai: string;
-  ly_do: string | null;
-  ngay_tao: Date;
-  ma_giao_dich_hoan: string | null;
-  thoi_diem_hoan: Date | null;
-  ngan_hang_vi_hoan: string | null;
-  ghi_chu_loi: string | null;
-  nguoi_duyet_id: number | null;
-  yeu_cau_doi_tra_id: number | null;
-}
-
 export function mapToAdminOrderDetail(
   order: Order,
   customer: DetailCustomerRow | null,
   address: DetailAddressRow | null,
   lineItems: DetailLineItemRow[],
   notes: NoteRow[] = [],
-  refunds: RefundRow[] = [],
   activityLogs: ActivityLogRow[] = [],
 ): AdminOrderDetailDto {
   const addr = {
@@ -235,7 +208,7 @@ export function mapToAdminOrderDetail(
       id:           String(item.chi_tiet_id),
       productId:    String(item.san_pham_id),
       variantId:    String(item.phien_ban_id),
-      productName:  item.ten_san_pham_snapshot,
+      productName:  item.ten_san_pham ?? item.ten_san_pham_snapshot,
       variantName:  item.ten_phien_ban ?? '',
       sku:          item.sku_snapshot,
       thumbnailUrl: item.thumbnail_url ?? undefined,
@@ -274,25 +247,6 @@ export function mapToAdminOrderDetail(
       action:      log.hanh_dong,
       detail:      log.chi_tiet ?? undefined,
       orderStatus: log.trang_thai_don ?? undefined,
-    })),
-    refunds: refunds.map((r) => ({
-      id:              String(r.hoan_tien_id),
-      createdAt:       (r.ngay_tao instanceof Date ? r.ngay_tao : new Date(r.ngay_tao)).toISOString(),
-      method:          r.phuong_thuc as 'original' | 'store_credit',
-      amount:          Number(r.so_tien),
-      status:          ({ DaHoan: 'completed', TuChoi: 'rejected' } as Record<string, string>)[r.trang_thai] ?? 'pending',
-      items:           JSON.parse(r.items_json),
-      processedBy:     r.nguoi_xu_ly,
-      processedById:   r.nguoi_xu_ly_id != null
-        ? String(r.nguoi_xu_ly_id)
-        : r.nguoi_duyet_id != null ? String(r.nguoi_duyet_id) : undefined,
-      externalRef:     r.ma_giao_dich_hoan ?? undefined,
-      settledAt:       r.thoi_diem_hoan
-        ? (r.thoi_diem_hoan instanceof Date ? r.thoi_diem_hoan : new Date(r.thoi_diem_hoan)).toISOString()
-        : undefined,
-      bank:            r.ngan_hang_vi_hoan ?? undefined,
-      errorNote:       r.ghi_chu_loi ?? undefined,
-      returnRequestId: r.yeu_cau_doi_tra_id ?? undefined,
     })),
   };
 }

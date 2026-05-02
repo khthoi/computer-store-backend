@@ -55,7 +55,7 @@ export function mapVariantListResponse(v: ProductVariant): VariantListResponse {
     sku: v.sku,
     name: v.tenPhienBan,
     price: Number(v.giaBan),
-    stock: v.soLuongTon ?? 0,
+    stock: v.stockLevel?.soLuongTon ?? 0,
     status: mapVariantStatus(v.trangThai),
     thumbnailUrl: mainImage?.urlHinhAnh ?? null,
     updatedAt: v.ngayCapNhat?.toISOString() ?? new Date().toISOString(),

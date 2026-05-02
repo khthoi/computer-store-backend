@@ -13,9 +13,6 @@ import { QueryOrderDto } from './dto/query-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { UpdateOrderShippingDto } from './dto/update-order-shipping.dto';
 import { AddOrderNoteDto } from './dto/add-order-note.dto';
-import { ProcessRefundDto } from './dto/process-refund.dto';
-import { SettleRefundDto } from './dto/settle-refund.dto';
-import { RejectRefundDto } from './dto/reject-refund.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { Roles } from '../../common/decorators/roles.decorator';
 
@@ -124,43 +121,6 @@ export class AdminOrdersController {
     @CurrentUser('sub') adminId: number,
   ) {
     return this.ordersService.addNoteAdmin(id, dto, adminId);
-  }
-
-  @Post(':id/refunds')
-  @ApiOperation({ summary: '[Admin] Xử lý hoàn tiền cho đơn hàng' })
-  @ApiParam({ name: 'id', example: 'ORD-20240315-0001' })
-  processRefund(
-    @Param('id') id: string,
-    @Body() dto: ProcessRefundDto,
-    @CurrentUser('sub') adminId: number,
-  ) {
-    return this.ordersService.processRefundAdmin(id, dto, adminId);
-  }
-
-  @Patch(':id/refunds/:refundId/settle')
-  @ApiOperation({ summary: '[Admin] Xác nhận hoàn tiền thành công (Track A manual settlement)' })
-  @ApiParam({ name: 'id', example: 'ORD-20240315-0001' })
-  @ApiParam({ name: 'refundId', example: 5 })
-  settleRefund(
-    @Param('id') id: string,
-    @Param('refundId') refundId: string,
-    @Body() dto: SettleRefundDto,
-    @CurrentUser('sub') adminId: number,
-  ) {
-    return this.ordersService.settleRefundAdmin(id, Number(refundId), dto, adminId);
-  }
-
-  @Patch(':id/refunds/:refundId/reject')
-  @ApiOperation({ summary: '[Admin] Đánh dấu hoàn tiền thất bại/từ chối (Track A manual settlement)' })
-  @ApiParam({ name: 'id', example: 'ORD-20240315-0001' })
-  @ApiParam({ name: 'refundId', example: 5 })
-  rejectRefund(
-    @Param('id') id: string,
-    @Param('refundId') refundId: string,
-    @Body() dto: RejectRefundDto,
-    @CurrentUser('sub') adminId: number,
-  ) {
-    return this.ordersService.rejectRefundAdmin(id, Number(refundId), dto, adminId);
   }
 
   @Get(':id/return-requests')

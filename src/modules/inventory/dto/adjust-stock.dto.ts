@@ -6,16 +6,12 @@ export class AdjustStockDto {
   @IsInt()
   phienBanId: number;
 
-  @ApiProperty()
-  @IsInt()
-  khoId: number;
-
   @ApiProperty({ description: 'Số dương = nhập thêm, số âm = giảm bớt' })
   @IsInt()
   soLuong: number;
 
-  @ApiProperty({ enum: ['Nhap', 'Xuat', 'HoanTra', 'Huy', 'DieuChinh'] })
-  @IsIn(['Nhap', 'Xuat', 'HoanTra', 'Huy', 'DieuChinh'])
+  @ApiProperty({ enum: ['Nhap', 'Xuat', 'Huy'], description: 'Nhap = nhập bù, Xuat = xuất điều chỉnh, Huy = huỷ hàng hỏng (FIFO)' })
+  @IsIn(['Nhap', 'Xuat', 'Huy'])
   loaiGiaoDich: string;
 
   @ApiPropertyOptional()

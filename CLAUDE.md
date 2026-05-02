@@ -136,6 +136,33 @@ if (sortBy === 'totalStock') {
 
 ---
 
+### Entity FK Convention — Option A Pattern
+
+Every FK column in an entity **must** have a corresponding `@ManyToOne` + `@JoinColumn` decorator immediately after the `@Column` declaration. This enforces DB-level `FOREIGN KEY` constraints via TypeORM `synchronize`.
+
+```ts
+// ✓ ĐÚNG — FK column + relation decorator
+@Column({ name: 'phien_ban_id' })
+phienBanId: number;
+
+@ManyToOne(() => ProductVariant, { nullable: false, eager: false })
+@JoinColumn({ name: 'phien_ban_id' })
+phienBan: ProductVariant;
+
+// ✗ SAI — chỉ có @Column, không có @ManyToOne → MySQL không tạo FK constraint
+@Column({ name: 'phien_ban_id' })
+phienBanId: number;
+```
+
+**Rules:**
+- Always `eager: false` — never load relations automatically
+- `nullable` mirrors the TypeScript type: `number | null` → `nullable: true`, `number` → `nullable: false`
+- Do NOT add `@OneToMany` back-references unless the back-reference is actively used for querying
+- Self-referential FK (e.g. `MenuItem.parentId → MenuItem`) does not need a self-import — the class is in scope
+- This pattern is for DB integrity only — all query logic stays in QueryBuilder
+
+---
+
 ### Code Rules
 
 1. **No raw SQL** — use TypeORM QueryBuilder or repository methods.
@@ -180,8 +207,8 @@ if (sortBy === 'totalStock') {
 
 ## Key Business Rules
 
-1. **Checkout flow**: validate cart → price → promotions → flash sale → loyalty → create order (pending) → reserve stock → create transaction → redirect payment → webhook → confirm → deduct stock → earn loyalty points → notify.
-2. **Stock**: reserved on checkout, actually deducted on order confirmation. Restore on cancel/return.
+1. **Checkout flow**: validate cart → price → promotions → flash sale → loyalty → create order (pending) → **deduct stock immediately** → create transaction → redirect payment → webhook → confirm → earn loyalty points → notify.
+2. **Stock**: **deducted atomically at checkout** (not on confirmation). `so_luong_ton` is the net available quantity — it already excludes stock tied to in-flight orders. `quantityReserved` is a read-only informational field computed from active order items (status `ChoTT / DaXacNhan / DongGoi / DangGiao`); it does NOT represent a separate reservation column in DB. On cancel/return: restore `so_luong_ton` directly.
 3. **Reviews**: only customers who have a delivered order for that variant can submit. Requires approval (pending → approved/hidden/rejected).
 4. **Promotions**: support `is_coupon` (manual code) and auto-apply. Stacking policy: `exclusive | stackable | stackable_with_coupons_only`.
 5. **Loyalty points**: `diem_hien_tai` on `khach_hang` is a **denormalized cache** — always update it in the same transaction as `loyalty_point_transaction` INSERT.

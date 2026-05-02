@@ -1,6 +1,7 @@
 import {
-  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn,
+  Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, ManyToOne, JoinColumn,
 } from 'typeorm';
+import { Customer } from '../../users/entities/customer.entity';
 
 @Entity('thong_bao')
 export class Notification {
@@ -9,6 +10,10 @@ export class Notification {
 
   @Column({ name: 'khach_hang_id' })
   customerId: number;
+
+  @ManyToOne(() => Customer, { nullable: false, eager: false })
+  @JoinColumn({ name: 'khach_hang_id' })
+  customer: Customer;
 
   @Column({ name: 'loai_thong_bao', length: 30 })
   type: string;

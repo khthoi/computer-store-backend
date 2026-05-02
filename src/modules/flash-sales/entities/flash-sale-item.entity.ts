@@ -7,6 +7,7 @@ import {
   Index,
 } from 'typeorm';
 import { FlashSale } from './flash-sale.entity';
+import { ProductVariant } from '../../products/entities/product-variant.entity';
 
 @Entity('flash_sale_item')
 @Index('uq_fsi_sale_variant', ['flashSaleId', 'phienBanId'], { unique: true })
@@ -19,6 +20,10 @@ export class FlashSaleItem {
 
   @Column({ name: 'phien_ban_id' })
   phienBanId: number;
+
+  @ManyToOne(() => ProductVariant, { nullable: false, eager: false })
+  @JoinColumn({ name: 'phien_ban_id' })
+  phienBan: ProductVariant;
 
   @Column({ name: 'gia_flash', type: 'decimal', precision: 18, scale: 2 })
   giaFlash: number;

@@ -22,7 +22,6 @@ export class InventoryController {
     schema: {
       example: {
         variantId: 20,
-        warehouseId: 1,
         soLuongTon: 150,
         soLuongDatTruoc: 10,
       },
@@ -30,6 +29,6 @@ export class InventoryController {
   })
   @ApiResponse({ status: 404, description: 'Variant không tồn tại' })
   getStock(@Param('variantId', ParseIntPipe) variantId: number) {
-    return this.inventoryService.findStockByVariant(variantId);
+    return this.inventoryService.findStockLevelByVariant(variantId);
   }
 }

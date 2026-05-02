@@ -1,4 +1,8 @@
-import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index, ManyToOne, JoinColumn } from 'typeorm';
+import { Customer } from '../../users/entities/customer.entity';
+import { RedemptionCatalog } from './redemption-catalog.entity';
+import { Promotion } from '../../promotions/entities/promotion.entity';
+import { Order } from '../../orders/entities/order.entity';
 
 @Entity('loyalty_redemption')
 @Index('idx_lr_khachhang', ['khachHangId'])
@@ -9,8 +13,16 @@ export class LoyaltyRedemption {
   @Column({ name: 'khach_hang_id' })
   khachHangId: number;
 
+  @ManyToOne(() => Customer, { nullable: false, eager: false })
+  @JoinColumn({ name: 'khach_hang_id' })
+  khachHang: Customer;
+
   @Column({ name: 'catalog_id' })
   catalogId: number;
+
+  @ManyToOne(() => RedemptionCatalog, { nullable: false, eager: false })
+  @JoinColumn({ name: 'catalog_id' })
+  catalog: RedemptionCatalog;
 
   @Column({ name: 'ten_snapshot', length: 300 })
   tenSnapshot: string;
@@ -24,6 +36,10 @@ export class LoyaltyRedemption {
   @Column({ name: 'promotion_id' })
   promotionId: number;
 
+  @ManyToOne(() => Promotion, { nullable: false, eager: false })
+  @JoinColumn({ name: 'promotion_id' })
+  promotion: Promotion;
+
   @Column({ name: 'trang_thai', length: 20, default: 'completed' })
   trangThai: 'completed' | 'cancelled' | 'expired';
 
@@ -35,4 +51,8 @@ export class LoyaltyRedemption {
 
   @Column({ name: 'don_hang_id', nullable: true })
   donHangId: number | null;
+
+  @ManyToOne(() => Order, { nullable: true, eager: false })
+  @JoinColumn({ name: 'don_hang_id' })
+  donHang: Order | null;
 }

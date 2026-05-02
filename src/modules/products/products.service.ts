@@ -55,7 +55,7 @@ export class ProductsService {
   async findOne(id: number): Promise<Product> {
     const product = await this.productRepo.findOne({
       where: { id },
-      relations: ['danhMuc', 'variants', 'variants.images'],
+      relations: ['danhMuc', 'variants', 'variants.images', 'variants.stockLevel'],
     });
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
     return product;
@@ -184,6 +184,9 @@ export class ProductsService {
 
   async saveVariantMedia(variantId: number, items: import('./dto/save-variant-media.dto').MediaItemDto[]): Promise<void> {
     const TYPE_MAP: Record<string, LoaiAnh> = { main: LoaiAnh.AnhChinh, gallery: LoaiAnh.AnhPhu };
+    if (items.filter((m) => m.type === 'main').length > 1) {
+      throw new BadRequestException('Mỗi biến thể chỉ được có một ảnh chính (AnhChinh)');
+    }
     await this.imageRepo.delete({ phienBanId: variantId });
     if (!items.length) return;
     await this.imageRepo.save(
@@ -234,7 +237,6 @@ export class ProductsService {
           moTaChiTiet: v.moTaChiTiet,
           trangThai: 'An',
           isMacDinh: i === 0,
-          soLuongTon: 0,
         });
       }),
     );
@@ -292,7 +294,6 @@ export class ProductsService {
       moTaChiTiet: variant.moTaChiTiet,
       trangThai: 'An',
       isMacDinh: false,
-      soLuongTon: 0,
     });
 
     const saved = await this.variantRepo.save(clone);

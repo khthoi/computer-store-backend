@@ -4,7 +4,10 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Promotion } from '../../promotions/entities/promotion.entity';
 
 @Entity('loyalty_redemption_catalog')
 export class RedemptionCatalog {
@@ -22,6 +25,10 @@ export class RedemptionCatalog {
 
   @Column({ name: 'promotion_id' })
   promotionId: number;
+
+  @ManyToOne(() => Promotion, { nullable: false, eager: false })
+  @JoinColumn({ name: 'promotion_id' })
+  promotion: Promotion;
 
   @Column({ name: 'la_hoat_dong', type: 'boolean', default: true })
   laHoatDong: boolean;

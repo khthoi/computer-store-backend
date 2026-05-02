@@ -1,4 +1,5 @@
-import { Entity, PrimaryColumn, Column, UpdateDateColumn } from 'typeorm';
+import { Entity, PrimaryColumn, Column, UpdateDateColumn, ManyToOne, JoinColumn } from 'typeorm';
+import { Employee } from '../../employees/entities/employee.entity';
 
 @Entity('site_config')
 export class SiteConfig {
@@ -10,6 +11,10 @@ export class SiteConfig {
 
   @Column({ name: 'nguoi_cap_nhat_id', nullable: true })
   updatedById: number | null;
+
+  @ManyToOne(() => Employee, { nullable: true, eager: false })
+  @JoinColumn({ name: 'nguoi_cap_nhat_id' })
+  updatedBy: Employee | null;
 
   @UpdateDateColumn({ name: 'ngay_cap_nhat' })
   updatedAt: Date;

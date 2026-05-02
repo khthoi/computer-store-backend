@@ -6,8 +6,11 @@ import {
   UpdateDateColumn,
   OneToMany,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { BuildDetail } from './build-detail.entity';
+import { Customer } from '../../users/entities/customer.entity';
 
 @Entity('buildpc_da_luu')
 export class SavedBuild {
@@ -16,6 +19,10 @@ export class SavedBuild {
 
   @Column({ name: 'khach_hang_id', nullable: true })
   khachHangId: number | null;
+
+  @ManyToOne(() => Customer, { nullable: true, eager: false })
+  @JoinColumn({ name: 'khach_hang_id' })
+  khachHang: Customer | null;
 
   @Column({ name: 'ten_build', length: 200, default: 'Cấu hình của tôi' })
   tenBuild: string;

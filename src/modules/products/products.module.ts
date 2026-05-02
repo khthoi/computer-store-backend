@@ -8,10 +8,11 @@ import { ProductsSearchService } from './products-search.service';
 import { ProductsController } from './products.controller';
 import { AdminProductsController } from './admin-products.controller';
 import { BrandsModule } from '../brands/brands.module';
+import { CategoriesModule } from '../categories/categories.module';
 import { SpecificationsModule } from '../specifications/specifications.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Product, ProductVariant, ProductImage]), BrandsModule, SpecificationsModule],
+  imports: [TypeOrmModule.forFeature([Product, ProductVariant, ProductImage]), BrandsModule, CategoriesModule, SpecificationsModule],
   controllers: [ProductsController, AdminProductsController],
   providers: [ProductsService, ProductsSearchService],
   exports: [ProductsService, ProductsSearchService, TypeOrmModule],

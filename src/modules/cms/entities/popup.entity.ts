@@ -4,7 +4,10 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Employee } from '../../employees/entities/employee.entity';
 
 @Entity('popup_thong_bao')
 export class Popup {
@@ -62,6 +65,10 @@ export class Popup {
 
   @Column({ name: 'nguoi_tao_id', nullable: true })
   createdById: number | null;
+
+  @ManyToOne(() => Employee, { nullable: true, eager: false })
+  @JoinColumn({ name: 'nguoi_tao_id' })
+  createdBy: Employee | null;
 
   @CreateDateColumn({ name: 'ngay_tao' })
   createdAt: Date;

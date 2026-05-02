@@ -37,7 +37,7 @@ export class Category {
   @Column({ name: 'thu_tu_hien_thi', type: 'smallint', default: 0 })
   thuTuHienThi: number;
 
-  @Column({ name: 'hinh_anh', length: 500, nullable: true })
+  @Column({ name: 'hinh_anh', type: 'text', nullable: true })
   hinhAnh: string | null;
 
   @Column({ name: 'trang_thai', length: 10, default: 'Hien' })

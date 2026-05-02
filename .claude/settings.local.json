@@ -106,7 +106,10 @@
       "mcp__dbhub__execute_sql",
       "Bash(git add *)",
       "Bash(git commit -m ' *)",
-      "mcp__dbhub__search_objects"
+      "mcp__dbhub__search_objects",
+      "Bash(Get-ChildItem *)",
+      "Bash(Remove-Item *)",
+      "Bash(npx typeorm-ts-node-commonjs *)"
     ]
   }
 }

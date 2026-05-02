@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 
 export type TrangThaiNCC = 'DangHopTac' | 'NgungHopTac';
 
@@ -24,4 +24,16 @@ export class Supplier {
 
   @Column({ name: 'trang_thai', length: 30, default: 'DangHopTac' })
   trangThai: TrangThaiNCC;
+
+  @Column({ name: 'lead_time_days', default: 7 })
+  leadTimeDays: number;
+
+  @Column({ name: 'ghi_chu', type: 'text', nullable: true })
+  ghiChu: string | null;
+
+  @CreateDateColumn({ name: 'ngay_tao' })
+  createdAt: Date;
+
+  @UpdateDateColumn({ name: 'ngay_cap_nhat' })
+  updatedAt: Date;
 }

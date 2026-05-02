@@ -1,7 +1,12 @@
 import {
   Entity, PrimaryGeneratedColumn, Column,
   CreateDateColumn, UpdateDateColumn, Index,
+  ManyToOne, JoinColumn,
 } from 'typeorm';
+import { ProductVariant } from '../../products/entities/product-variant.entity';
+import { Customer } from '../../users/entities/customer.entity';
+import { Order } from '../../orders/entities/order.entity';
+import { Employee } from '../../employees/entities/employee.entity';
 
 @Entity('danh_gia_san_pham')
 @Index('idx_review_variant', ['variantId'])
@@ -15,11 +20,23 @@ export class ProductReview {
   @Column({ name: 'phien_ban_id' })
   variantId: number;
 
+  @ManyToOne(() => ProductVariant, { nullable: false, eager: false })
+  @JoinColumn({ name: 'phien_ban_id' })
+  variant: ProductVariant;
+
   @Column({ name: 'khach_hang_id' })
   customerId: number;
 
+  @ManyToOne(() => Customer, { nullable: false, eager: false })
+  @JoinColumn({ name: 'khach_hang_id' })
+  customer: Customer;
+
   @Column({ name: 'don_hang_id' })
   orderId: number;
+
+  @ManyToOne(() => Order, { nullable: false, eager: false })
+  @JoinColumn({ name: 'don_hang_id' })
+  order: Order;
 
   @Column({ name: 'rating', type: 'smallint' })
   rating: number;
@@ -35,6 +52,10 @@ export class ProductReview {
 
   @Column({ name: 'nguoi_duyet_id', nullable: true })
   approvedById: number | null;
+
+  @ManyToOne(() => Employee, { nullable: true, eager: false })
+  @JoinColumn({ name: 'nguoi_duyet_id' })
+  approvedBy: Employee | null;
 
   @Column({ name: 'ly_do_tu_choi', length: 500, nullable: true })
   rejectReason: string | null;

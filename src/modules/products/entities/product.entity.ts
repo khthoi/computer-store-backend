@@ -11,6 +11,7 @@ import {
 } from 'typeorm';
 import { ProductVariant } from './product-variant.entity';
 import { Category } from '../../categories/entities/category.entity';
+import { Employee } from '../../employees/entities/employee.entity';
 
 @Entity('san_pham')
 @Index('idx_sp_danhmuc', ['danhMucId'])
@@ -39,7 +40,7 @@ export class Product {
   @Column({ name: 'mo_ta_chi_tiet', type: 'text', nullable: true })
   moTaChiTiet: string | null;
 
-  @Column({ name: 'chinh_sach_bao_hanh', length: 500, nullable: true })
+  @Column({ name: 'chinh_sach_bao_hanh', type: 'text', nullable: true })
   chinhSachBaoHanh: string | null;
 
   @Column({ name: 'diem_danh_gia_tb', type: 'decimal', precision: 3, scale: 2, nullable: true })
@@ -53,6 +54,10 @@ export class Product {
 
   @Column({ name: 'nguoi_tao_id' })
   nguoiTaoId: number;
+
+  @ManyToOne(() => Employee, { nullable: false, eager: false })
+  @JoinColumn({ name: 'nguoi_tao_id' })
+  nguoiTao: Employee;
 
   @CreateDateColumn({ name: 'ngay_tao' })
   ngayTao: Date;

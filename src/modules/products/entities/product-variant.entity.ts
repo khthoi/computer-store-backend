@@ -5,11 +5,13 @@ import {
   UpdateDateColumn,
   ManyToOne,
   OneToMany,
+  OneToOne,
   JoinColumn,
   Index,
 } from 'typeorm';
 import { Product } from './product.entity';
 import { ProductImage } from './product-image.entity';
+import { StockLevel } from '../../inventory/entities/stock-level.entity';
 
 @Entity('phien_ban_san_pham')
 @Index('idx_pbsp_sanpham', ['sanPhamId'])
@@ -42,14 +44,14 @@ export class ProductVariant {
   @Column({ name: 'mo_ta_chi_tiet', type: 'text', nullable: true })
   moTaChiTiet: string | null;
 
-  @Column({ name: 'chinh_sach_bao_hanh', length: 500, nullable: true })
+  @Column({ name: 'chinh_sach_bao_hanh', type: 'text', nullable: true })
   chinhSachBaoHanh: string | null;
 
   @Column({ name: 'is_mac_dinh', type: 'boolean', default: false })
   isMacDinh: boolean;
 
-  @Column({ name: 'so_luong_ton', type: 'int', default: 0 })
-  soLuongTon: number;
+  @Column({ name: 'thoi_gian_bao_hanh', type: 'smallint', unsigned: true, nullable: true })
+  thoiGianBaoHanh: number | null;
 
   @UpdateDateColumn({ name: 'ngay_cap_nhat' })
   ngayCapNhat: Date;
@@ -60,4 +62,7 @@ export class ProductVariant {
 
   @OneToMany(() => ProductImage, (img) => img.variant, { cascade: true })
   images: ProductImage[];
+
+  @OneToOne(() => StockLevel, (sl) => sl.phienBan, { nullable: true, eager: false })
+  stockLevel: StockLevel | null;
 }

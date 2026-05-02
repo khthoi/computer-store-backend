@@ -6,6 +6,8 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { SavedBuild } from './saved-build.entity';
+import { BuildSlot } from './build-slot.entity';
+import { ProductVariant } from '../../products/entities/product-variant.entity';
 
 @Entity('buildpc_chi_tiet')
 export class BuildDetail {
@@ -18,8 +20,16 @@ export class BuildDetail {
   @Column({ name: 'slot_id' })
   slotId: number;
 
+  @ManyToOne(() => BuildSlot, { nullable: false, eager: false })
+  @JoinColumn({ name: 'slot_id' })
+  slot: BuildSlot;
+
   @Column({ name: 'phien_ban_id' })
   phienBanId: number;
+
+  @ManyToOne(() => ProductVariant, { nullable: false, eager: false })
+  @JoinColumn({ name: 'phien_ban_id' })
+  phienBan: ProductVariant;
 
   @Column({ name: 'so_luong', type: 'tinyint', default: 1 })
   soLuong: number;

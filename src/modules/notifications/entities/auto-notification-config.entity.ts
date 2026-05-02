@@ -1,7 +1,8 @@
 import {
   Entity, PrimaryGeneratedColumn, Column,
-  CreateDateColumn, UpdateDateColumn,
+  CreateDateColumn, UpdateDateColumn, ManyToOne, JoinColumn,
 } from 'typeorm';
+import { Employee } from '../../employees/entities/employee.entity';
 
 @Entity('thong_bao_tu_dong_cau_hinh')
 export class AutoNotificationConfig {
@@ -34,6 +35,10 @@ export class AutoNotificationConfig {
 
   @Column({ name: 'cap_nhat_boi', type: 'int', nullable: true })
   updatedById: number | null;
+
+  @ManyToOne(() => Employee, { nullable: true, eager: false })
+  @JoinColumn({ name: 'cap_nhat_boi' })
+  updatedBy: Employee | null;
 
   @CreateDateColumn({ name: 'ngay_tao' })
   createdAt: Date;

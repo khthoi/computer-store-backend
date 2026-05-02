@@ -4,7 +4,10 @@ import {
   Column,
   CreateDateColumn,
   UpdateDateColumn,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Employee } from '../../employees/entities/employee.entity';
 
 @Entity('banner_noi_dung')
 export class Banner {
@@ -20,7 +23,7 @@ export class Banner {
   @Column({ name: 'asset_id', nullable: true })
   assetId: number | null;
 
-  @Column({ name: 'url_hinh_anh', length: 500, nullable: true })
+  @Column({ name: 'url_hinh_anh', type: 'text', nullable: true })
   imageUrl: string | null;
 
   @Column({ name: 'alt_text', length: 255, nullable: true })
@@ -29,7 +32,7 @@ export class Banner {
   @Column({ name: 'asset_id_mobile', nullable: true })
   assetIdMobile: number | null;
 
-  @Column({ name: 'url_hinh_anh_mobile', length: 500, nullable: true })
+  @Column({ name: 'url_hinh_anh_mobile', type: 'text', nullable: true })
   imageUrlMobile: string | null;
 
   @Column({ name: 'overlay_color', length: 20, nullable: true })
@@ -38,13 +41,13 @@ export class Banner {
   @Column({ name: 'overlay_opacity', type: 'decimal', precision: 3, scale: 2, nullable: true })
   overlayOpacity: number | null;
 
-  @Column({ name: 'url_dich_den', length: 500, nullable: true })
+  @Column({ name: 'url_dich_den', type: 'text', nullable: true })
   targetUrl: string | null;
 
   @Column({ name: 'button_text', length: 100, nullable: true })
   buttonText: string | null;
 
-  @Column({ name: 'button_url', length: 500, nullable: true })
+  @Column({ name: 'button_url', type: 'text', nullable: true })
   buttonUrl: string | null;
 
   @Column({
@@ -75,8 +78,16 @@ export class Banner {
   @Column({ name: 'nguoi_tao_id', nullable: true })
   createdById: number | null;
 
+  @ManyToOne(() => Employee, { nullable: true, eager: false })
+  @JoinColumn({ name: 'nguoi_tao_id' })
+  createdBy: Employee | null;
+
   @Column({ name: 'nguoi_cap_nhat_id', nullable: true })
   updatedById: number | null;
+
+  @ManyToOne(() => Employee, { nullable: true, eager: false })
+  @JoinColumn({ name: 'nguoi_cap_nhat_id' })
+  updatedBy: Employee | null;
 
   @CreateDateColumn({ name: 'ngay_tao' })
   createdAt: Date;

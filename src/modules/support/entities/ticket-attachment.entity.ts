@@ -1,6 +1,9 @@
 import {
   Entity, PrimaryGeneratedColumn, Column, CreateDateColumn, Index,
+  ManyToOne, JoinColumn,
 } from 'typeorm';
+import { TicketMessage } from './ticket-message.entity';
+import { MediaAsset } from '../../media/entities/media-asset.entity';
 
 @Entity('ticket_attachment')
 @Index('idx_ticketatt_message', ['messageId'])
@@ -10,6 +13,10 @@ export class TicketAttachment {
 
   @Column({ name: 'message_id' })
   messageId: number;
+
+  @ManyToOne(() => TicketMessage, { nullable: false, eager: false })
+  @JoinColumn({ name: 'message_id' })
+  message: TicketMessage;
 
   @Column({ name: 'file_name', length: 255 })
   fileName: string;
@@ -25,6 +32,10 @@ export class TicketAttachment {
 
   @Column({ name: 'asset_id', nullable: true })
   assetId: number | null;
+
+  @ManyToOne(() => MediaAsset, { nullable: true, eager: false })
+  @JoinColumn({ name: 'asset_id' })
+  asset: MediaAsset | null;
 
   @CreateDateColumn({ name: 'uploaded_at' })
   uploadedAt: Date;

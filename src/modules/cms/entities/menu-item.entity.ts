@@ -18,6 +18,10 @@ export class MenuItem {
   @Column({ name: 'parent_id', nullable: true })
   parentId: number | null;
 
+  @ManyToOne(() => MenuItem, { nullable: true, eager: false })
+  @JoinColumn({ name: 'parent_id' })
+  parent: MenuItem | null;
+
   @Column({ name: 'nhan', length: 255 })
   label: string;
 

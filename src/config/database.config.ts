@@ -13,7 +13,7 @@ export default registerAs(
     entities: [__dirname + '/../modules/**/entities/*.entity.{ts,js}'],
     migrations: [__dirname + '/../database/migrations/*.{ts,js}'],
     autoLoadEntities: true,
-    synchronize: process.env.NODE_ENV === 'development',
+    synchronize: true,
     logging: process.env.NODE_ENV === 'development',
     charset: 'utf8mb4',
   }),

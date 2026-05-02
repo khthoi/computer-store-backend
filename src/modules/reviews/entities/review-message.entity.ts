@@ -1,7 +1,10 @@
 import {
   Entity, PrimaryGeneratedColumn, Column,
   CreateDateColumn, UpdateDateColumn, Index,
+  ManyToOne, JoinColumn,
 } from 'typeorm';
+import { ProductReview } from './product-review.entity';
+import { Employee } from '../../employees/entities/employee.entity';
 
 @Entity('danh_gia_message')
 @Index('idx_dgmsg_review', ['reviewId'])
@@ -12,11 +15,19 @@ export class ReviewMessage {
   @Column({ name: 'review_id' })
   reviewId: number;
 
+  @ManyToOne(() => ProductReview, { nullable: false, eager: false })
+  @JoinColumn({ name: 'review_id' })
+  review: ProductReview;
+
   @Column({ name: 'sender_type', length: 20 })
   senderType: 'KhachHang' | 'NhanVien' | 'HeThong';
 
   @Column({ name: 'sender_id', nullable: true })
   senderId: number | null;
+
+  @ManyToOne(() => Employee, { nullable: true, eager: false })
+  @JoinColumn({ name: 'sender_id' })
+  sender: Employee | null;
 
   @Column({ name: 'noi_dung_tin_nhan', type: 'text' })
   content: string;

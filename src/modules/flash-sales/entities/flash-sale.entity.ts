@@ -6,8 +6,11 @@ import {
   UpdateDateColumn,
   OneToMany,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { FlashSaleItem } from './flash-sale-item.entity';
+import { Employee } from '../../employees/entities/employee.entity';
 
 export enum FlashSaleStatus {
   NHAP = 'nhap',
@@ -42,11 +45,15 @@ export class FlashSale {
   @Column({ name: 'banner_title', length: 500, nullable: true })
   bannerTitle: string | null;
 
-  @Column({ name: 'banner_image_url', length: 500, nullable: true })
+  @Column({ name: 'banner_image_url', type: 'text', nullable: true })
   bannerImageUrl: string | null;
 
   @Column({ name: 'created_by' })
   createdBy: number;
+
+  @ManyToOne(() => Employee, { nullable: false, eager: false })
+  @JoinColumn({ name: 'created_by' })
+  createdByEmployee: Employee;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

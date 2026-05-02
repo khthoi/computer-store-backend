@@ -5,8 +5,11 @@ import {
   CreateDateColumn,
   UpdateDateColumn,
   OneToMany,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { HomepageSectionItem } from './homepage-section-item.entity';
+import { Employee } from '../../employees/entities/employee.entity';
 
 @Entity('homepage_section')
 export class HomepageSection {
@@ -19,7 +22,7 @@ export class HomepageSection {
   @Column({ name: 'subtitle', length: 255, nullable: true })
   subtitle: string | null;
 
-  @Column({ name: 'view_all_url', length: 500, nullable: true })
+  @Column({ name: 'view_all_url', type: 'text', nullable: true })
   viewAllUrl: string | null;
 
   @Column({
@@ -71,6 +74,10 @@ export class HomepageSection {
 
   @Column({ name: 'nguoi_tao_id', nullable: true })
   createdById: number | null;
+
+  @ManyToOne(() => Employee, { nullable: true, eager: false })
+  @JoinColumn({ name: 'nguoi_tao_id' })
+  createdBy: Employee | null;
 
   @CreateDateColumn({ name: 'ngay_tao' })
   createdAt: Date;

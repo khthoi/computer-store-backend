@@ -13,15 +13,12 @@ import { QueryOrderDto } from './dto/query-order.dto';
 import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { CartService } from '../cart/cart.service';
 import { InventoryService } from '../inventory/inventory.service';
-import { OrderItemResponseDto, OrderResponseDto, AdminOrderSummaryDto, mapToAdminOrderSummary, AdminOrderDetailDto, mapToAdminOrderDetail, mapToTransaction, NoteRow, RefundRow, ActivityLogRow } from './dto/order-response.dto';
+import { BatchService } from '../inventory/batch.service';
+import { OrderItemResponseDto, OrderResponseDto, AdminOrderSummaryDto, mapToAdminOrderSummary, AdminOrderDetailDto, mapToAdminOrderDetail, mapToTransaction, NoteRow, ActivityLogRow } from './dto/order-response.dto';
 import { OrderActivityLogService } from './order-activity-log.service';
 import { OrderActivityStatus } from './entities/order-activity-log.entity';
 import { UpdateOrderShippingDto } from './dto/update-order-shipping.dto';
 import { AddOrderNoteDto } from './dto/add-order-note.dto';
-import { ProcessRefundDto } from './dto/process-refund.dto';
-import { SettleRefundDto } from './dto/settle-refund.dto';
-import { RejectRefundDto } from './dto/reject-refund.dto';
-import { OrdersRefundService } from './orders-refund.service';
 import { OrdersReturnsQueryService } from './orders-returns-query.service';
 
 const STATUS_ACTIONS: Partial<Record<TrangThaiDon, string>> = {
@@ -49,7 +46,7 @@ export class OrdersService {
     private dataSource: DataSource,
     private cartService: CartService,
     private inventoryService: InventoryService,
-    private ordersRefundService: OrdersRefundService,
+    private batchService: BatchService,
     private ordersReturnsQueryService: OrdersReturnsQueryService,
     private activityLogService: OrderActivityLogService,
   ) {}
@@ -79,7 +76,7 @@ export class OrdersService {
     const variantMap = new Map(variants.map((v) => [v.phien_ban_id, v]));
 
     let tongTienHang = 0;
-    const orderItemsData: Omit<OrderItem, 'id' | 'order'>[] = [];
+    const orderItemsData: Omit<OrderItem, 'id' | 'order' | 'phienBan'>[] = [];
 
     for (const item of cart.items) {
       const v = variantMap.get(item.variantId);
@@ -286,7 +283,7 @@ export class OrdersService {
     const order = await this.orderRepo.findOne({ where: { maDonHang: orderCode } });
     if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
 
-    const [customers, addresses, lineItems, notes, refunds, activityLogs] = await Promise.all([
+    const [customers, addresses, lineItems, notes, activityLogs] = await Promise.all([
       this.dataSource.query(
         `SELECT ho_ten, email, so_dien_thoai FROM khach_hang WHERE khach_hang_id = ?`,
         [order.khachHangId],
@@ -301,11 +298,13 @@ export class OrdersService {
                 COALESCE(pbsp.san_pham_id, 0) AS san_pham_id,
                 ct.so_luong, ct.gia_tai_thoi_diem, ct.ten_san_pham_snapshot, ct.sku_snapshot,
                 pbsp.ten_phien_ban,
+                sp.ten_san_pham,
                 pbsp.gia_goc,
                 (SELECT url_hinh_anh FROM hinh_anh_san_pham
                  WHERE phien_ban_id = ct.phien_ban_id ORDER BY thu_tu ASC LIMIT 1) AS thumbnail_url
          FROM chi_tiet_don_hang ct
          LEFT JOIN phien_ban_san_pham pbsp ON pbsp.phien_ban_id = ct.phien_ban_id
+         LEFT JOIN san_pham sp ON sp.san_pham_id = pbsp.san_pham_id
          WHERE ct.don_hang_id = ?`,
         [order.id],
       ),
@@ -314,17 +313,13 @@ export class OrdersService {
         [order.id],
       ) as Promise<NoteRow[]>,
       this.dataSource.query(
-        `SELECT * FROM hoan_tien_don_hang WHERE don_hang_id = ? ORDER BY ngay_tao ASC`,
-        [order.id],
-      ) as Promise<RefundRow[]>,
-      this.dataSource.query(
         `SELECT nhat_ky_id, ten_nguoi_thuc_hien, vai_tro, nguoi_thuc_hien_id, hanh_dong, chi_tiet, trang_thai_don, thoi_diem
          FROM nhat_ky_don_hang WHERE don_hang_id = ? ORDER BY thoi_diem ASC`,
         [order.id],
       ) as Promise<ActivityLogRow[]>,
     ]);
 
-    return mapToAdminOrderDetail(order, customers[0] ?? null, addresses[0] ?? null, lineItems, notes, refunds, activityLogs);
+    return mapToAdminOrderDetail(order, customers[0] ?? null, addresses[0] ?? null, lineItems, notes, activityLogs);
   }
 
   async findTransactionByOrderCode(orderCode: string) {
@@ -376,18 +371,6 @@ export class OrdersService {
     };
   }
 
-  async processRefundAdmin(orderCode: string, dto: ProcessRefundDto, adminId?: number) {
-    return this.ordersRefundService.processRefundAdmin(orderCode, dto, adminId);
-  }
-
-  async settleRefundAdmin(orderCode: string, refundId: number, dto: SettleRefundDto, adminId?: number) {
-    return this.ordersRefundService.settleRefundAdmin(orderCode, refundId, dto, adminId);
-  }
-
-  async rejectRefundAdmin(orderCode: string, refundId: number, dto: RejectRefundDto, adminId?: number) {
-    return this.ordersRefundService.rejectRefundAdmin(orderCode, refundId, dto, adminId);
-  }
-
   async getReturnRequestsForOrder(orderCode: string) {
     return this.ordersReturnsQueryService.getReturnRequestsForOrder(orderCode);
   }
@@ -416,55 +399,45 @@ export class OrdersService {
         ORDER_STATUS_TO_ACTIVITY[newStatus] ?? null,
       );
 
-      if (newStatus === TrangThaiDon.DA_XAC_NHAN) {
-        const confirmedItems = await manager.find(OrderItem, { where: { donHangId: order.id } });
-        for (const item of confirmedItems) {
-          const [stockRow]: any[] = await manager.query(
-            `SELECT kho_id FROM ton_kho WHERE phien_ban_id = ? ORDER BY so_luong_ton ASC LIMIT 1`,
-            [item.phienBanId],
-          );
-          if (stockRow) {
+      if (newStatus === TrangThaiDon.DONG_GOI) {
+        const packingItems = await manager.find(OrderItem, { where: { donHangId: order.id } });
+        for (const item of packingItems) {
+          const deductions = await this.batchService.deductFromBatches(manager, item.phienBanId, item.soLuong, 'FIFO');
+          for (const d of deductions) {
             await this.inventoryService.recordMovement(manager, {
               phienBanId: item.phienBanId,
-              khoId: stockRow.kho_id,
-              soLuong: item.soLuong,
+              soLuong: d.soLuong,
               loaiGiaoDich: 'Xuat',
               donHangId: order.id,
+              loId: d.loId,
+              giaVon: d.donGiaNhap,
               nguoiThucHienId: updaterId,
-              ghiChu: `Xuất kho đơn hàng ${order.maDonHang}`,
+              ghiChu: `Xuất lô FIFO đơn hàng ${order.maDonHang}`,
             });
           }
         }
         await this.activityLogService.log(
           manager, order.id, actor,
-          'Xuất kho hàng hóa',
-          `Đã xuất ${confirmedItems.length} sản phẩm cho đơn hàng ${order.maDonHang}`,
+          'Xuất lô hàng FIFO',
+          `Đã deduct batch FIFO cho ${packingItems.length} dòng sản phẩm đơn hàng ${order.maDonHang}`,
         );
       }
 
       if (restoreStock) {
         const items = await manager.find(OrderItem, { where: { donHangId: order.id } });
         for (const item of items) {
-          const [stockRow]: any[] = await manager.query(
-            `SELECT kho_id FROM ton_kho WHERE phien_ban_id = ? ORDER BY so_luong_ton ASC LIMIT 1`,
-            [item.phienBanId],
-          );
           await manager.query(
-            `UPDATE ton_kho SET so_luong_ton = so_luong_ton + ?
-             WHERE phien_ban_id = ? ORDER BY so_luong_ton ASC LIMIT 1`,
+            `UPDATE ton_kho SET so_luong_ton = so_luong_ton + ? WHERE phien_ban_id = ?`,
             [item.soLuong, item.phienBanId],
           );
-          if (stockRow) {
-            await this.inventoryService.recordMovement(manager, {
-              phienBanId: item.phienBanId,
-              khoId: stockRow.kho_id,
-              soLuong: item.soLuong,
-              loaiGiaoDich: 'HoanTra',
-              donHangId: order.id,
-              nguoiThucHienId: updaterId,
-              ghiChu: `Hoàn kho đơn hàng ${order.maDonHang}`,
-            });
-          }
+          await this.inventoryService.recordMovement(manager, {
+            phienBanId: item.phienBanId,
+            soLuong: item.soLuong,
+            loaiGiaoDich: 'HoanTra',
+            donHangId: order.id,
+            nguoiThucHienId: updaterId,
+            ghiChu: `Hoàn kho đơn hàng ${order.maDonHang}`,
+          });
         }
         await this.activityLogService.log(
           manager, order.id, actor,

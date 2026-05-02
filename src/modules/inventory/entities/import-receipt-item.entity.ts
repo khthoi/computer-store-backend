@@ -1,5 +1,6 @@
 import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
 import { ImportReceipt } from './import-receipt.entity';
+import { ProductVariant } from '../../products/entities/product-variant.entity';
 
 @Entity('chi_tiet_phieu_nhap')
 export class ImportReceiptItem {
@@ -12,11 +13,18 @@ export class ImportReceiptItem {
   @Column({ name: 'phien_ban_id' })
   phienBanId: number;
 
+  @ManyToOne(() => ProductVariant, { nullable: false, eager: false })
+  @JoinColumn({ name: 'phien_ban_id' })
+  phienBan: ProductVariant;
+
   @Column({ name: 'so_luong_du_kien' })
   soLuongDuKien: number;
 
   @Column({ name: 'so_luong_thuc_nhap', nullable: true })
   soLuongThucNhap: number | null;
+
+  @Column({ name: 'so_luong_hu_hong', default: 0 })
+  soLuongHuHong: number;
 
   @Column({ name: 'don_gia_nhap', type: 'decimal', precision: 18, scale: 2, nullable: true })
   donGiaNhap: number | null;

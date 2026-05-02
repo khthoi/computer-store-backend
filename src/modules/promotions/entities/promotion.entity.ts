@@ -6,11 +6,14 @@ import {
   UpdateDateColumn,
   OneToMany,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
 import { PromotionScope } from './promotion-scope.entity';
 import { PromotionCondition } from './promotion-condition.entity';
 import { PromotionAction } from './promotion-action.entity';
 import { PromotionUsage } from './promotion-usage.entity';
+import { Employee } from '../../employees/entities/employee.entity';
 
 export enum PromotionType {
   STANDARD = 'standard',
@@ -84,6 +87,10 @@ export class Promotion {
 
   @Column({ name: 'created_by' })
   createdBy: number;
+
+  @ManyToOne(() => Employee, { nullable: false, eager: false })
+  @JoinColumn({ name: 'created_by' })
+  createdByEmployee: Employee;
 
   @CreateDateColumn({ name: 'created_at' })
   createdAt: Date;

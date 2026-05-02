@@ -3,7 +3,11 @@ import {
   PrimaryGeneratedColumn,
   Column,
   Index,
+  ManyToOne,
+  JoinColumn,
 } from 'typeorm';
+import { Category } from '../../categories/entities/category.entity';
+import { SpecGroup } from './spec-group.entity';
 
 @Entity('danh_muc_nhom_thong_so')
 @Index('uq_dm_nhom', ['danhMucId', 'nhomThongSoId'], { unique: true })
@@ -14,8 +18,16 @@ export class CategorySpecGroup {
   @Column({ name: 'danh_muc_id' })
   danhMucId: number;
 
+  @ManyToOne(() => Category, { nullable: false, eager: false })
+  @JoinColumn({ name: 'danh_muc_id' })
+  danhMuc: Category;
+
   @Column({ name: 'nhom_thong_so_id' })
   nhomThongSoId: number;
+
+  @ManyToOne(() => SpecGroup, { nullable: false, eager: false })
+  @JoinColumn({ name: 'nhom_thong_so_id' })
+  nhomThongSo: SpecGroup;
 
   @Column({ name: 'thu_tu_hien_thi', type: 'smallint', default: 0 })
   thuTuHienThi: number;
