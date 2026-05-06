@@ -2,15 +2,18 @@ import { Injectable, NotFoundException, BadRequestException } from '@nestjs/comm
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository } from 'typeorm';
 import { LoyaltyEarnRule } from './entities/loyalty-earn-rule.entity';
+import { LoyaltyEarnRuleScope } from './entities/loyalty-earn-rule-scope.entity';
 import { LoyaltyTransaction } from './entities/loyalty-transaction.entity';
 import { RedemptionCatalog } from './entities/redemption-catalog.entity';
 import { LoyaltyRedemption } from './entities/loyalty-redemption.entity';
 import { CreateEarnRuleDto } from './dto/create-earn-rule.dto';
 import { RedeemPointsDto } from './dto/redeem-points.dto';
 import { CreateRedemptionCatalogDto } from './dto/create-redemption-catalog.dto';
+import { UpdateRedemptionCatalogDto } from './dto/update-redemption-catalog.dto';
 import { AdjustPointsDto } from './dto/adjust-points.dto';
 import {
   EarnRuleResponseDto,
+  EarnRuleScopeResponseDto,
   LoyaltyTransactionResponseDto,
   LoyaltyRedemptionResponseDto,
   RedemptionCatalogResponseDto,
@@ -21,6 +24,8 @@ export class LoyaltyService {
   constructor(
     @InjectRepository(LoyaltyEarnRule)
     private readonly earnRuleRepo: Repository<LoyaltyEarnRule>,
+    @InjectRepository(LoyaltyEarnRuleScope)
+    private readonly earnRuleScopeRepo: Repository<LoyaltyEarnRuleScope>,
     @InjectRepository(LoyaltyTransaction)
     private readonly transactionRepo: Repository<LoyaltyTransaction>,
     @InjectRepository(RedemptionCatalog)
@@ -37,9 +42,23 @@ export class LoyaltyService {
     return this.toEarnRuleDto(await this.earnRuleRepo.save(rule));
   }
 
-  async findAllEarnRules(): Promise<EarnRuleResponseDto[]> {
-    const rules = await this.earnRuleRepo.find({ relations: ['scopes'], order: { priority: 'DESC' } });
-    return rules.map((r) => this.toEarnRuleDto(r));
+  async findAllEarnRules(page = 1, limit = 20, search?: string): Promise<{ data: EarnRuleResponseDto[]; total: number; totalPages: number }> {
+    const qb = this.earnRuleRepo.createQueryBuilder('r')
+      .leftJoinAndSelect('r.scopes', 'scopes')
+      .orderBy('r.priority', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+    if (search) {
+      qb.where('(r.name LIKE :s OR r.description LIKE :s)', { s: `%${search}%` });
+    }
+    const [rules, total] = await qb.getManyAndCount();
+    return { data: rules.map((r) => this.toEarnRuleDto(r)), total, totalPages: Math.ceil(total / limit) };
+  }
+
+  async findEarnRuleById(id: number): Promise<EarnRuleResponseDto> {
+    const rule = await this.earnRuleRepo.findOne({ where: { id }, relations: ['scopes'] });
+    if (!rule) throw new NotFoundException(`Earn rule #${id} không tồn tại`);
+    return this.toEarnRuleDto(rule);
   }
 
   async findActiveEarnRules(): Promise<LoyaltyEarnRule[]> {
@@ -57,8 +76,24 @@ export class LoyaltyService {
   async updateEarnRule(id: number, dto: Partial<CreateEarnRuleDto>): Promise<EarnRuleResponseDto> {
     const rule = await this.earnRuleRepo.findOne({ where: { id }, relations: ['scopes'] });
     if (!rule) throw new NotFoundException(`Earn rule #${id} không tồn tại`);
-    Object.assign(rule, dto);
+
+    const { scopes, ...rest } = dto;
+    Object.assign(rule, rest);
+
+    if (scopes !== undefined) {
+      await this.earnRuleScopeRepo.delete({ earnRuleId: id });
+      rule.scopes = scopes.map((s) =>
+        this.earnRuleScopeRepo.create({ ...s, earnRuleId: id }),
+      );
+    }
+
     return this.toEarnRuleDto(await this.earnRuleRepo.save(rule));
+  }
+
+  async deleteEarnRule(id: number): Promise<void> {
+    const rule = await this.earnRuleRepo.findOne({ where: { id } });
+    if (!rule) throw new NotFoundException(`Earn rule #${id} không tồn tại`);
+    await this.earnRuleRepo.remove(rule);
   }
 
   // ─── Point Balance ────────────────────────────────────────────────────────
@@ -152,7 +187,6 @@ export class LoyaltyService {
     return this.toTransactionDto(tx);
   }
 
-  // Atomic write: locks khach_hang row, updates balance, inserts transaction
   async writeTransaction(
     manager: EntityManager,
     params: {
@@ -192,14 +226,19 @@ export class LoyaltyService {
   // ─── Redemption Catalog ───────────────────────────────────────────────────
 
   async createCatalogItem(dto: CreateRedemptionCatalogDto): Promise<RedemptionCatalogResponseDto> {
-    const catalog = await this.catalogRepo.save(this.catalogRepo.create(dto));
-    return this.toCatalogDto(catalog);
+    const saved = await this.catalogRepo.save(this.catalogRepo.create(dto));
+    const withPromotion = await this.catalogRepo.findOne({
+      where: { id: saved.id },
+      relations: ['promotion'],
+    });
+    return this.toCatalogDto(withPromotion!);
   }
 
   async findActiveCatalog(): Promise<RedemptionCatalogResponseDto[]> {
     const now = new Date();
     const list = await this.catalogRepo
       .createQueryBuilder('c')
+      .leftJoinAndSelect('c.promotion', 'promotion')
       .where('c.la_hoat_dong = 1')
       .andWhere('(c.hieu_luc_tu IS NULL OR c.hieu_luc_tu <= :now)', { now })
       .andWhere('(c.hieu_luc_den IS NULL OR c.hieu_luc_den >= :now)', { now })
@@ -207,9 +246,35 @@ export class LoyaltyService {
     return list.map((c) => this.toCatalogDto(c));
   }
 
-  async findAllCatalog(): Promise<RedemptionCatalogResponseDto[]> {
-    const list = await this.catalogRepo.find({ order: { ngayTao: 'DESC' } });
-    return list.map((c) => this.toCatalogDto(c));
+  async findAllCatalog(page = 1, limit = 20, search?: string): Promise<{ data: RedemptionCatalogResponseDto[]; total: number; totalPages: number }> {
+    const qb = this.catalogRepo.createQueryBuilder('c')
+      .leftJoinAndSelect('c.promotion', 'promotion')
+      .orderBy('c.ngayTao', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+    if (search) {
+      qb.where('(c.ten LIKE :s OR c.moTa LIKE :s)', { s: `%${search}%` });
+    }
+    const [list, total] = await qb.getManyAndCount();
+    return { data: list.map((c) => this.toCatalogDto(c)), total, totalPages: Math.ceil(total / limit) };
+  }
+
+  async updateCatalogItem(id: number, dto: UpdateRedemptionCatalogDto): Promise<RedemptionCatalogResponseDto> {
+    const catalog = await this.catalogRepo.findOne({ where: { id } });
+    if (!catalog) throw new NotFoundException(`Catalog item #${id} không tồn tại`);
+    Object.assign(catalog, dto);
+    await this.catalogRepo.save(catalog);
+    const withPromotion = await this.catalogRepo.findOne({
+      where: { id },
+      relations: ['promotion'],
+    });
+    return this.toCatalogDto(withPromotion!);
+  }
+
+  async deleteCatalogItem(id: number): Promise<void> {
+    const catalog = await this.catalogRepo.findOne({ where: { id } });
+    if (!catalog) throw new NotFoundException(`Catalog item #${id} không tồn tại`);
+    await this.catalogRepo.remove(catalog);
   }
 
   // ─── Redeem Points ────────────────────────────────────────────────────────
@@ -261,18 +326,33 @@ export class LoyaltyService {
 
   private toEarnRuleDto(r: LoyaltyEarnRule): EarnRuleResponseDto {
     return {
-      id: r.id,
+      id: String(r.id),
       name: r.name,
       description: r.description,
       pointsPerUnit: r.pointsPerUnit,
       spendPerUnit: Number(r.spendPerUnit),
       minOrderValue: r.minOrderValue !== null ? Number(r.minOrderValue) : null,
       maxPointsPerOrder: r.maxPointsPerOrder,
+      bonusTrigger: r.bonusTrigger ?? null,
+      bonusPoints: r.bonusPoints ?? null,
+      scopes: (r.scopes ?? []).map((s) => this.toScopeDto(s)),
       isActive: r.isActive,
       priority: r.priority,
       validFrom: r.validFrom,
       validUntil: r.validUntil,
       createdAt: r.createdAt,
+      updatedAt: r.updatedAt,
+    };
+  }
+
+  private toScopeDto(s: LoyaltyEarnRuleScope): EarnRuleScopeResponseDto {
+    return {
+      id: String(s.id),
+      ruleId: String(s.earnRuleId),
+      scopeType: s.scopeType,
+      scopeRefId: s.scopeRefId,
+      scopeRefLabel: s.scopeRefLabel,
+      multiplier: Number(s.multiplier),
     };
   }
 
@@ -291,18 +371,22 @@ export class LoyaltyService {
     };
   }
 
-  private toCatalogDto(c: RedemptionCatalog): RedemptionCatalogResponseDto {
+  private toCatalogDto(c: RedemptionCatalog & { promotion?: any }): RedemptionCatalogResponseDto {
     return {
-      id: c.id,
+      id: String(c.id),
       name: c.ten,
       description: c.moTa,
       pointsRequired: c.diemCan,
+      promotionId: String(c.promotionId),
+      promotionCode: c.promotion?.code ?? undefined,
+      promotionName: c.promotion?.name ?? undefined,
       isActive: c.laHoatDong,
       stockLimit: c.gioiHanTonKho,
       redeemed: c.soDaDoi,
       validFrom: c.hieuLucTu,
       validUntil: c.hieuLucDen,
       createdAt: c.ngayTao,
+      updatedAt: c.ngayCapNhat,
     };
   }
 

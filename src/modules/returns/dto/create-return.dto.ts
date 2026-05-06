@@ -1,8 +1,21 @@
 import {
-  IsInt, IsString, IsEnum, IsOptional, IsArray, MaxLength, Min, ValidateNested,
+  IsInt, IsEnum, IsOptional, IsArray, IsString, MaxLength, Min, ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+
+export const RETURN_REASON_CODES = [
+  'LoiNhaSanXuat',        // Lỗi từ nhà sản xuất
+  'GuiNhamHang',           // Store gửi nhầm hàng
+  'HuHongKhiVanChuyen',   // Hư hỏng trong quá trình vận chuyển
+  'ThieuPhuKien',          // Thiếu phụ kiện trong hộp
+  'KhongDungMoTa',         // Sản phẩm không đúng mô tả
+  'DoiYKien',              // Khách đổi ý, không có lỗi sản phẩm
+  'KhongTuongThich',       // Không tương thích với thiết bị khách
+  'HieuNangKemHon',        // Hiệu năng thực tế kém hơn mô tả
+] as const;
+
+export type ReturnReasonCode = typeof RETURN_REASON_CODES[number];
 
 class ReturnItemDto {
   @ApiProperty({ example: 12, description: 'ID phiên bản sản phẩm muốn trả' })
@@ -25,10 +38,13 @@ export class CreateReturnDto {
   @IsEnum(['DoiHang', 'TraHang', 'BaoHanh'])
   requestType: 'DoiHang' | 'TraHang' | 'BaoHanh';
 
-  @ApiProperty({ example: 'HangLoiKhongDungMoTa', description: 'Lý do ngắn gọn' })
-  @IsString()
-  @MaxLength(30)
-  reason: string;
+  @ApiProperty({
+    enum: RETURN_REASON_CODES,
+    example: 'LoiNhaSanXuat',
+    description: 'Mã lý do chuẩn hóa',
+  })
+  @IsEnum(RETURN_REASON_CODES)
+  reason: ReturnReasonCode;
 
   @ApiPropertyOptional({ example: 'Sản phẩm bị lỗi màn hình ngay từ khi mở hộp...' })
   @IsOptional()

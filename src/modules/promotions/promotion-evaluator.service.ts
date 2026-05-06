@@ -119,6 +119,28 @@ export class PromotionEvaluatorService {
         const totalQty = ctx.items.reduce((sum, i) => sum + i.quantity, 0);
         return this.compare(totalQty, parsed as number, cond.operator);
       }
+      case ConditionType.REQUIRED_CATEGORIES: {
+        const categoryIds = (parsed as (number | string)[]).map(Number);
+        const cartCategoryIds = ctx.categoryIds ?? [];
+        if (cond.operator === ConditionOperator.ANY_IN_CART) {
+          return categoryIds.some((id) => cartCategoryIds.includes(id));
+        }
+        if (cond.operator === ConditionOperator.ALL_IN_CART) {
+          return categoryIds.every((id) => cartCategoryIds.includes(id));
+        }
+        return true;
+      }
+      case ConditionType.REQUIRED_PRODUCTS: {
+        const variantIds = (parsed as (number | string)[]).map(Number);
+        const cartVariantIds = ctx.items.map((i) => i.variantId);
+        if (cond.operator === ConditionOperator.ANY_IN_CART) {
+          return variantIds.some((id) => cartVariantIds.includes(id));
+        }
+        if (cond.operator === ConditionOperator.ALL_IN_CART) {
+          return variantIds.every((id) => cartVariantIds.includes(id));
+        }
+        return true;
+      }
       default:
         return true;
     }

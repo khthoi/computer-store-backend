@@ -27,4 +27,7 @@ export class ReturnAsset {
 
   @Column({ name: 'thu_tu', type: 'tinyint', default: 0 })
   sortOrder: number;
+
+  @Column({ name: 'loai_asset', length: 30, default: 'customer_evidence' })
+  loaiAsset: 'customer_evidence' | 'inspection_evidence';
 }

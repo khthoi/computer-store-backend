@@ -61,6 +61,9 @@ export class FlashSale {
   @UpdateDateColumn({ name: 'updated_at' })
   updatedAt: Date;
 
+  @Column({ name: 'banner_alt', type: 'text', nullable: true })
+  bannerAlt: string | null;
+
   @Column({ name: 'asset_id_banner', nullable: true })
   assetIdBanner: number | null;
 

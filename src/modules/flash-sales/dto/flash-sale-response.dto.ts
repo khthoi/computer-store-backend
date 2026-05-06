@@ -2,67 +2,166 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class FlashSaleItemResponseDto {
   @ApiProperty({ example: 1 })
-  id: number;
+  flashSaleItemId: number;
 
   @ApiProperty({ example: 1 })
   flashSaleId: number;
 
   @ApiProperty({ example: 5 })
-  variantId: number;
+  phienBanId: number;
+
+  @ApiPropertyOptional({ example: 3 })
+  sanPhamId?: number;
+
+  @ApiProperty({ example: 'Intel Core i9-13900K' })
+  tenPhienBan: string;
+
+  @ApiProperty({ example: 'CPU-I9-13900K-001' })
+  skuSnapshot: string;
+
+  @ApiProperty({ example: 'Intel Core i9' })
+  sanPhamTen: string;
+
+  @ApiPropertyOptional({ example: 'https://cdn.example.com/img.jpg' })
+  hinhAnh?: string;
 
   @ApiProperty({ example: 9990000 })
-  flashPrice: number;
+  giaFlash: number;
 
-  @ApiProperty({ example: 15000000 })
-  originalPriceSnapshot: number;
+  @ApiProperty({ example: 12990000 })
+  giaGocSnapshot: number;
+
+  @ApiPropertyOptional({ example: 15000000 })
+  giaGoc?: number;
 
   @ApiProperty({ example: 50 })
-  quantityLimit: number;
+  soLuongGioiHan: number;
 
   @ApiProperty({ example: 12 })
-  quantitySold: number;
+  soLuongDaBan: number;
 
   @ApiProperty({ example: 1 })
-  displayOrder: number;
+  thuTuHienThi: number;
 }
 
 export class FlashSaleResponseDto {
   @ApiProperty({ example: 1 })
-  id: number;
+  flashSaleId: number;
 
   @ApiProperty({ example: 'Flash Sale 11/11' })
-  name: string;
+  ten: string;
 
   @ApiPropertyOptional({ example: 'Giảm giá sốc ngày 11/11' })
-  description: string | null;
+  moTa?: string;
 
   @ApiProperty({ example: 'nhap', enum: ['nhap', 'sap_dien_ra', 'dang_dien_ra', 'da_ket_thuc', 'huy'] })
-  status: string;
+  trangThai: string;
 
   @ApiProperty({ example: '2024-11-11T00:00:00.000Z' })
-  startAt: Date;
+  batDau: string;
 
   @ApiProperty({ example: '2024-11-11T23:59:59.000Z' })
-  endAt: Date;
+  ketThuc: string;
 
   @ApiPropertyOptional({ example: 'Flash Sale Tháng 11' })
-  bannerTitle: string | null;
+  bannerTitle?: string;
 
   @ApiPropertyOptional({ example: 'https://cdn.example.com/banner.jpg' })
-  bannerImageUrl: string | null;
+  bannerImageUrl?: string;
 
-  @ApiPropertyOptional({ example: 42 })
-  assetIdBanner: number | null;
+  @ApiPropertyOptional({ example: 'Banner Flash Sale tháng 5' })
+  bannerAlt?: string;
 
   @ApiProperty({ example: 3 })
-  createdBy: number;
+  createdByEmployeeId: number;
+
+  @ApiProperty({ example: 'Nguyễn Văn An' })
+  createdBy: string;
+
+  @ApiPropertyOptional({ example: 'an.nguyen@store.vn' })
+  createdByEmail?: string;
 
   @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
-  createdAt: Date;
+  createdAt: string;
 
   @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
-  updatedAt: Date;
+  updatedAt: string;
 
   @ApiProperty({ type: [FlashSaleItemResponseDto] })
   items: FlashSaleItemResponseDto[];
+}
+
+export class FlashSaleSummaryResponseDto {
+  @ApiProperty({ example: 1 })
+  flashSaleId: number;
+
+  @ApiProperty({ example: 'Flash Sale 11/11' })
+  ten: string;
+
+  @ApiProperty({ example: 'nhap', enum: ['nhap', 'sap_dien_ra', 'dang_dien_ra', 'da_ket_thuc', 'huy'] })
+  trangThai: string;
+
+  @ApiProperty({ example: '2024-11-11T00:00:00.000Z' })
+  batDau: string;
+
+  @ApiProperty({ example: '2024-11-11T23:59:59.000Z' })
+  ketThuc: string;
+
+  @ApiProperty({ example: 5 })
+  soLuongPhienBan: number;
+
+  @ApiProperty({ example: 30 })
+  tongSanPhamDaBan: number;
+
+  @ApiProperty({ example: 100 })
+  tongGioiHan: number;
+
+  @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
+  createdAt: string;
+}
+
+export class FlashSaleStatsResponseDto {
+  @ApiProperty({ example: 10 })
+  totalEvents: number;
+
+  @ApiProperty({ example: 1 })
+  activeNow: number;
+
+  @ApiProperty({ example: 3 })
+  upcomingCount: number;
+
+  @ApiProperty({ example: 2 })
+  todayCount: number;
+}
+
+export class VariantSearchResultResponseDto {
+  @ApiProperty({ example: 5 })
+  phienBanId: number;
+
+  @ApiPropertyOptional({ example: 3 })
+  sanPhamId?: number;
+
+  @ApiProperty({ example: 'Intel Core i9-13900K' })
+  tenPhienBan: string;
+
+  @ApiProperty({ example: 'CPU-I9-13900K-001' })
+  sku: string;
+
+  @ApiProperty({ example: 'Intel Core i9' })
+  sanPhamTen: string;
+
+  @ApiPropertyOptional({ example: 'https://cdn.example.com/img.jpg' })
+  hinhAnh?: string;
+
+  @ApiProperty({ example: 12990000 })
+  giaBan: number;
+
+  @ApiPropertyOptional({ example: 15000000 })
+  giaGoc?: number;
+
+  @ApiProperty({ example: 'HienThi' })
+  trangThai: string;
+
+  @ApiProperty({ example: 20 })
+  tonKho: number;
 }

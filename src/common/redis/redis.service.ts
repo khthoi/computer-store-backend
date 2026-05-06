@@ -115,6 +115,11 @@ export class RedisService {
     await this.redis.hdel(this.CUSTOMER_RT_KEY(userId), sessionJti);
   }
 
+  async getTtlMs(key: string): Promise<number> {
+    const ms = await this.redis.pttl(key);
+    return ms < 0 ? 0 : ms;
+  }
+
   // ─── Generic cache helpers ────────────────────────────────────────────────
   async cache<T>(key: string, ttlSeconds: number, factory: () => Promise<T>): Promise<T> {
     const cached = await this.get(key);

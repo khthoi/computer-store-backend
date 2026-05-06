@@ -1,8 +1,28 @@
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
+export class EarnRuleScopeResponseDto {
+  @ApiProperty({ example: '1' })
+  id: string;
+
+  @ApiProperty({ example: '2' })
+  ruleId: string;
+
+  @ApiProperty({ enum: ['category', 'brand', 'product'], example: 'category' })
+  scopeType: 'category' | 'brand' | 'product';
+
+  @ApiProperty({ example: '3' })
+  scopeRefId: string;
+
+  @ApiProperty({ example: 'Laptop' })
+  scopeRefLabel: string;
+
+  @ApiProperty({ example: 2.0 })
+  multiplier: number;
+}
+
 export class EarnRuleResponseDto {
-  @ApiProperty({ example: 1 })
-  id: number;
+  @ApiProperty({ example: '1' })
+  id: string;
 
   @ApiProperty({ example: 'Quy tắc tích điểm mặc định' })
   name: string;
@@ -22,6 +42,15 @@ export class EarnRuleResponseDto {
   @ApiPropertyOptional({ example: 500 })
   maxPointsPerOrder: number | null;
 
+  @ApiPropertyOptional({ example: 'first_order', enum: ['first_order', 'birthday', 'manual'] })
+  bonusTrigger: string | null;
+
+  @ApiPropertyOptional({ example: 100 })
+  bonusPoints: number | null;
+
+  @ApiProperty({ type: [EarnRuleScopeResponseDto] })
+  scopes: EarnRuleScopeResponseDto[];
+
   @ApiProperty({ example: true })
   isActive: boolean;
 
@@ -36,6 +65,9 @@ export class EarnRuleResponseDto {
 
   @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
   createdAt: Date;
+
+  @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
+  updatedAt: Date;
 }
 
 export class LoyaltyTransactionResponseDto {
@@ -71,8 +103,8 @@ export class LoyaltyTransactionResponseDto {
 }
 
 export class RedemptionCatalogResponseDto {
-  @ApiProperty({ example: 1 })
-  id: number;
+  @ApiProperty({ example: '1' })
+  id: string;
 
   @ApiProperty({ example: 'Voucher giảm 50.000đ' })
   name: string;
@@ -82,6 +114,15 @@ export class RedemptionCatalogResponseDto {
 
   @ApiProperty({ example: 200 })
   pointsRequired: number;
+
+  @ApiProperty({ example: '3', description: 'ID của promotion liên kết (is_coupon=true)' })
+  promotionId: string;
+
+  @ApiPropertyOptional({ example: 'SUMMER20' })
+  promotionCode?: string;
+
+  @ApiPropertyOptional({ example: 'Summer Sale 20% Off' })
+  promotionName?: string;
 
   @ApiProperty({ example: true })
   isActive: boolean;
@@ -100,6 +141,9 @@ export class RedemptionCatalogResponseDto {
 
   @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
   createdAt: Date;
+
+  @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
+  updatedAt: Date;
 }
 
 export class LoyaltyRedemptionResponseDto {

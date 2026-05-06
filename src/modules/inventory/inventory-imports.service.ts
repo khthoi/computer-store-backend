@@ -174,10 +174,17 @@ export class InventoryImportsService {
   }
 
   async create(dto: CreateImportReceiptDto, nhanVienId: number): Promise<ImportReceiptDetailDto> {
+    const loaiPhieu = dto.loaiPhieu ?? 'NhapMua';
+    if (loaiPhieu === 'NhapMua' && !dto.nhaCungCapId) {
+      throw new BadRequestException('Phiếu nhập mua hàng (NhapMua) phải có nhà cung cấp (nhaCungCapId)');
+    }
+
     const maPhieuNhap = this.generateCode();
     return this.dataSource.transaction(async (manager) => {
       const receipt = manager.create(ImportReceipt, {
-        nhaCungCapId: dto.nhaCungCapId,
+        loaiPhieu,
+        nhaCungCapId: dto.nhaCungCapId ?? null,
+        yeuCauDoiTraId: dto.yeuCauDoiTraId ?? null,
         nhanVienNhapId: nhanVienId,
         maPhieuNhap,
         ngayDuKien: dto.ngayDuKien ?? null,

@@ -11,6 +11,7 @@ import { Order } from '../../orders/entities/order.entity';
 export type HuongXuLy = 'HoanTien' | 'GiaoHangMoi' | 'BaoHanh';
 export type TrangThaiXuLy = 'DangXuLy' | 'HoanThanh' | 'ThatBai';
 export type TinhTrangHangNhan = 'NguyenVen' | 'HuHong' | 'ThieuPhuKien';
+export type XuLyHangLoi = 'TraNhaCungCap' | 'TieuHuy' | 'TaiSuDung';
 
 @Entity('doi_tra_xu_ly')
 @Index('idx_dtxl_yeucau', ['yeuCauDoiTraId'])
@@ -93,14 +94,42 @@ export class ReturnResolution {
   @Column({ name: 'ngay_gui_hang_bao_hanh', type: 'date', nullable: true })
   ngayGuiHangBaoHanh: Date | null;
 
+  // Vận đơn kho gửi hàng đến hãng bảo hành
+  @Column({ name: 'tracking_gui_nha_sx', length: 200, nullable: true })
+  trackingGuiNhaSanXuat: string | null;
+
+  @Column({ name: 'carrier_gui_nha_sx', length: 100, nullable: true })
+  carrierGuiNhaSanXuat: string | null;
+
   @Column({ name: 'ngay_nhan_hang_ve', type: 'date', nullable: true })
   ngayNhanHangVe: Date | null;
 
   @Column({ name: 'ket_qua_bao_hanh', type: 'text', nullable: true })
   ketQuaBaoHanh: string | null;
 
+  // Vận đơn gửi hàng bảo hành trả về khách
   @Column({ name: 'tracking_tra_khach', length: 200, nullable: true })
   trackingTraKhach: string | null;
+
+  @Column({ name: 'carrier_tra_khach', length: 100, nullable: true })
+  carrierTraKhach: string | null;
+
+  // ── Xử lý hàng lỗi/hàng hoàn trả (sau khi resolution hoàn thành) ────────
+  @Column({ name: 'xu_ly_hang_loi', length: 30, nullable: true })
+  defectiveHandling: XuLyHangLoi | null;
+
+  @Column({ name: 'ngay_xu_ly_hang_loi', type: 'datetime', nullable: true })
+  defectiveHandledAt: Date | null;
+
+  @Column({ name: 'nv_xu_ly_hang_loi_id', nullable: true })
+  defectiveHandledById: number | null;
+
+  @ManyToOne(() => Employee, { nullable: true, eager: false })
+  @JoinColumn({ name: 'nv_xu_ly_hang_loi_id' })
+  defectiveHandledBy: Employee | null;
+
+  @Column({ name: 'ghi_chu_hang_loi', type: 'text', nullable: true })
+  defectiveNotes: string | null;
 
   // ── Chung ────────────────────────────────────────────────────────────────
   @Column({ name: 'nguoi_xu_ly_id' })

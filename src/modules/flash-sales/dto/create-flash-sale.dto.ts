@@ -1,8 +1,9 @@
 import {
-  IsString, IsOptional, IsDate, IsArray, ValidateNested, IsInt, Min, IsNumber, MaxLength,
+  IsString, IsOptional, IsDate, IsArray, ValidateNested, IsInt, Min, IsNumber, MaxLength, IsEnum,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { FlashSaleStatus } from '../entities/flash-sale.entity';
 
 export class CreateFlashSaleItemDto {
   @ApiProperty({ example: 12, description: 'ID phiên bản sản phẩm' })
@@ -47,9 +48,17 @@ export class CreateFlashSaleDto {
   @IsOptional() @IsString() @MaxLength(500)
   bannerImageUrl?: string;
 
+  @ApiPropertyOptional({ example: 'Banner Flash Sale tháng 5' })
+  @IsOptional() @IsString() @MaxLength(500)
+  bannerAlt?: string;
+
   @ApiPropertyOptional({ example: 42 })
   @IsOptional() @IsInt()
   assetIdBanner?: number;
+
+  @ApiPropertyOptional({ enum: FlashSaleStatus, example: FlashSaleStatus.NHAP, description: 'Trạng thái ban đầu — chỉ nhap hoặc sap_dien_ra' })
+  @IsOptional() @IsEnum([FlashSaleStatus.NHAP, FlashSaleStatus.SAP_DIEN_RA])
+  trangThai?: FlashSaleStatus.NHAP | FlashSaleStatus.SAP_DIEN_RA;
 
   @ApiProperty({ type: [CreateFlashSaleItemDto] })
   @IsArray() @ValidateNested({ each: true }) @Type(() => CreateFlashSaleItemDto)

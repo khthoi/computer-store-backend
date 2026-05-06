@@ -3,10 +3,10 @@ import { Type } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class QueryReturnsDto {
-  @ApiPropertyOptional({ enum: ['ChoDuyet', 'DaDuyet', 'TuChoi', 'DangXuLy', 'HoanThanh'] })
+  @ApiPropertyOptional({ enum: ['ChoDuyet', 'DaDuyet', 'TuChoi', 'DaNhanHang', 'DaKiemTra', 'DangXuLy', 'HoanThanh'] })
   @IsOptional()
   @IsString()
-  @IsIn(['ChoDuyet', 'DaDuyet', 'TuChoi', 'DangXuLy', 'HoanThanh'])
+  @IsIn(['ChoDuyet', 'DaDuyet', 'TuChoi', 'DaNhanHang', 'DaKiemTra', 'DangXuLy', 'HoanThanh'])
   status?: string;
 
   @ApiPropertyOptional({ example: 1 })

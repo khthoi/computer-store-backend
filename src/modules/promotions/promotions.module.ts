@@ -7,6 +7,8 @@ import { PromotionAction } from './entities/promotion-action.entity';
 import { PromotionUsage } from './entities/promotion-usage.entity';
 import { BulkTier } from './entities/bulk-tier.entity';
 import { BulkComponent } from './entities/bulk-component.entity';
+import { LoyaltyRedemption } from '../loyalty/entities/loyalty-redemption.entity';
+import { RedemptionCatalog } from '../loyalty/entities/redemption-catalog.entity';
 import { PromotionsService } from './promotions.service';
 import { PromotionEvaluatorService } from './promotion-evaluator.service';
 import { PromotionsController } from './promotions.controller';
@@ -22,6 +24,8 @@ import { AdminPromotionsController } from './admin-promotions.controller';
       PromotionUsage,
       BulkTier,
       BulkComponent,
+      LoyaltyRedemption,
+      RedemptionCatalog,
     ]),
   ],
   controllers: [PromotionsController, AdminPromotionsController],
