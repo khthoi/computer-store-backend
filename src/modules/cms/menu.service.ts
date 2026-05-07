@@ -30,7 +30,49 @@ export class MenuService {
   }
 
   async getAllMenus() {
-    return this.menuRepo.find({ order: { position: 'ASC' } });
+    const menus = await this.menuRepo.find({ order: { position: 'ASC' } });
+    return Promise.all(
+      menus.map(async (menu) => {
+        const flatItems = await this.itemRepo.find({
+          where: { menuId: menu.id },
+          order: { sortOrder: 'ASC' },
+        });
+        const items = this.buildTree(flatItems).map((i) => this.mapItem(i));
+        return {
+          id: String(menu.id),
+          location: menu.position,
+          name: menu.name,
+          description: null,
+          isActive: true,
+          createdAt: menu.updatedAt.toISOString(),
+          updatedAt: menu.updatedAt.toISOString(),
+          items,
+        };
+      }),
+    );
+  }
+
+  async reorderItems(menuId: number, itemIds: number[]): Promise<void> {
+    for (let i = 0; i < itemIds.length; i++) {
+      await this.itemRepo.update({ id: itemIds[i], menuId }, { sortOrder: i + 1 });
+    }
+  }
+
+  private mapItem(item: MenuItemNode): Record<string, unknown> {
+    return {
+      id: String(item.id),
+      menuId: String(item.menuId),
+      parentId: item.parentId != null ? String(item.parentId) : null,
+      label: item.label,
+      url: item.url ?? null,
+      type: item.type,
+      sortOrder: item.sortOrder,
+      isVisible: item.isVisible,
+      target: item.openInNewTab ? '_blank' : '_self',
+      icon: null,
+      cssClass: null,
+      children: item.children.map((c) => this.mapItem(c)),
+    };
   }
 
   async getMenuItemsByMenu(menuId: number) {
@@ -43,14 +85,16 @@ export class MenuService {
   async addItem(menuId: number, dto: CreateMenuItemDto) {
     const menu = await this.menuRepo.findOne({ where: { id: menuId } });
     if (!menu) throw new NotFoundException('Menu không tồn tại');
-    return this.itemRepo.save(this.itemRepo.create({ ...dto, menuId }));
+    const saved = await this.itemRepo.save(this.itemRepo.create({ ...dto, menuId }));
+    return this.mapItem({ ...saved, children: [] });
   }
 
   async updateItem(menuId: number, itemId: number, dto: UpdateMenuItemDto) {
     const item = await this.itemRepo.findOne({ where: { id: itemId, menuId } });
     if (!item) throw new NotFoundException('Menu item không tồn tại');
     await this.itemRepo.update(itemId, dto);
-    return this.itemRepo.findOne({ where: { id: itemId } });
+    const updated = await this.itemRepo.findOne({ where: { id: itemId } });
+    return this.mapItem({ ...updated!, children: [] });
   }
 
   async removeItem(menuId: number, itemId: number) {

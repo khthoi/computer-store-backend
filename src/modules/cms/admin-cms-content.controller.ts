@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param,
+  Controller, Get, Post, Put, Patch, Delete, Body, Param,
   ParseIntPipe, Query, Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
@@ -10,12 +10,16 @@ import { MenuService } from './menu.service';
 import { SiteConfigService } from './site-config.service';
 import { CreatePageDto } from './dto/create-page.dto';
 import { UpdatePageDto } from './dto/update-page.dto';
+import { ReorderPagesDto } from './dto/reorder-pages.dto';
 import { CreateFaqGroupDto } from './dto/create-faq-group.dto';
 import { UpdateFaqGroupDto } from './dto/update-faq-group.dto';
 import { CreateFaqItemDto } from './dto/create-faq-item.dto';
 import { UpdateFaqItemDto } from './dto/update-faq-item.dto';
+import { ReorderFaqGroupsDto } from './dto/reorder-faq-groups.dto';
+import { ReorderFaqItemsDto } from './dto/reorder-faq-items.dto';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
+import { ReorderMenuItemsDto } from './dto/reorder-menu-items.dto';
 import { UpsertSiteConfigDto } from './dto/upsert-site-config.dto';
 
 @ApiTags('Admin — CMS')
@@ -33,36 +37,25 @@ export class AdminCmsContentController {
   // ── Pages ──────────────────────────────────────────────────
   @Get('pages')
   @ApiOperation({ summary: 'Danh sách trang nội dung (admin, bao gồm bản nháp)' })
-  @ApiOkResponse({
-    schema: {
-      example: [
-        { id: 1, title: 'Chính sách bảo hành', slug: 'chinh-sach-bao-hanh', status: 'Published', publishedAt: '2024-01-01T00:00:00.000Z' },
-        { id: 2, title: 'Về chúng tôi', slug: 've-chung-toi', status: 'Draft', publishedAt: null },
-      ],
-    },
-  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
-  getPages() {
-    return this.pagesService.findAll();
+  getPages(
+    @Query('q') q?: string,
+    @Query('status') status?: string | string[],
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.pagesService.findAll({
+      q,
+      status,
+      page: page ? Number(page) : undefined,
+      pageSize: pageSize ? Number(pageSize) : undefined,
+    });
   }
 
   @Get('pages/:id')
   @ApiOperation({ summary: 'Chi tiết trang nội dung (admin)' })
   @ApiParam({ name: 'id', example: 1, description: 'ID trang nội dung' })
-  @ApiOkResponse({
-    schema: {
-      example: {
-        id: 1,
-        title: 'Chính sách bảo hành',
-        slug: 'chinh-sach-bao-hanh',
-        content: '<p>Nội dung chính sách bảo hành...</p>',
-        status: 'Published',
-        publishedAt: '2024-01-01T00:00:00.000Z',
-        createdAt: '2023-12-01T08:00:00.000Z',
-      },
-    },
-  })
   @ApiResponse({ status: 404, description: 'Trang nội dung không tồn tại' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
@@ -91,6 +84,13 @@ export class AdminCmsContentController {
     return this.pagesService.update(id, dto, req.user.sub);
   }
 
+  @Patch('pages/reorder')
+  @ApiOperation({ summary: 'Cập nhật thứ tự trang nội dung' })
+  @ApiResponse({ status: 200, description: 'Thứ tự đã được cập nhật' })
+  reorderPages(@Body() dto: ReorderPagesDto) {
+    return this.pagesService.reorder(dto.ids);
+  }
+
   @Delete('pages/:id')
   @ApiOperation({ summary: 'Xoá trang nội dung' })
   @ApiParam({ name: 'id', example: 1, description: 'ID trang nội dung' })
@@ -117,6 +117,15 @@ export class AdminCmsContentController {
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   getFaqGroups() {
     return this.faqService.findAllGroups();
+  }
+
+  @Patch('faq/groups/reorder')
+  @ApiOperation({ summary: 'Cập nhật thứ tự nhóm FAQ' })
+  @ApiResponse({ status: 200, description: 'Thứ tự đã được cập nhật' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
+  reorderFaqGroups(@Body() dto: ReorderFaqGroupsDto) {
+    return this.faqService.reorderGroups(dto.ids);
   }
 
   @Post('faq/groups')
@@ -155,17 +164,35 @@ export class AdminCmsContentController {
   @Get('faq/items')
   @ApiOperation({ summary: 'Danh sách FAQ item (admin, lọc theo nhóm)' })
   @ApiQuery({ name: 'groupId', required: false, description: 'Lọc theo ID nhóm FAQ', example: 1 })
-  @ApiOkResponse({
-    schema: {
-      example: [
-        { id: 1, groupId: 1, question: 'Bao lâu để nhận được hàng?', answer: '3-5 ngày làm việc', sortOrder: 1, helpfulCount: 12, isActive: true },
-      ],
-    },
-  })
+  @ApiQuery({ name: 'q', required: false, description: 'Tìm kiếm theo câu hỏi' })
+  @ApiQuery({ name: 'isVisible', required: false, description: 'Lọc theo trạng thái hiển thị' })
+  @ApiQuery({ name: 'page', required: false, description: 'Trang hiện tại', example: 1 })
+  @ApiQuery({ name: 'pageSize', required: false, description: 'Số item mỗi trang', example: 20 })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
-  getFaqItems(@Query('groupId') groupId?: string) {
-    return this.faqService.findAllItems(groupId ? +groupId : undefined);
+  getFaqItems(
+    @Query('groupId') groupId?: string,
+    @Query('q') q?: string,
+    @Query('isVisible') isVisible?: string,
+    @Query('page') page?: string,
+    @Query('pageSize') pageSize?: string,
+  ) {
+    return this.faqService.findAllItems({
+      groupId:  groupId ? +groupId : undefined,
+      q,
+      isVisible: isVisible !== undefined ? isVisible === 'true' : undefined,
+      page:     page ? +page : 1,
+      pageSize: pageSize ? +pageSize : undefined,
+    });
+  }
+
+  @Patch('faq/items/reorder')
+  @ApiOperation({ summary: 'Cập nhật thứ tự FAQ item' })
+  @ApiResponse({ status: 200, description: 'Thứ tự đã được cập nhật' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
+  reorderFaqItems(@Body() dto: ReorderFaqItemsDto) {
+    return this.faqService.reorderItems(dto.ids);
   }
 
   @Post('faq/items')
@@ -280,6 +307,19 @@ export class AdminCmsContentController {
     @Param('itemId', ParseIntPipe) itemId: number,
   ) {
     return this.menuService.removeItem(menuId, itemId);
+  }
+
+  @Patch('menus/:id/items/reorder')
+  @ApiOperation({ summary: 'Cập nhật thứ tự item trong menu' })
+  @ApiParam({ name: 'id', example: 1, description: 'ID menu' })
+  @ApiResponse({ status: 200, description: 'Thứ tự đã được cập nhật' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
+  reorderMenuItems(
+    @Param('id', ParseIntPipe) menuId: number,
+    @Body() dto: ReorderMenuItemsDto,
+  ) {
+    return this.menuService.reorderItems(menuId, dto.itemIds);
   }
 
   // ── Site Config ────────────────────────────────────────────

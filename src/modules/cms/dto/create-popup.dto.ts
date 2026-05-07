@@ -5,84 +5,102 @@ import {
   IsInt,
   IsEnum,
   IsDateString,
+  IsArray,
   Min,
+  MinLength,
   MaxLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
-
-const POPUP_TYPES = ['banner_top', 'popup_center', 'banner_bot'] as const;
-const POPUP_STATUSES = ['nhap', 'hoat_dong', 'an'] as const;
+import { PopupStatus, PopupPosition, PopupTrigger } from '../entities/popup.entity';
 
 export class CreatePopupDto {
   @ApiProperty()
   @IsString()
+  @MinLength(1)
   @MaxLength(255)
-  title: string;
+  name: string;
 
-  @ApiProperty()
-  @IsString()
-  content: string;
-
-  @ApiPropertyOptional({ enum: POPUP_TYPES })
+  @ApiPropertyOptional({ enum: PopupStatus })
   @IsOptional()
-  @IsEnum(POPUP_TYPES)
-  type?: string;
+  @IsEnum(PopupStatus)
+  status?: PopupStatus;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ enum: PopupPosition })
   @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  bgColor?: string;
+  @IsEnum(PopupPosition)
+  position?: PopupPosition;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ enum: PopupTrigger })
   @IsOptional()
-  @IsString()
-  @MaxLength(20)
-  textColor?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  icon?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  actionUrl?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  @MaxLength(100)
-  actionLabel?: string;
-
-  @ApiPropertyOptional({ enum: POPUP_STATUSES })
-  @IsOptional()
-  @IsEnum(POPUP_STATUSES)
-  status?: string;
+  @IsEnum(PopupTrigger)
+  trigger?: PopupTrigger;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsInt()
   @Min(0)
   @Type(() => Number)
-  sortOrder?: number;
+  delaySeconds?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsDateString()
-  startAt?: string;
+  @IsInt()
+  @Min(0)
+  @Type(() => Number)
+  scrollPercent?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsDateString()
-  endAt?: string;
+  @IsString()
+  @MaxLength(255)
+  title?: string;
+
+  @ApiProperty()
+  @IsString()
+  body: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  imageUrl?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  ctaLabel?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  ctaUrl?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsBoolean()
-  allowClose?: boolean;
+  showCloseButton?: boolean;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  showOnce?: boolean;
+
+  @ApiPropertyOptional({ type: [String] })
+  @IsOptional()
+  @IsArray()
+  @IsString({ each: true })
+  targetPages?: string[];
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  startDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsDateString()
+  endDate?: string;
 }

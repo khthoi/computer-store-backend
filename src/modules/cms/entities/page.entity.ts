@@ -40,11 +40,32 @@ export class Page {
   @Column({ name: 'hien_trong_footer', default: false })
   showInFooter: boolean;
 
+  @Column({ name: 'hien_trong_header', default: false })
+  showInHeader: boolean;
+
+  @Column({ name: 'template', length: 20, default: 'default' })
+  template: string;
+
+  @Column({ name: 'luot_xem', default: 0 })
+  viewCount: number;
+
   @Column({ name: 'meta_title', length: 255, nullable: true })
   metaTitle: string | null;
 
   @Column({ name: 'meta_description', length: 500, nullable: true })
   metaDescription: string | null;
+
+  @Column({ name: 'meta_keywords', length: 500, nullable: true })
+  metaKeywords: string | null;
+
+  @Column({ name: 'og_image', length: 500, nullable: true })
+  ogImage: string | null;
+
+  @Column({ name: 'canonical_url', length: 500, nullable: true })
+  canonicalUrl: string | null;
+
+  @Column({ name: 'no_index', default: false })
+  noIndex: boolean;
 
   @Column({ name: 'ngay_xuat_ban', type: 'datetime', nullable: true })
   publishedAt: Date | null;

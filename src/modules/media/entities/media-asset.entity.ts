@@ -3,6 +3,7 @@ import {
   PrimaryGeneratedColumn,
   Column,
   CreateDateColumn,
+  UpdateDateColumn,
   Index,
   ManyToOne,
   JoinColumn,
@@ -80,4 +81,7 @@ export class MediaAsset {
 
   @CreateDateColumn({ name: 'ngay_upload' })
   ngayUpload: Date;
+
+  @UpdateDateColumn({ name: 'ngay_cap_nhat' })
+  ngayCapNhat: Date;
 }

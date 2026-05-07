@@ -22,6 +22,9 @@ export class FaqGroup {
   @Column({ name: 'mo_ta', length: 500, nullable: true })
   description: string | null;
 
+  @Column({ name: 'bieu_tuong', length: 100, nullable: true })
+  icon: string | null;
+
   @Column({ name: 'thu_tu', default: 0 })
   sortOrder: number;
 

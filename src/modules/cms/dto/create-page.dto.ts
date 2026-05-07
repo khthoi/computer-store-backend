@@ -17,12 +17,14 @@ const PAGE_TYPES = [
   'gioi_thieu', 'lien_he', 'custom',
 ] as const;
 
-const PAGE_STATUSES = ['nhap', 'da_xuat_ban', 'an'] as const;
+// Accepts both frontend-facing values and DB values
+const PAGE_STATUSES = ['nhap', 'da_xuat_ban', 'an', 'draft', 'published', 'archived'] as const;
 
 export class CreatePageDto {
-  @ApiProperty({ enum: PAGE_TYPES })
+  @ApiPropertyOptional({ enum: PAGE_TYPES, default: 'custom' })
+  @IsOptional()
   @IsEnum(PAGE_TYPES)
-  type: string;
+  type?: string;
 
   @ApiProperty()
   @IsString()
@@ -57,6 +59,16 @@ export class CreatePageDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsBoolean()
+  showInHeader?: boolean;
+
+  @ApiPropertyOptional({ enum: ['default', 'fullwidth', 'sidebar'] })
+  @IsOptional()
+  @IsString()
+  template?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsString()
   @MaxLength(255)
   metaTitle?: string;
@@ -66,6 +78,29 @@ export class CreatePageDto {
   @IsString()
   @MaxLength(500)
   metaDescription?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  metaKeywords?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  ogImage?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(500)
+  canonicalUrl?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsBoolean()
+  noIndex?: boolean;
 
   @ApiPropertyOptional()
   @IsOptional()

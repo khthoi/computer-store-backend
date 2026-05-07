@@ -10,6 +10,51 @@ import { v2 as cloudinary } from 'cloudinary';
 import { MediaAsset } from './entities/media-asset.entity';
 import { MediaFolderService } from './media-folder.service';
 import { QueryMediaDto } from './dto/query-media.dto';
+import { UpdateMediaDto } from './dto/update-media.dto';
+
+const RAW_RENDERABLE_IMAGE_EXTENSIONS = new Set([
+  '.svg',
+  '.svgz',
+  '.ico',
+  '.icon',
+]);
+
+function decodeOriginalName(file: Express.Multer.File): string {
+  return Buffer.from(file.originalname, 'latin1').toString('utf8');
+}
+
+function getFileExtension(filename: string): string {
+  const cleanName = filename.split(/[?#]/, 1)[0].toLowerCase();
+  const dotIndex = cleanName.lastIndexOf('.');
+  return dotIndex >= 0 ? cleanName.slice(dotIndex) : '';
+}
+
+function getBaseName(filename: string): string {
+  const name = filename.split(/[\\/]/).pop() ?? 'file';
+  const dotIndex = name.lastIndexOf('.');
+  return dotIndex > 0 ? name.slice(0, dotIndex) : name;
+}
+
+function sanitizePublicIdSegment(value: string): string {
+  return (
+    value
+      .normalize('NFKD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/[^a-zA-Z0-9_-]+/g, '-')
+      .replace(/^-+|-+$/g, '')
+      .toLowerCase() || 'file'
+  );
+}
+
+function isRenderableImageFile(
+  file: Express.Multer.File,
+  originalName: string,
+): boolean {
+  return (
+    file.mimetype.startsWith('image/') ||
+    RAW_RENDERABLE_IMAGE_EXTENSIONS.has(getFileExtension(originalName))
+  );
+}
 
 @Injectable()
 export class MediaService {
@@ -29,9 +74,20 @@ export class MediaService {
   async upload(
     file: Express.Multer.File,
     employeeId: number,
-    options?: { folderPath?: string; thuMucId?: number; altText?: string; caption?: string },
+    options?: {
+      folderPath?: string;
+      thuMucId?: number;
+      altText?: string;
+      caption?: string;
+    },
   ): Promise<MediaAsset> {
-    const { folderPath, thuMucId: thuMucIdParam, altText, caption } = options ?? {};
+    const {
+      folderPath,
+      thuMucId: thuMucIdParam,
+      altText,
+      caption,
+    } = options ?? {};
+    const originalName = decodeOriginalName(file);
     let targetFolder = 'pc-store/misc';
     let thuMucId: number | null = null;
     let phamVi = 'public';
@@ -39,10 +95,15 @@ export class MediaService {
     if (thuMucIdParam) {
       const configured = await this.folderService.findOne(thuMucIdParam);
       if (configured.loaiChoPhep !== 'all') {
-        const fileType = file.mimetype.startsWith('image/') ? 'image'
-          : file.mimetype.startsWith('video/') ? 'video' : 'raw';
+        const fileType = isRenderableImageFile(file, originalName)
+          ? 'image'
+          : file.mimetype.startsWith('video/')
+            ? 'video'
+            : 'raw';
         if (configured.loaiChoPhep !== fileType) {
-          throw new BadRequestException(`Thư mục này chỉ chấp nhận loại file: ${configured.loaiChoPhep}`);
+          throw new BadRequestException(
+            `Thư mục này chỉ chấp nhận loại file: ${configured.loaiChoPhep}`,
+          );
         }
       }
       targetFolder = configured.duongDan;
@@ -51,13 +112,20 @@ export class MediaService {
     } else if (folderPath) {
       const configured = await this.folderService.findByPath(folderPath);
       if (!configured) {
-        throw new BadRequestException(`Thư mục "${folderPath}" không được cấu hình. Chọn thư mục hợp lệ từ danh sách.`);
+        throw new BadRequestException(
+          `Thư mục "${folderPath}" không được cấu hình. Chọn thư mục hợp lệ từ danh sách.`,
+        );
       }
       if (configured.loaiChoPhep !== 'all') {
-        const fileType = file.mimetype.startsWith('image/') ? 'image'
-          : file.mimetype.startsWith('video/') ? 'video' : 'raw';
+        const fileType = isRenderableImageFile(file, originalName)
+          ? 'image'
+          : file.mimetype.startsWith('video/')
+            ? 'video'
+            : 'raw';
         if (configured.loaiChoPhep !== fileType) {
-          throw new BadRequestException(`Thư mục này chỉ chấp nhận loại file: ${configured.loaiChoPhep}`);
+          throw new BadRequestException(
+            `Thư mục này chỉ chấp nhận loại file: ${configured.loaiChoPhep}`,
+          );
         }
       }
       targetFolder = configured.duongDan;
@@ -65,17 +133,27 @@ export class MediaService {
       phamVi = configured.phamVi ?? 'public';
     }
 
-    const result = await this.uploadToCloudinary(file, targetFolder);
+    const result = await this.uploadToCloudinary(
+      file,
+      targetFolder,
+      originalName,
+    );
 
-    const loaiFile = (result.resource_type === 'image' ? 'image'
-      : result.resource_type === 'video' ? 'video'
-      : 'raw') as string;
+    const loaiFile = (
+      isRenderableImageFile(file, originalName)
+        ? 'image'
+        : result.resource_type === 'image'
+          ? 'image'
+          : result.resource_type === 'video'
+            ? 'video'
+            : 'raw'
+    ) as string;
 
     const asset = this.repo.create({
       cloudinaryId: result.public_id as string,
       cloudinaryVer: result.version as number,
       urlGoc: result.secure_url as string,
-      tenFileGoc: file.originalname,
+      tenFileGoc: originalName,
       loaiFile,
       mimeType: file.mimetype,
       kichThuocByte: file.size,
@@ -90,12 +168,23 @@ export class MediaService {
       nguoiUploadId: employeeId,
     });
 
-    return this.repo.save(asset);
+    const saved = await this.repo.save(asset);
+    return this.findOne(saved.id);
   }
 
   async findAll(query: QueryMediaDto) {
-    const { page = 1, limit = 20, search, loaiFile, trangThai, thuMucId } = query;
-    const qb = this.repo.createQueryBuilder('a')
+    const {
+      page = 1,
+      limit = 20,
+      search,
+      loaiFile,
+      trangThai,
+      thuMucId,
+    } = query;
+    const qb = this.repo
+      .createQueryBuilder('a')
+      .leftJoinAndSelect('a.nguoiUpload', 'nv')
+      .leftJoinAndSelect('a.thuMucObj', 'tm')
       .orderBy('a.ngayUpload', 'DESC')
       .skip((page - 1) * limit)
       .take(limit);
@@ -111,7 +200,10 @@ export class MediaService {
   }
 
   async findOne(id: number): Promise<MediaAsset> {
-    const asset = await this.repo.findOne({ where: { id } });
+    const asset = await this.repo.findOne({
+      where: { id },
+      relations: ['nguoiUpload', 'thuMucObj'],
+    });
     if (!asset) throw new NotFoundException('Asset không tồn tại');
     return asset;
   }
@@ -127,18 +219,55 @@ export class MediaService {
     await this.repo.remove(asset);
   }
 
+  async update(id: number, dto: UpdateMediaDto): Promise<MediaAsset> {
+    const asset = await this.findOne(id);
+    if (dto.originalName !== undefined) asset.tenFileGoc = dto.originalName;
+    if (dto.altText !== undefined) asset.altText = dto.altText;
+    if (dto.caption !== undefined) asset.caption = dto.caption;
+    return this.repo.save(asset);
+  }
+
   async archive(id: number): Promise<MediaAsset> {
     const asset = await this.findOne(id);
     asset.trangThai = 'archived';
     return this.repo.save(asset);
   }
 
-  private uploadToCloudinary(file: Express.Multer.File, folder: string): Promise<Record<string, unknown>> {
+  private uploadToCloudinary(
+    file: Express.Multer.File,
+    folder: string,
+    originalName: string,
+  ): Promise<Record<string, unknown>> {
+    // Cloudinary raw assets need the extension in public_id; otherwise delivery
+    // URLs like /raw/upload/.../file_qczdto are served as opaque downloads.
+    const extension = getFileExtension(originalName);
+    const uploadAsRawImage = RAW_RENDERABLE_IMAGE_EXTENSIONS.has(extension);
+
+    const opts = uploadAsRawImage
+      ? {
+          folder,
+          resource_type: 'raw' as const,
+          public_id: `${sanitizePublicIdSegment(getBaseName(originalName))}-${Date.now()}${extension}`,
+          use_filename: false,
+          unique_filename: false,
+        }
+      : { folder, resource_type: 'auto' as const };
+
     return new Promise((resolve, reject) => {
       const stream = cloudinary.uploader.upload_stream(
-        { folder, resource_type: 'auto' },
+        opts,
         (error, result) => {
-          if (error) return reject(error);
+          if (error) {
+            const messageValue =
+              typeof error === 'object' && 'message' in error
+                ? (error as { message: unknown }).message
+                : undefined;
+            const message =
+              typeof messageValue === 'string'
+                ? messageValue
+                : 'Cloudinary upload failed';
+            return reject(new Error(message));
+          }
           resolve(result as Record<string, unknown>);
         },
       );

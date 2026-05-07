@@ -14,8 +14,8 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 const SECTION_TYPES = ['category', 'promotion', 'brand', 'manual', 'new_arrivals', 'best_selling'] as const;
-const SORT_BYS = ['price_asc', 'price_desc', 'newest', 'best_selling', 'rating'] as const;
-const LAYOUTS = ['carousel', 'grid_2x3', 'grid_3x2', 'grid_4'] as const;
+const SORT_BYS = ['price_asc', 'price_desc', 'newest', 'best_selling', 'highest_rated'] as const;
+const LAYOUTS = ['carousel', 'grid_3', 'grid_4', 'grid_6'] as const;
 
 export class SectionItemDto {
   @ApiProperty()
@@ -84,6 +84,12 @@ export class CreateHomepageSectionDto {
   @IsString()
   @MaxLength(20)
   badgeColor?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  badgeTextColor?: string;
 
   @ApiPropertyOptional()
   @IsOptional()

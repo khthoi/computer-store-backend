@@ -22,6 +22,7 @@ import { MediaFolderService } from './media-folder.service';
 import { QueryMediaDto } from './dto/query-media.dto';
 import { CreateMediaFolderDto } from './dto/create-media-folder.dto';
 import { UpdateMediaFolderDto } from './dto/update-media-folder.dto';
+import { UpdateMediaDto } from './dto/update-media.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
@@ -190,6 +191,12 @@ export class AdminMediaController {
   @ApiResponse({ status: 404, description: 'Asset không tồn tại' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.mediaService.findOne(id);
+  }
+
+  @Patch(':id')
+  @ApiOperation({ summary: 'Cập nhật metadata asset (altText, caption)' })
+  update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateMediaDto) {
+    return this.mediaService.update(id, dto);
   }
 
   @Patch(':id/archive')

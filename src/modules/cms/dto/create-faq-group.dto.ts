@@ -21,6 +21,12 @@ export class CreateFaqGroupDto {
 
   @ApiPropertyOptional()
   @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  icon?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
   @IsInt()
   @Min(0)
   @Type(() => Number)

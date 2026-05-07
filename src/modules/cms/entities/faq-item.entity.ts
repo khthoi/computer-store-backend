@@ -35,6 +35,9 @@ export class FaqItem {
   @Column({ name: 'luot_huu_ich', default: 0 })
   helpfulCount: number;
 
+  @Column({ name: 'luot_khong_huu_ich', default: 0 })
+  notHelpfulCount: number;
+
   @CreateDateColumn({ name: 'ngay_tao' })
   createdAt: Date;
 

@@ -2,18 +2,16 @@ import {
   IsString,
   IsOptional,
   IsInt,
-  IsNumber,
   IsDateString,
   IsEnum,
   Min,
   MaxLength,
-  ValidateIf,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
-const BANNER_POSITIONS = ['TrangChu', 'TrangDanhMuc', 'TrangSanPham', 'DauTrang', 'CuaTrang', 'Popup', 'SideBanner'] as const;
-const BANNER_STATUSES = ['DangHienThi', 'An', 'HetHan'] as const;
+export const BANNER_POSITIONS = ['homepage_hero', 'homepage_hero_slider', 'homepage_small', 'side_banner', 'promotions_banner'] as const;
+export const BANNER_STATUSES = ['draft', 'active', 'scheduled', 'ended'] as const;
 
 export class CreateBannerDto {
   @ApiProperty()
@@ -21,24 +19,25 @@ export class CreateBannerDto {
   @MaxLength(255)
   title: string;
 
+  @ApiProperty({ enum: BANNER_POSITIONS })
+  @IsEnum(BANNER_POSITIONS)
+  position: string;
+
+  @ApiPropertyOptional({ enum: BANNER_STATUSES })
+  @IsOptional()
+  @IsEnum(BANNER_STATUSES)
+  status?: string;
+
+  @ApiProperty()
+  @IsString()
+  @MaxLength(500)
+  imageUrl: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @MaxLength(255)
-  subtitle?: string;
-
-  @ApiPropertyOptional({ description: 'ID asset từ media library (bắt buộc nếu không có imageUrl)' })
-  @ValidateIf((o) => !o.imageUrl)
-  @IsInt()
-  @Min(1)
-  @Type(() => Number)
-  assetId?: number;
-
-  @ApiPropertyOptional({ description: 'URL ảnh trực tiếp (bắt buộc nếu không có assetId)' })
-  @ValidateIf((o) => !o.assetId)
-  @IsString()
   @MaxLength(500)
-  imageUrl?: string;
+  mobileImageUrl?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -48,49 +47,79 @@ export class CreateBannerDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsInt()
-  @Min(1)
-  @Type(() => Number)
-  assetIdMobile?: number;
-
-  @ApiPropertyOptional()
-  @IsOptional()
   @IsString()
   @MaxLength(500)
-  imageUrlMobile?: string;
+  linkUrl?: string;
+
+  @ApiPropertyOptional({ enum: ['_self', '_blank'] })
+  @IsOptional()
+  @IsString()
+  @MaxLength(10)
+  linkTarget?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @MaxLength(20)
-  overlayColor?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsNumber()
-  overlayOpacity?: number;
+  overlayText?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
-  @MaxLength(500)
-  targetUrl?: string;
+  overlaySubtext?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   @MaxLength(100)
-  buttonText?: string;
+  ctaLabel?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   @MaxLength(500)
-  buttonUrl?: string;
+  ctaUrl?: string;
 
-  @ApiProperty({ enum: BANNER_POSITIONS })
-  @IsEnum(BANNER_POSITIONS)
-  position: string;
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  badge?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  badgeColor?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(20)
+  badgeTextColor?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  gridX?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  gridY?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  gridW?: number;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsInt()
+  @Type(() => Number)
+  gridH?: number;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -102,15 +131,10 @@ export class CreateBannerDto {
   @ApiPropertyOptional()
   @IsOptional()
   @IsDateString()
-  startAt?: string;
+  startDate?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
   @IsDateString()
-  endAt?: string;
-
-  @ApiPropertyOptional({ enum: BANNER_STATUSES })
-  @IsOptional()
-  @IsEnum(BANNER_STATUSES)
-  status?: string;
+  endDate?: string;
 }

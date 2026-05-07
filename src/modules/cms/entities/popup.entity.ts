@@ -9,66 +9,111 @@ import {
 } from 'typeorm';
 import { Employee } from '../../employees/entities/employee.entity';
 
+export enum PopupStatus {
+  DRAFT = 'draft',
+  ACTIVE = 'active',
+  SCHEDULED = 'scheduled',
+  ENDED = 'ended',
+}
+
+export enum PopupPosition {
+  CENTER = 'center',
+  TOP_LEFT = 'top_left',
+  TOP_RIGHT = 'top_right',
+  BOTTOM_LEFT = 'bottom_left',
+  BOTTOM_RIGHT = 'bottom_right',
+}
+
+export enum PopupTrigger {
+  ON_LOAD = 'on_load',
+  ON_EXIT = 'on_exit',
+  ON_SCROLL = 'on_scroll',
+  ON_DELAY = 'on_delay',
+}
+
 @Entity('popup_thong_bao')
 export class Popup {
   @PrimaryGeneratedColumn({ name: 'popup_id' })
   id: number;
 
-  @Column({ name: 'tieu_de', length: 255 })
-  title: string;
+  @Column({ name: 'ten_popup', length: 255, default: 'Popup' })
+  name: string;
+
+  @Column({ name: 'tieu_de', length: 255, nullable: true })
+  title: string | null;
 
   @Column({ name: 'noi_dung', type: 'text' })
-  content: string;
-
-  @Column({
-    name: 'loai',
-    type: 'enum',
-    enum: ['banner_top', 'popup_center', 'banner_bot'],
-    default: 'popup_center',
-  })
-  type: string;
-
-  @Column({ name: 'mau_nen', length: 20, nullable: true })
-  bgColor: string | null;
-
-  @Column({ name: 'mau_chu', length: 20, nullable: true })
-  textColor: string | null;
-
-  @Column({ name: 'icon', length: 100, nullable: true })
-  icon: string | null;
-
-  @Column({ name: 'url_hanh_dong', length: 500, nullable: true })
-  actionUrl: string | null;
-
-  @Column({ name: 'nhan_hanh_dong', length: 100, nullable: true })
-  actionLabel: string | null;
+  body: string;
 
   @Column({
     name: 'trang_thai',
     type: 'enum',
-    enum: ['nhap', 'hoat_dong', 'an'],
-    default: 'nhap',
+    enum: PopupStatus,
+    default: PopupStatus.DRAFT,
   })
-  status: string;
+  status: PopupStatus;
 
-  @Column({ name: 'thu_tu', default: 0 })
-  sortOrder: number;
+  @Column({
+    name: 'vi_tri',
+    type: 'enum',
+    enum: PopupPosition,
+    default: PopupPosition.CENTER,
+  })
+  position: PopupPosition;
 
-  @Column({ name: 'ngay_bat_dau', type: 'datetime', nullable: true })
-  startAt: Date | null;
+  @Column({
+    name: 'kich_hoat',
+    type: 'enum',
+    enum: PopupTrigger,
+    default: PopupTrigger.ON_LOAD,
+  })
+  trigger: PopupTrigger;
 
-  @Column({ name: 'ngay_ket_thuc', type: 'datetime', nullable: true })
-  endAt: Date | null;
+  @Column({ name: 'gio_tre', type: 'int', nullable: true })
+  delaySeconds: number | null;
+
+  @Column({ name: 'phan_tram_cuon', type: 'int', nullable: true })
+  scrollPercent: number | null;
+
+  @Column({ name: 'url_anh', length: 500, nullable: true })
+  imageUrl: string | null;
+
+  @Column({ name: 'nhan_hanh_dong', length: 100, nullable: true })
+  ctaLabel: string | null;
+
+  @Column({ name: 'url_hanh_dong', length: 500, nullable: true })
+  ctaUrl: string | null;
 
   @Column({ name: 'cho_phep_dong', default: true })
-  allowClose: boolean;
+  showCloseButton: boolean;
+
+  @Column({ name: 'hien_thi_mot_lan', default: false })
+  showOnce: boolean;
+
+  @Column({ name: 'trang_muc_tieu', type: 'json', nullable: true })
+  targetPages: string[] | null;
+
+  @Column({ name: 'ngay_bat_dau', type: 'datetime', nullable: true })
+  startDate: Date | null;
+
+  @Column({ name: 'ngay_ket_thuc', type: 'datetime', nullable: true })
+  endDate: Date | null;
+
+  @Column({ name: 'luot_xem', default: 0 })
+  viewCount: number;
+
+  @Column({ name: 'luot_click', default: 0 })
+  clickCount: number;
+
+  @Column({ name: 'luot_dong', default: 0 })
+  closeCount: number;
 
   @Column({ name: 'nguoi_tao_id', nullable: true })
   createdById: number | null;
 
   @ManyToOne(() => Employee, { nullable: true, eager: false })
   @JoinColumn({ name: 'nguoi_tao_id' })
-  createdBy: Employee | null;
+  createdByEmployee: Employee | null;
 
   @CreateDateColumn({ name: 'ngay_tao' })
   createdAt: Date;

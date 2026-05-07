@@ -1,20 +1,27 @@
-import { IsOptional, IsEnum, IsInt, Min } from 'class-validator';
+import { IsOptional, IsString, IsArray, IsEnum, IsInt, Min } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 import { Type, Transform } from 'class-transformer';
-
-const BANNER_POSITIONS = ['TrangChu', 'TrangDanhMuc', 'TrangSanPham', 'DauTrang', 'CuaTrang', 'Popup', 'SideBanner'] as const;
-const BANNER_STATUSES = ['DangHienThi', 'An', 'HetHan'] as const;
+import { BANNER_POSITIONS, BANNER_STATUSES } from './create-banner.dto';
 
 export class QueryBannersDto {
-  @ApiPropertyOptional({ enum: BANNER_POSITIONS })
+  @ApiPropertyOptional({ description: 'Tìm kiếm theo tiêu đề' })
   @IsOptional()
-  @IsEnum(BANNER_POSITIONS)
-  position?: string;
+  @IsString()
+  q?: string;
 
-  @ApiPropertyOptional({ enum: BANNER_STATUSES })
+  @ApiPropertyOptional({ enum: BANNER_POSITIONS, isArray: true })
   @IsOptional()
-  @IsEnum(BANNER_STATUSES)
-  status?: string;
+  @IsArray()
+  @IsEnum(BANNER_POSITIONS, { each: true })
+  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  position?: string[];
+
+  @ApiPropertyOptional({ enum: BANNER_STATUSES, isArray: true })
+  @IsOptional()
+  @IsArray()
+  @IsEnum(BANNER_STATUSES, { each: true })
+  @Transform(({ value }) => (Array.isArray(value) ? value : [value]))
+  status?: string[];
 
   @ApiPropertyOptional({ default: 1 })
   @IsOptional()

@@ -80,23 +80,28 @@ export class FaqGroupResponseDto {
 }
 
 export class MenuItemResponseDto {
-  @ApiProperty({ example: 1 }) id: number;
-  @ApiProperty({ example: 1 }) menuId: number;
-  @ApiPropertyOptional({ example: null }) parentId: number | null;
+  @ApiProperty({ example: '1' }) id: string;
+  @ApiProperty({ example: '1' }) menuId: string;
+  @ApiPropertyOptional({ example: null }) parentId: string | null;
   @ApiProperty({ example: 'Sản phẩm' }) label: string;
-  @ApiProperty({ example: '/products' }) url: string;
+  @ApiPropertyOptional({ example: '/products' }) url: string | null;
   @ApiProperty({ example: 'link' }) type: string;
   @ApiProperty({ example: 1 }) sortOrder: number;
   @ApiProperty({ example: true }) isVisible: boolean;
-  @ApiProperty({ example: false }) openInNewTab: boolean;
+  @ApiProperty({ example: '_self' }) target: '_self' | '_blank';
+  @ApiPropertyOptional({ example: null }) icon: string | null;
+  @ApiPropertyOptional({ example: null }) cssClass: string | null;
   @ApiProperty({ type: () => [MenuItemResponseDto] }) children: MenuItemResponseDto[];
 }
 
 export class MenuResponseDto {
-  @ApiProperty({ example: 1 }) id: number;
-  @ApiProperty({ example: 'header' }) position: string;
+  @ApiProperty({ example: '1' }) id: string;
+  @ApiProperty({ example: 'header_main' }) location: string;
   @ApiProperty({ example: 'Menu chính' }) name: string;
-  @ApiProperty({ example: '2024-01-15T10:30:00.000Z' }) updatedAt: Date;
+  @ApiPropertyOptional({ example: null }) description: string | null;
+  @ApiProperty({ example: true }) isActive: boolean;
+  @ApiProperty({ example: '2024-01-15T10:30:00.000Z' }) createdAt: string;
+  @ApiProperty({ example: '2024-01-15T10:30:00.000Z' }) updatedAt: string;
   @ApiProperty({ type: [MenuItemResponseDto] }) items: MenuItemResponseDto[];
 }
 

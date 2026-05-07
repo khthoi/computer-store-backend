@@ -17,9 +17,6 @@ export class Banner {
   @Column({ name: 'tieu_de', length: 255 })
   title: string;
 
-  @Column({ name: 'subtitle', length: 255, nullable: true })
-  subtitle: string | null;
-
   @Column({ name: 'asset_id', nullable: true })
   assetId: number | null;
 
@@ -33,28 +30,52 @@ export class Banner {
   assetIdMobile: number | null;
 
   @Column({ name: 'url_hinh_anh_mobile', type: 'text', nullable: true })
-  imageUrlMobile: string | null;
-
-  @Column({ name: 'overlay_color', length: 20, nullable: true })
-  overlayColor: string | null;
-
-  @Column({ name: 'overlay_opacity', type: 'decimal', precision: 3, scale: 2, nullable: true })
-  overlayOpacity: number | null;
+  mobileImageUrl: string | null;
 
   @Column({ name: 'url_dich_den', type: 'text', nullable: true })
-  targetUrl: string | null;
+  linkUrl: string | null;
+
+  @Column({ name: 'link_target', length: 10, default: '_self' })
+  linkTarget: string;
 
   @Column({ name: 'button_text', length: 100, nullable: true })
-  buttonText: string | null;
+  ctaLabel: string | null;
 
   @Column({ name: 'button_url', type: 'text', nullable: true })
-  buttonUrl: string | null;
+  ctaUrl: string | null;
+
+  @Column({ name: 'overlay_text', type: 'text', nullable: true })
+  overlayText: string | null;
+
+  @Column({ name: 'overlay_subtext', type: 'text', nullable: true })
+  overlaySubtext: string | null;
+
+  @Column({ name: 'badge', length: 100, nullable: true })
+  badge: string | null;
+
+  @Column({ name: 'badge_color', length: 20, nullable: true })
+  badgeColor: string | null;
+
+  @Column({ name: 'badge_text_color', length: 20, nullable: true })
+  badgeTextColor: string | null;
+
+  @Column({ name: 'grid_x', nullable: true })
+  gridX: number | null;
+
+  @Column({ name: 'grid_y', nullable: true })
+  gridY: number | null;
+
+  @Column({ name: 'grid_w', nullable: true })
+  gridW: number | null;
+
+  @Column({ name: 'grid_h', nullable: true })
+  gridH: number | null;
 
   @Column({
     name: 'vi_tri_hien_thi',
     type: 'enum',
-    enum: ['TrangChu', 'TrangDanhMuc', 'TrangSanPham', 'DauTrang', 'CuaTrang', 'Popup', 'SideBanner'],
-    default: 'TrangChu',
+    enum: ['homepage_hero', 'homepage_hero_slider', 'homepage_small', 'side_banner', 'promotions_banner'],
+    default: 'homepage_hero',
   })
   position: string;
 
@@ -62,18 +83,24 @@ export class Banner {
   sortOrder: number;
 
   @Column({ name: 'ngay_bat_dau', type: 'datetime', nullable: true })
-  startAt: Date | null;
+  startDate: Date | null;
 
   @Column({ name: 'ngay_ket_thuc', type: 'datetime', nullable: true })
-  endAt: Date | null;
+  endDate: Date | null;
 
   @Column({
     name: 'trang_thai',
     type: 'enum',
-    enum: ['DangHienThi', 'An', 'HetHan'],
-    default: 'DangHienThi',
+    enum: ['draft', 'active', 'scheduled', 'ended'],
+    default: 'draft',
   })
   status: string;
+
+  @Column({ name: 'click_count', default: 0 })
+  clickCount: number;
+
+  @Column({ name: 'impression_count', default: 0 })
+  impressionCount: number;
 
   @Column({ name: 'nguoi_tao_id', nullable: true })
   createdById: number | null;

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException, ConflictException } from '@nestjs/common
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { MediaFolder } from './entities/media-folder.entity';
+import { MediaAsset } from './entities/media-asset.entity';
 import { CreateMediaFolderDto } from './dto/create-media-folder.dto';
 import { UpdateMediaFolderDto } from './dto/update-media-folder.dto';
 
@@ -10,12 +11,31 @@ export class MediaFolderService {
   constructor(
     @InjectRepository(MediaFolder)
     private readonly repo: Repository<MediaFolder>,
+    @InjectRepository(MediaAsset)
+    private readonly assetRepo: Repository<MediaAsset>,
   ) {}
 
-  async findAll(onlyActive = false): Promise<MediaFolder[]> {
-    const where: Record<string, unknown> = { phamVi: 'public' };
-    if (onlyActive) where['isActive'] = true;
-    return this.repo.find({ where, order: { thuTu: 'ASC', tenHienThi: 'ASC' } });
+  async findAll(onlyActive = false): Promise<(MediaFolder & { fileCount: number })[]> {
+    const qb = this.repo.createQueryBuilder('f')
+      .where('f.phamVi = :pv', { pv: 'public' })
+      .orderBy('f.thuTu', 'ASC')
+      .addOrderBy('f.tenHienThi', 'ASC');
+    if (onlyActive) qb.andWhere('f.isActive = :active', { active: true });
+
+    const folders = await qb.getMany();
+
+    const counts = await this.assetRepo
+      .createQueryBuilder('a')
+      .select('a.thuMucId', 'folderId')
+      .addSelect('COUNT(*)', 'cnt')
+      .where('a.thuMucId IS NOT NULL')
+      .andWhere('a.trangThai != :archived', { archived: 'archived' })
+      .groupBy('a.thuMucId')
+      .getRawMany<{ folderId: number; cnt: string }>();
+
+    const countMap = new Map(counts.map((r) => [Number(r.folderId), Number(r.cnt)]));
+
+    return folders.map((f) => Object.assign(f, { fileCount: countMap.get(f.id) ?? 0 }));
   }
 
   async findOne(id: number): Promise<MediaFolder> {

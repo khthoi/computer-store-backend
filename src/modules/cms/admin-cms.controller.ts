@@ -1,17 +1,16 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param,
-  ParseIntPipe, Query, Request,
+  Controller, Get, Post, Put, Patch, Delete, Body, Param,
+  ParseIntPipe, Query, Request, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { BannersService } from './banners.service';
-import { HomepageService } from './homepage.service';
 import { PopupsService } from './popups.service';
 import { CreateBannerDto } from './dto/create-banner.dto';
 import { UpdateBannerDto } from './dto/update-banner.dto';
 import { QueryBannersDto } from './dto/query-banners.dto';
-import { CreateHomepageSectionDto } from './dto/create-homepage-section.dto';
-import { UpdateHomepageSectionDto } from './dto/update-homepage-section.dto';
+import { UpdateBannersLayoutDto } from './dto/update-banners-layout.dto';
+import { ReorderBannersDto } from './dto/reorder-banners.dto';
 import { CreatePopupDto } from './dto/create-popup.dto';
 import { UpdatePopupDto } from './dto/update-popup.dto';
 
@@ -22,7 +21,6 @@ import { UpdatePopupDto } from './dto/update-popup.dto';
 export class AdminCmsController {
   constructor(
     private readonly bannersService: BannersService,
-    private readonly homepageService: HomepageService,
     private readonly popupsService: PopupsService,
   ) {}
 
@@ -123,68 +121,26 @@ export class AdminCmsController {
     return this.bannersService.remove(id);
   }
 
-  // ── Homepage sections ─────────────────────────────────────
-  @Get('homepage-sections')
-  @ApiOperation({ summary: 'Danh sách homepage sections (admin)' })
-  @ApiOkResponse({
-    schema: {
-      example: [
-        { id: 1, sectionKey: 'featured_products', title: 'Sản phẩm nổi bật', sortOrder: 1, isVisible: true },
-        { id: 2, sectionKey: 'flash_sale', title: 'Flash Sale', sortOrder: 2, isVisible: false },
-      ],
-    },
-  })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
-  getSections() {
-    return this.homepageService.findAll();
-  }
-
-  @Get('homepage-sections/:id')
-  @ApiOperation({ summary: 'Chi tiết homepage section (admin)' })
-  @ApiParam({ name: 'id', example: 1, description: 'ID homepage section' })
-  @ApiOkResponse({
-    schema: {
-      example: { id: 1, sectionKey: 'featured_products', title: 'Sản phẩm nổi bật', sortOrder: 1, isVisible: true, createdAt: '2024-01-01T00:00:00.000Z' },
-    },
-  })
-  @ApiResponse({ status: 404, description: 'Section không tồn tại' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
-  getSection(@Param('id', ParseIntPipe) id: number) {
-    return this.homepageService.findOne(id);
-  }
-
-  @Post('homepage-sections')
-  @ApiOperation({ summary: 'Tạo homepage section mới' })
-  @ApiResponse({ status: 201, description: 'Section đã được tạo' })
+  @Patch('banners/reorder')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Cập nhật sortOrder của banners theo vị trí (bulk reorder)' })
+  @ApiResponse({ status: 204, description: 'Thứ tự đã được lưu' })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
-  createSection(@Body() dto: CreateHomepageSectionDto, @Request() req: any) {
-    return this.homepageService.create(dto, req.user.sub);
+  reorderBanners(@Body() dto: ReorderBannersDto) {
+    return this.bannersService.reorder(dto);
   }
 
-  @Put('homepage-sections/:id')
-  @ApiOperation({ summary: 'Cập nhật homepage section' })
-  @ApiParam({ name: 'id', example: 1, description: 'ID homepage section' })
-  @ApiResponse({ status: 200, description: 'Section đã được cập nhật' })
-  @ApiResponse({ status: 404, description: 'Section không tồn tại' })
+  @Patch('banners/layout')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Cập nhật vị trí grid của promotions_banner (bulk)' })
+  @ApiResponse({ status: 204, description: 'Layout đã được lưu' })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
-  updateSection(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateHomepageSectionDto) {
-    return this.homepageService.update(id, dto);
-  }
-
-  @Delete('homepage-sections/:id')
-  @ApiOperation({ summary: 'Xoá homepage section' })
-  @ApiParam({ name: 'id', example: 1, description: 'ID homepage section' })
-  @ApiResponse({ status: 200, description: 'Section đã được xoá' })
-  @ApiResponse({ status: 404, description: 'Section không tồn tại' })
-  @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
-  removeSection(@Param('id', ParseIntPipe) id: number) {
-    return this.homepageService.remove(id);
+  updateBannersLayout(@Body() dto: UpdateBannersLayoutDto) {
+    return this.bannersService.updateLayout(dto);
   }
 
   // ── Popups ────────────────────────────────────────────────

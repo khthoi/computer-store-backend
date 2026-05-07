@@ -38,7 +38,7 @@ export class HomepageSection {
   @Column({
     name: 'sort_by',
     type: 'enum',
-    enum: ['price_asc', 'price_desc', 'newest', 'best_selling', 'rating'],
+    enum: ['price_asc', 'price_desc', 'newest', 'best_selling', 'highest_rated'],
     nullable: true,
   })
   sortBy: string | null;
@@ -49,7 +49,7 @@ export class HomepageSection {
   @Column({
     name: 'layout',
     type: 'enum',
-    enum: ['carousel', 'grid_2x3', 'grid_3x2', 'grid_4'],
+    enum: ['carousel', 'grid_3', 'grid_4', 'grid_6'],
     default: 'carousel',
   })
   layout: string;
@@ -59,6 +59,9 @@ export class HomepageSection {
 
   @Column({ name: 'badge_color', length: 20, nullable: true })
   badgeColor: string | null;
+
+  @Column({ name: 'badge_text_color', length: 20, nullable: true })
+  badgeTextColor: string | null;
 
   @Column({ name: 'is_visible', default: true })
   isVisible: boolean;
