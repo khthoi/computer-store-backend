@@ -1,7 +1,8 @@
 import {
-  IsString, IsEnum, IsOptional, IsInt, IsArray, MaxLength, MinLength,
+  IsEnum, IsOptional, IsString, IsInt, MaxLength, MinLength,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IssueType, TicketChannel, TicketPriority } from '../support.enums';
 
 export class CreateTicketDto {
   @ApiPropertyOptional({ example: 20, description: 'ID đơn hàng liên quan (nếu có)' })
@@ -9,15 +10,14 @@ export class CreateTicketDto {
   @IsInt()
   orderId?: number;
 
-  @ApiProperty({ example: 'GiaoHangChamTre', description: 'Loại vấn đề' })
-  @IsString()
-  @MaxLength(30)
-  issueType: string;
+  @ApiProperty({ enum: IssueType, example: IssueType.KhieuNai })
+  @IsEnum(IssueType)
+  issueType: IssueType;
 
-  @ApiPropertyOptional({ enum: ['Cao', 'TrungBinh', 'Thap'], default: 'TrungBinh' })
+  @ApiPropertyOptional({ enum: TicketPriority, default: TicketPriority.TrungBinh })
   @IsOptional()
-  @IsEnum(['Cao', 'TrungBinh', 'Thap'])
-  priority?: 'Cao' | 'TrungBinh' | 'Thap' = 'TrungBinh';
+  @IsEnum(TicketPriority)
+  priority?: TicketPriority = TicketPriority.TrungBinh;
 
   @ApiProperty({ example: 'Đơn hàng #20 giao trễ hơn 5 ngày' })
   @IsString()
@@ -30,13 +30,8 @@ export class CreateTicketDto {
   @MinLength(10)
   description: string;
 
-  @ApiProperty({ enum: ['Chat', 'Email', 'DienThoai', 'Form'], example: 'Form' })
-  @IsEnum(['Chat', 'Email', 'DienThoai', 'Form'])
-  channel: 'Chat' | 'Email' | 'DienThoai' | 'Form';
+  @ApiProperty({ enum: TicketChannel, example: TicketChannel.Form })
+  @IsEnum(TicketChannel)
+  channel: TicketChannel;
 
-  @ApiPropertyOptional({ type: [String], example: ['giao hàng', 'chậm trễ'] })
-  @IsOptional()
-  @IsArray()
-  @IsString({ each: true })
-  tags?: string[];
 }

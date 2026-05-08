@@ -1,5 +1,5 @@
-import { IsOptional, IsString, IsInt, Min, Max, IsIn } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsString, IsInt, Min, Max, IsIn, IsBoolean } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class QueryReviewsDto {
@@ -22,6 +22,33 @@ export class QueryReviewsDto {
   @Min(1)
   @Max(5)
   rating?: number;
+
+  @ApiPropertyOptional({ example: 'laptop' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ example: '2024-01-01' })
+  @IsOptional()
+  @IsString()
+  dateFrom?: string;
+
+  @ApiPropertyOptional({ example: '2024-12-31' })
+  @IsOptional()
+  @IsString()
+  dateTo?: string;
+
+  @ApiPropertyOptional({ example: true })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => value === 'true' || value === true)
+  chuaTraLoi?: boolean;
+
+  @ApiPropertyOptional({ example: 'Website', enum: ['Website', 'App', 'Import'] })
+  @IsOptional()
+  @IsString()
+  @IsIn(['Website', 'App', 'Import'])
+  nguon?: string;
 
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()

@@ -2,43 +2,46 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export class ReviewResponseDto {
   @ApiProperty({ example: 1 })
-  id: number;
+  reviewId: number;
 
   @ApiProperty({ example: 5 })
-  variantId: number;
+  phienBanId: number;
 
   @ApiProperty({ example: 12 })
-  customerId: number;
+  khachHangId: number;
 
   @ApiProperty({ example: 8 })
-  orderId: number;
+  donHangId: number;
 
   @ApiProperty({ example: 5 })
   rating: number;
 
   @ApiPropertyOptional({ example: 'Sản phẩm rất tốt' })
-  title: string | null;
+  tieuDe: string | null;
 
   @ApiPropertyOptional({ example: 'Hàng đúng mô tả, giao hàng nhanh' })
-  content: string | null;
+  noiDung: string | null;
 
   @ApiProperty({ example: 'Pending', enum: ['Pending', 'Approved', 'Rejected', 'Hidden'] })
-  status: string;
+  trangThai: string;
 
   @ApiProperty({ example: false })
-  hasReply: boolean;
+  daPhanHoi: boolean;
 
   @ApiProperty({ example: 0 })
   helpfulCount: number;
 
   @ApiPropertyOptional({ example: 3 })
-  approvedById: number | null;
+  nguoiDuyetId: number | null;
 
   @ApiPropertyOptional({ example: null })
-  rejectReason: string | null;
+  lyDoTuChoi: string | null;
 
   @ApiPropertyOptional({ example: null })
-  approvedAt: string | null;
+  duyetTai: string | null;
+
+  @ApiProperty({ example: 'Website', enum: ['Website', 'App', 'Import'] })
+  nguon: string;
 
   @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
   createdAt: Date;
@@ -48,17 +51,26 @@ export class ReviewResponseDto {
 
   // ── Joined fields (populated by admin list endpoint) ──────────────────────
 
+  @ApiPropertyOptional({ example: 1 })
+  sanPhamId?: number | null;
+
   @ApiPropertyOptional({ example: 'Laptop Gaming ASUS ROG' })
   tenSanPham?: string | null;
 
   @ApiPropertyOptional({ example: 'RAM 16GB / RTX 4060' })
   tenPhienBan?: string | null;
 
+  @ApiPropertyOptional({ example: 'ASUS-ROG-G15-16GB-4060' })
+  skuPhienBan?: string | null;
+
   @ApiPropertyOptional({ example: 'https://example.com/img.jpg' })
   anhPhienBan?: string | null;
 
   @ApiPropertyOptional({ example: 'Nguyễn Văn An' })
   khachHangTen?: string | null;
+
+  @ApiPropertyOptional({ example: '0901234567' })
+  khachHangSdT?: string | null;
 
   @ApiPropertyOptional({ example: 'https://example.com/avatar.jpg' })
   khachHangAvatar?: string | null;
@@ -68,11 +80,14 @@ export class ReviewResponseDto {
 
   @ApiPropertyOptional({ example: 'Admin Hệ thống' })
   nguoiDuyetTen?: string | null;
+
+  @ApiPropertyOptional({ example: 'NV-001' })
+  nguoiDuyetMa?: string | null;
 }
 
 export class ReviewMessageResponseDto {
   @ApiProperty({ example: 1 })
-  id: number;
+  messageId: number;
 
   @ApiProperty({ example: 1 })
   reviewId: number;
@@ -83,8 +98,17 @@ export class ReviewMessageResponseDto {
   @ApiPropertyOptional({ example: 3 })
   senderId: number | null;
 
+  @ApiProperty({ example: 'Admin Hệ thống' })
+  senderName: string;
+
+  @ApiPropertyOptional({ example: 'https://example.com/avatar.jpg' })
+  senderAvatar: string | null;
+
+  @ApiPropertyOptional({ example: 'NV-001' })
+  senderCode?: string | null;
+
   @ApiProperty({ example: 'Cảm ơn bạn đã đánh giá!' })
-  content: string;
+  noiDungTinNhan: string;
 
   @ApiProperty({ example: 'Reply', enum: ['Reply', 'InternalNote', 'SystemLog'] })
   messageType: string;
@@ -94,4 +118,7 @@ export class ReviewMessageResponseDto {
 
   @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
   createdAt: Date;
+
+  @ApiPropertyOptional({ example: '2024-01-15T10:30:00.000Z' })
+  updatedAt: Date | null;
 }

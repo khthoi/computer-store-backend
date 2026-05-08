@@ -57,6 +57,9 @@ export class ProductReview {
   @JoinColumn({ name: 'nguoi_duyet_id' })
   approvedBy: Employee | null;
 
+  @Column({ name: 'nguon_danh_gia', length: 20, default: 'Website' })
+  nguon: 'Website' | 'App' | 'Import';
+
   @Column({ name: 'ly_do_tu_choi', length: 500, nullable: true })
   rejectReason: string | null;
 

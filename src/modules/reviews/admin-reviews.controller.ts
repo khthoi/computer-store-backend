@@ -10,6 +10,7 @@ import { ReviewsService } from './reviews.service';
 import { QueryReviewsDto } from './dto/query-reviews.dto';
 import { ModerateReviewDto } from './dto/moderate-review.dto';
 import { ReplyReviewDto } from './dto/reply-review.dto';
+import { BulkModerateDto } from './dto/bulk-moderate.dto';
 
 @ApiTags('Admin — Reviews')
 @ApiBearerAuth()
@@ -19,29 +20,56 @@ export class AdminReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Danh sách đánh giá (có thể lọc theo trạng thái, biến thể)' })
-  @ApiQuery({ name: 'status', required: false, enum: ['Pending', 'Approved', 'Rejected', 'Hidden'], description: 'Lọc theo trạng thái', example: 'Pending' })
+  @ApiOperation({ summary: 'Danh sách đánh giá (có thể lọc theo trạng thái, biến thể, tìm kiếm)' })
+  @ApiQuery({ name: 'status', required: false, enum: ['Pending', 'Approved', 'Rejected', 'Hidden'] })
   @ApiQuery({ name: 'variantId', required: false, description: 'Lọc theo biến thể sản phẩm', example: 5 })
-  @ApiQuery({ name: 'page', required: false, description: 'Trang', example: 1 })
-  @ApiQuery({ name: 'limit', required: false, description: 'Số item/trang', example: 20 })
-  @ApiOkResponse({
-    schema: {
-      example: {
-        items: [
-          {
-            id: 1, variantId: 5, customerId: 3, rating: 5,
-            title: 'Tốt lắm', content: 'Hàng đẹp, giao đúng hẹn', status: 'Pending',
-            hasReply: 0, createdAt: '2024-06-01T10:00:00.000Z',
-          },
-        ],
-        total: 1, page: 1, limit: 20,
-      },
-    },
-  })
+  @ApiQuery({ name: 'rating', required: false, description: 'Lọc theo số sao', example: 5 })
+  @ApiQuery({ name: 'search', required: false, description: 'Tìm theo tên SP / KH / mã đơn' })
+  @ApiQuery({ name: 'dateFrom', required: false, description: 'ISO date string (yyyy-mm-dd)' })
+  @ApiQuery({ name: 'dateTo', required: false, description: 'ISO date string (yyyy-mm-dd)' })
+  @ApiQuery({ name: 'chuaTraLoi', required: false, description: 'Chỉ lấy đánh giá Approved chưa được trả lời' })
+  @ApiQuery({ name: 'nguon', required: false, enum: ['Website', 'App', 'Import'] })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 20 })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findAll(@Query() query: QueryReviewsDto) {
     return this.reviewsService.findAll(query);
+  }
+
+  // IMPORTANT: @Get('stats') must be declared BEFORE @Get(':id')
+  @Get('stats')
+  @ApiOperation({ summary: 'Thống kê tổng quan đánh giá' })
+  @ApiOkResponse({
+    schema: {
+      example: { tong: 100, choDuyet: 10, daDuyet: 70, tuChoi: 5, an: 15, tbRating: 4.2, chuaTraLoi: 8 },
+    },
+  })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
+  getStats() {
+    return this.reviewsService.getStats();
+  }
+
+  @Get(':id')
+  @ApiOperation({ summary: 'Chi tiết đánh giá kèm lịch sử phản hồi' })
+  @ApiParam({ name: 'id', example: 1, description: 'ID đánh giá' })
+  @ApiResponse({ status: 200, description: 'Chi tiết review + messages' })
+  @ApiResponse({ status: 404, description: 'Đánh giá không tồn tại' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
+  getDetail(@Param('id', ParseIntPipe) id: number) {
+    return this.reviewsService.getDetail(id);
+  }
+
+  @Post('bulk-moderate')
+  @ApiOperation({ summary: 'Duyệt/từ chối nhiều đánh giá cùng lúc' })
+  @ApiResponse({ status: 201, description: 'Bulk moderation completed' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
+  bulkModerate(@Body() dto: BulkModerateDto, @Request() req: any) {
+    const employeeId = req.user?.employeeId ?? req.user?.sub;
+    return this.reviewsService.bulkModerate(dto, employeeId);
   }
 
   @Put(':id/approve')
@@ -108,17 +136,6 @@ export class AdminReviewsController {
   @Get(':id/messages')
   @ApiOperation({ summary: 'Lịch sử phản hồi của một đánh giá (bao gồm InternalNote)' })
   @ApiParam({ name: 'id', example: 1, description: 'ID đánh giá' })
-  @ApiOkResponse({
-    schema: {
-      example: [
-        {
-          id: 1, reviewId: 1, senderType: 'NhanVien', senderId: 2,
-          content: 'Cảm ơn bạn đã đánh giá!', messageType: 'Reply',
-          isVisibleToCustomer: 1, createdAt: '2024-06-02T09:00:00.000Z',
-        },
-      ],
-    },
-  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   getMessages(@Param('id', ParseIntPipe) id: number) {

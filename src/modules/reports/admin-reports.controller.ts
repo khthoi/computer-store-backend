@@ -28,7 +28,7 @@ export class AdminReportsController {
   ) {}
 
   @Get('revenue')
-  @Roles('report.view')
+  @Roles('admin', 'staff')
   @ApiOperation({ summary: 'Dữ liệu biểu đồ doanh thu theo ngày' })
   @ApiQuery({ name: 'startDate', required: false, example: '2026-01-01', description: 'Ngày bắt đầu' })
   @ApiQuery({ name: 'endDate', required: false, example: '2026-04-24', description: 'Ngày kết thúc' })
@@ -47,7 +47,7 @@ export class AdminReportsController {
   }
 
   @Get('top-products')
-  @Roles('report.view')
+  @Roles('admin', 'staff')
   @ApiOperation({ summary: 'Sản phẩm bán chạy nhất theo khoảng thời gian' })
   @ApiQuery({ name: 'period', required: false, enum: ['7d', '30d', '90d', '365d'], example: '30d', description: 'Khoảng thời gian' })
   @ApiQuery({ name: 'limit', required: false, example: 10, description: 'Số lượng sản phẩm (tối đa 50)' })
@@ -63,7 +63,7 @@ export class AdminReportsController {
   }
 
   @Get('customers/summary')
-  @Roles('report.view')
+  @Roles('admin', 'staff')
   @ApiOperation({ summary: 'Phân phối segment RFM khách hàng (cho pie chart)' })
   @ApiOkResponse({
     schema: {
@@ -80,7 +80,7 @@ export class AdminReportsController {
   }
 
   @Get('customers')
-  @Roles('report.view')
+  @Roles('admin', 'staff')
   @ApiOperation({ summary: 'Danh sách phân khúc RFM khách hàng (phân trang)' })
   @ApiQuery({ name: 'segment', required: false, example: 'Champions', description: 'Lọc theo segment' })
   @ApiQuery({ name: 'page', required: false, example: 1, description: 'Trang' })
@@ -102,7 +102,7 @@ export class AdminReportsController {
   }
 
   @Get('inventory-health')
-  @Roles('report.view')
+  @Roles('admin', 'staff')
   @ApiOperation({ summary: 'Tình trạng sức khỏe kho theo biến thể sản phẩm' })
   @ApiQuery({ name: 'bucket', required: false, enum: ['het_hang', 'thap', 'tot', 'ton_kho'], description: 'Lọc theo nhóm tình trạng' })
   @ApiQuery({ name: 'page', required: false, example: 1, description: 'Trang' })
@@ -124,7 +124,7 @@ export class AdminReportsController {
   }
 
   @Get('retention')
-  @Roles('report.view')
+  @Roles('admin', 'staff')
   @ApiOperation({ summary: 'Ma trận cohort retention khách hàng theo tháng' })
   @ApiOkResponse({
     schema: {
@@ -138,7 +138,7 @@ export class AdminReportsController {
   }
 
   @Get('job-logs')
-  @Roles('report.view')
+  @Roles('admin', 'staff')
   @ApiOperation({ summary: 'Lịch sử chạy cron job báo cáo' })
   @ApiQuery({ name: 'limit', required: false, example: 20, description: 'Số bản ghi gần nhất' })
   @ApiOkResponse({
@@ -153,7 +153,7 @@ export class AdminReportsController {
   }
 
   @Get('export')
-  @Roles('report.export')
+  @Roles('admin', 'staff')
   @ApiOperation({ summary: 'Xuất báo cáo dạng Excel (.xlsx)' })
   @ApiQuery({ name: 'type', required: true, enum: ['revenue', 'rfm', 'inventory'], description: 'Loại báo cáo' })
   @ApiQuery({ name: 'startDate', required: false, example: '2026-01-01', description: 'Ngày bắt đầu (cho báo cáo doanh thu)' })

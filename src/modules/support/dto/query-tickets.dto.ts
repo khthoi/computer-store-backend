@@ -1,19 +1,18 @@
-import { IsOptional, IsString, IsInt, Min, IsIn } from 'class-validator';
-import { Type } from 'class-transformer';
+import { IsOptional, IsString, IsInt, Min, IsIn, IsBoolean, IsEnum } from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 import { ApiPropertyOptional } from '@nestjs/swagger';
+import { IssueType, TicketPriority, TicketStatus } from '../support.enums';
 
 export class QueryTicketsDto {
-  @ApiPropertyOptional({ enum: ['Moi', 'DangXuLy', 'ChoDongY', 'DaDong', 'MoLai'] })
+  @ApiPropertyOptional({ enum: TicketStatus })
   @IsOptional()
-  @IsString()
-  @IsIn(['Moi', 'DangXuLy', 'ChoDongY', 'DaDong', 'MoLai'])
-  status?: string;
+  @IsEnum(TicketStatus)
+  status?: TicketStatus;
 
-  @ApiPropertyOptional({ enum: ['Cao', 'TrungBinh', 'Thap'] })
+  @ApiPropertyOptional({ enum: TicketPriority })
   @IsOptional()
-  @IsString()
-  @IsIn(['Cao', 'TrungBinh', 'Thap'])
-  priority?: string;
+  @IsEnum(TicketPriority)
+  priority?: TicketPriority;
 
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()
@@ -28,4 +27,36 @@ export class QueryTicketsDto {
   @IsInt()
   @Min(1)
   limit?: number = 20;
+
+  @ApiPropertyOptional({ description: 'Tìm theo tiêu đề, mã ticket, hoặc tên khách hàng' })
+  @IsOptional()
+  @IsString()
+  search?: string;
+
+  @ApiPropertyOptional({ description: 'Lọc theo ID nhân viên phụ trách' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  assignedTo?: number;
+
+  @ApiPropertyOptional({ description: 'Chỉ lấy ticket của nhân viên đang đăng nhập' })
+  @IsOptional()
+  @Transform(({ value }) => value === 'true' || value === true)
+  @IsBoolean()
+  myOnly?: boolean;
+
+  @ApiPropertyOptional({ example: '2024-01-01', description: 'Lọc ticket cập nhật từ ngày (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsString()
+  dateFrom?: string;
+
+  @ApiPropertyOptional({ example: '2024-12-31', description: 'Lọc ticket cập nhật đến ngày (YYYY-MM-DD)' })
+  @IsOptional()
+  @IsString()
+  dateTo?: string;
+
+  @ApiPropertyOptional({ description: 'Lọc theo loại vấn đề', enum: IssueType })
+  @IsOptional()
+  @IsEnum(IssueType)
+  loaiVanDe?: IssueType;
 }

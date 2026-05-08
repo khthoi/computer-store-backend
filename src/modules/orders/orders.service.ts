@@ -235,8 +235,9 @@ export class OrdersService {
     if (needsCustomerJoin) {
       qb.leftJoin('khach_hang', 'kh', 'kh.khach_hang_id = o.khach_hang_id');
     }
-    if (query.trangThai) qb.andWhere('o.trangThaiDon = :tt', { tt: query.trangThai });
-    if (query.trangThaiThanhToan) qb.andWhere('o.trangThaiThanhToan = :tttt', { tttt: query.trangThaiThanhToan });
+    if (query.customerId)          qb.andWhere('o.khachHangId = :cid',        { cid:  query.customerId });
+    if (query.trangThai)           qb.andWhere('o.trangThaiDon = :tt',        { tt:   query.trangThai });
+    if (query.trangThaiThanhToan)  qb.andWhere('o.trangThaiThanhToan = :tttt', { tttt: query.trangThaiThanhToan });
     if (query.q) {
       qb.andWhere(
         '(o.ma_don_hang LIKE :q OR kh.ho_ten LIKE :q OR kh.so_dien_thoai LIKE :q)',

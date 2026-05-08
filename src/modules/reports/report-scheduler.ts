@@ -40,5 +40,11 @@ export class ReportScheduler implements OnModuleInit {
       {},
       { repeat: { cron: '0 0 1 * *' }, removeOnComplete: true },
     );
+
+    await this.reportQueue.add(
+      REPORT_JOBS.REPORT_AGGREGATION,
+      {},
+      { repeat: { cron: '10 0 * * *' }, removeOnComplete: true },
+    );
   }
 }

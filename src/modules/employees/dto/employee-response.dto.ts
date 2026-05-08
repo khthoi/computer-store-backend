@@ -11,6 +11,7 @@ export class EmployeeResponseDto {
   @ApiProperty({ example: 'b@store.vn' }) email: string;
   @ApiProperty({ example: 'Trần Thị B' }) hoTen: string;
   @ApiProperty({ example: 'Female', nullable: true }) gioiTinh: string | null;
+  @ApiProperty({ example: '0912345678', nullable: true }) soDienThoai: string | null;
   @ApiProperty({ example: null, nullable: true }) anhDaiDien: string | null;
   @ApiProperty({ example: 'DangLam' }) trangThai: string;
   @ApiProperty({ example: '2024-01-10T08:00:00.000Z' }) ngayTao: Date;

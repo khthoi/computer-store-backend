@@ -1,22 +1,25 @@
 import { Processor, Process } from '@nestjs/bull';
 import { Job } from 'bull';
 import { ReportsComputeService } from '../reports-compute.service';
+import { ReportsAggregateService } from '../reports-aggregate.service';
 import { RedisService } from '../../../common/redis/redis.service';
 import { CACHE_KEYS } from '../reports-query.service';
 
 export const REPORT_QUEUE = 'report';
 
 export const REPORT_JOBS = {
-  DAILY_REVENUE: 'daily_revenue',
-  RFM_SNAPSHOT: 'rfm_snapshot',
-  INVENTORY_HEALTH: 'inventory_health',
-  RETENTION_COHORT: 'retention_cohort',
+  DAILY_REVENUE:       'daily_revenue',
+  RFM_SNAPSHOT:        'rfm_snapshot',
+  INVENTORY_HEALTH:    'inventory_health',
+  RETENTION_COHORT:    'retention_cohort',
+  REPORT_AGGREGATION:  'report_aggregation',
 } as const;
 
 @Processor(REPORT_QUEUE)
 export class ReportProcessor {
   constructor(
     private readonly computeService: ReportsComputeService,
+    private readonly aggService: ReportsAggregateService,
     private readonly redisService: RedisService,
   ) {}
 
@@ -65,6 +68,17 @@ export class ReportProcessor {
       const rows = await this.computeService.computeRetentionCohort();
       await this.computeService.finishJobLog(log, rows);
       await this.redisService.invalidate(CACHE_KEYS.retention());
+    } catch (err) {
+      await this.computeService.failJobLog(log, String(err));
+    }
+  }
+
+  @Process(REPORT_JOBS.REPORT_AGGREGATION)
+  async handleReportAggregation(_job: Job): Promise<void> {
+    const log = await this.computeService.startJobLog(REPORT_JOBS.REPORT_AGGREGATION);
+    try {
+      await this.aggService.computeAllAggregations();
+      await this.computeService.finishJobLog(log, 0);
     } catch (err) {
       await this.computeService.failJobLog(log, String(err));
     }

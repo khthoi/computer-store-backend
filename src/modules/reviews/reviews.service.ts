@@ -10,6 +10,7 @@ import { CreateReviewDto } from './dto/create-review.dto';
 import { QueryReviewsDto } from './dto/query-reviews.dto';
 import { ModerateReviewDto } from './dto/moderate-review.dto';
 import { ReplyReviewDto } from './dto/reply-review.dto';
+import { BulkModerateDto } from './dto/bulk-moderate.dto';
 import { ReviewResponseDto, ReviewMessageResponseDto } from './dto/review-response.dto';
 
 @Injectable()
@@ -48,7 +49,6 @@ export class ReviewsService {
   // ─── Customer ─────────────────────────────────────────────────────────────
 
   async submitReview(dto: CreateReviewDto, customerId: number): Promise<ReviewResponseDto> {
-    // Gate check: must have a delivered order containing this variant
     const purchase = await this.dataSource.query(
       `SELECT ct.chi_tiet_id
        FROM don_hang dh
@@ -62,7 +62,6 @@ export class ReviewsService {
       throw new ForbiddenException('Bạn cần mua và nhận hàng thành công để đánh giá sản phẩm này');
     }
 
-    // Prevent duplicate review for same variant + order
     const existing = await this.reviewRepo.findOne({
       where: { customerId, variantId: dto.variantId, orderId: dto.orderId },
     });
@@ -90,7 +89,7 @@ export class ReviewsService {
     const offset = (page - 1) * limit;
 
     const conditions: string[] = [];
-    const params: (string | number)[] = [];
+    const params: (string | number | boolean)[] = [];
 
     if (query.status) {
       conditions.push('r.review_status = ?');
@@ -104,10 +103,29 @@ export class ReviewsService {
       conditions.push('r.rating = ?');
       params.push(query.rating);
     }
+    if (query.search) {
+      conditions.push(`(sp.ten_san_pham LIKE ? OR r.tieu_de LIKE ? OR r.noi_dung LIKE ? OR kh.ho_ten LIKE ? OR dh.ma_don_hang LIKE ?)`);
+      const q = `%${query.search}%`;
+      params.push(q, q, q, q, q);
+    }
+    if (query.dateFrom) {
+      conditions.push('r.created_at >= ?');
+      params.push(query.dateFrom);
+    }
+    if (query.dateTo) {
+      conditions.push('r.created_at <= ?');
+      params.push(query.dateTo + ' 23:59:59');
+    }
+    if (query.chuaTraLoi) {
+      conditions.push("r.review_status = 'Approved' AND r.da_phan_hoi = 0");
+    }
+    if (query.nguon) {
+      conditions.push('r.nguon_danh_gia = ?');
+      params.push(query.nguon);
+    }
 
     const where = conditions.length > 0 ? `WHERE ${conditions.join(' AND ')}` : '';
 
-    // Base conditions without rating for stats (stats always reflect full variant, not filtered by rating)
     const statsConditions: string[] = [];
     const statsParams: (string | number)[] = [];
     if (query.variantId) {
@@ -122,13 +140,13 @@ export class ReviewsService {
           r.review_id, r.phien_ban_id, r.khach_hang_id, r.don_hang_id,
           r.rating, r.tieu_de, r.noi_dung, r.review_status,
           r.nguoi_duyet_id, r.ly_do_tu_choi, r.da_phan_hoi, r.helpful_count,
-          r.duyet_tai, r.created_at, r.updated_at,
-          sp.ten_san_pham, v.ten_phien_ban,
+          r.duyet_tai, r.created_at, r.updated_at, r.nguon_danh_gia,
+          sp.san_pham_id, sp.ten_san_pham, v.ten_phien_ban, v.sku AS sku_phien_ban,
           (SELECT url_hinh_anh FROM hinh_anh_san_pham
            WHERE phien_ban_id = v.phien_ban_id AND loai_anh = 'AnhChinh'
            ORDER BY thu_tu ASC LIMIT 1) AS anh_phien_ban,
-          kh.ho_ten AS khach_hang_ten, kh.anh_dai_dien AS khach_hang_avatar,
-          dh.ma_don_hang, nv.ho_ten AS nguoi_duyet_ten
+          kh.ho_ten AS khach_hang_ten, kh.so_dien_thoai AS khach_hang_sdt, kh.anh_dai_dien AS khach_hang_avatar,
+          dh.ma_don_hang, nv.ho_ten AS nguoi_duyet_ten, nv.ma_nhan_vien AS nguoi_duyet_ma
          FROM danh_gia_san_pham r
          INNER JOIN phien_ban_san_pham v ON v.phien_ban_id = r.phien_ban_id
          INNER JOIN san_pham sp ON sp.san_pham_id = v.san_pham_id
@@ -141,7 +159,13 @@ export class ReviewsService {
         [...params, limit, offset],
       ),
       this.dataSource.query(
-        `SELECT COUNT(*) AS total FROM danh_gia_san_pham r ${where}`,
+        `SELECT COUNT(*) AS total
+         FROM danh_gia_san_pham r
+         INNER JOIN phien_ban_san_pham v ON v.phien_ban_id = r.phien_ban_id
+         INNER JOIN san_pham sp ON sp.san_pham_id = v.san_pham_id
+         INNER JOIN khach_hang kh ON kh.khach_hang_id = r.khach_hang_id
+         INNER JOIN don_hang dh ON dh.don_hang_id = r.don_hang_id
+         ${where}`,
         params,
       ),
       this.dataSource.query(
@@ -152,6 +176,7 @@ export class ReviewsService {
           SUM(CASE WHEN r.review_status = 'Rejected' THEN 1 ELSE 0 END) AS tuChoi,
           SUM(CASE WHEN r.review_status = 'Hidden'   THEN 1 ELSE 0 END) AS daAn,
           ROUND(AVG(r.rating), 1) AS tbRating,
+          SUM(CASE WHEN r.review_status = 'Approved' AND r.da_phan_hoi = 0 THEN 1 ELSE 0 END) AS chuaTraLoi,
           SUM(CASE WHEN r.rating = 5 THEN 1 ELSE 0 END) AS r5,
           SUM(CASE WHEN r.rating = 4 THEN 1 ELSE 0 END) AS r4,
           SUM(CASE WHEN r.rating = 3 THEN 1 ELSE 0 END) AS r3,
@@ -164,19 +189,13 @@ export class ReviewsService {
 
     const s = statsRows[0] ?? {};
     const stats = {
-      tongDanhGia: Number(s.tongDanhGia ?? 0),
-      daDuyet:     Number(s.daDuyet     ?? 0),
-      choDuyet:    Number(s.choDuyet    ?? 0),
-      tuChoi:      Number(s.tuChoi      ?? 0),
-      daAn:        Number(s.daAn        ?? 0),
-      tbRating:    Number(s.tbRating    ?? 0),
-      phanBoRating: {
-        '5': Number(s.r5 ?? 0),
-        '4': Number(s.r4 ?? 0),
-        '3': Number(s.r3 ?? 0),
-        '2': Number(s.r2 ?? 0),
-        '1': Number(s.r1 ?? 0),
-      },
+      tong:       Number(s.tongDanhGia ?? 0),
+      choDuyet:   Number(s.choDuyet    ?? 0),
+      daDuyet:    Number(s.daDuyet     ?? 0),
+      tuChoi:     Number(s.tuChoi      ?? 0),
+      an:         Number(s.daAn        ?? 0),
+      tbRating:   Number(s.tbRating    ?? 0),
+      chuaTraLoi: Number(s.chuaTraLoi  ?? 0),
     };
 
     const totalPages = Math.ceil(Number(total) / limit);
@@ -190,6 +209,57 @@ export class ReviewsService {
     };
   }
 
+  async getStats() {
+    const [s] = await this.dataSource.query(
+      `SELECT
+        COUNT(*) AS tong,
+        SUM(CASE WHEN review_status = 'Approved' THEN 1 ELSE 0 END) AS daDuyet,
+        SUM(CASE WHEN review_status = 'Pending'  THEN 1 ELSE 0 END) AS choDuyet,
+        SUM(CASE WHEN review_status = 'Rejected' THEN 1 ELSE 0 END) AS tuChoi,
+        SUM(CASE WHEN review_status = 'Hidden'   THEN 1 ELSE 0 END) AS an,
+        ROUND(AVG(CASE WHEN review_status = 'Approved' THEN rating END), 1) AS tbRating,
+        SUM(CASE WHEN review_status = 'Approved' AND da_phan_hoi = 0 THEN 1 ELSE 0 END) AS chuaTraLoi
+       FROM danh_gia_san_pham`,
+    );
+    return {
+      tong:       Number(s.tong       ?? 0),
+      choDuyet:   Number(s.choDuyet   ?? 0),
+      daDuyet:    Number(s.daDuyet    ?? 0),
+      tuChoi:     Number(s.tuChoi     ?? 0),
+      an:         Number(s.an         ?? 0),
+      tbRating:   Number(s.tbRating   ?? 0),
+      chuaTraLoi: Number(s.chuaTraLoi ?? 0),
+    };
+  }
+
+  async getDetail(id: number): Promise<ReviewResponseDto & { messages: ReviewMessageResponseDto[] }> {
+    const rows = await this.dataSource.query(
+      `SELECT
+        r.review_id, r.phien_ban_id, r.khach_hang_id, r.don_hang_id,
+        r.rating, r.tieu_de, r.noi_dung, r.review_status,
+        r.nguoi_duyet_id, r.ly_do_tu_choi, r.da_phan_hoi, r.helpful_count,
+        r.duyet_tai, r.created_at, r.updated_at, r.nguon_danh_gia,
+        sp.san_pham_id, sp.ten_san_pham, v.ten_phien_ban, v.sku AS sku_phien_ban,
+        (SELECT url_hinh_anh FROM hinh_anh_san_pham
+         WHERE phien_ban_id = v.phien_ban_id AND loai_anh = 'AnhChinh'
+         ORDER BY thu_tu ASC LIMIT 1) AS anh_phien_ban,
+        kh.ho_ten AS khach_hang_ten, kh.anh_dai_dien AS khach_hang_avatar,
+        dh.ma_don_hang, nv.ho_ten AS nguoi_duyet_ten, nv.ma_nhan_vien AS nguoi_duyet_ma
+       FROM danh_gia_san_pham r
+       INNER JOIN phien_ban_san_pham v ON v.phien_ban_id = r.phien_ban_id
+       INNER JOIN san_pham sp ON sp.san_pham_id = v.san_pham_id
+       INNER JOIN khach_hang kh ON kh.khach_hang_id = r.khach_hang_id
+       INNER JOIN don_hang dh ON dh.don_hang_id = r.don_hang_id
+       LEFT JOIN nhan_vien nv ON nv.nhan_vien_id = r.nguoi_duyet_id
+       WHERE r.review_id = ?`,
+      [id],
+    );
+    if (!rows || rows.length === 0) throw new NotFoundException(`Đánh giá #${id} không tồn tại`);
+
+    const messages = await this.getMessages(id);
+    return { ...this.toRichDto(rows[0]), messages };
+  }
+
   async approveReview(id: number, employeeId: number): Promise<ReviewResponseDto> {
     const review = await this.reviewRepo.findOne({ where: { id } });
     if (!review) throw new NotFoundException(`Đánh giá #${id} không tồn tại`);
@@ -200,7 +270,6 @@ export class ReviewsService {
     review.approvedAt = new Date().toISOString();
     await this.reviewRepo.save(review);
 
-    // Recompute avg rating and review count from authoritative source
     await this.recomputeProductRating(review.variantId);
 
     return this.toDto(review);
@@ -216,7 +285,6 @@ export class ReviewsService {
     review.rejectReason = dto.reason ?? null;
     const saved = await this.reviewRepo.save(review);
 
-    // Recompute rating if rejecting a previously approved review
     if (wasApproved) await this.recomputeProductRating(review.variantId);
 
     return this.toDto(saved);
@@ -252,7 +320,6 @@ export class ReviewsService {
     });
     const saved = await this.messageRepo.save(message);
 
-    // Update the flag on the review row to avoid a join for badge display
     if (messageType === 'Reply') {
       await this.reviewRepo.update(id, { hasReply: 1 });
     }
@@ -261,16 +328,42 @@ export class ReviewsService {
   }
 
   async getMessages(reviewId: number): Promise<ReviewMessageResponseDto[]> {
-    const messages = await this.messageRepo.find({
-      where: { reviewId },
-      order: { createdAt: 'ASC' },
-    });
-    return messages.map((m) => this.toMessageDto(m));
+    const rows: any[] = await this.dataSource.query(
+      `SELECT m.*, nv.ho_ten AS sender_name, nv.anh_dai_dien AS sender_avatar, nv.ma_nhan_vien AS sender_code
+       FROM danh_gia_message m
+       LEFT JOIN nhan_vien nv ON nv.nhan_vien_id = m.sender_id
+       WHERE m.review_id = ?
+       ORDER BY m.created_at ASC`,
+      [reviewId],
+    );
+    return rows.map((row) => ({
+      messageId:           row.message_id,
+      reviewId:            row.review_id,
+      senderType:          row.sender_type,
+      senderId:            row.sender_id ?? null,
+      senderName:          row.sender_name ?? 'Hệ thống',
+      senderAvatar:        row.sender_avatar ?? null,
+      senderCode:          row.sender_code ?? null,
+      noiDungTinNhan:      row.noi_dung_tin_nhan,
+      messageType:         row.message_type,
+      isVisibleToCustomer: !!row.is_visible_to_customer,
+      createdAt:           row.created_at,
+      updatedAt:           row.updated_at ?? null,
+    }));
+  }
+
+  async bulkModerate(dto: BulkModerateDto, employeeId: number): Promise<void> {
+    for (const id of dto.reviewIds) {
+      if (dto.action === 'approve') {
+        await this.approveReview(id, employeeId);
+      } else {
+        await this.rejectReview(id, { reason: dto.reason }, employeeId);
+      }
+    }
   }
 
   // ─── Internal ─────────────────────────────────────────────────────────────
 
-  // Recompute from count/avg of Approved reviews — avoids drift from increment/decrement
   private async recomputeProductRating(variantId: number): Promise<void> {
     const [agg] = await this.dataSource.query(
       `SELECT sp.san_pham_id,
@@ -295,82 +388,93 @@ export class ReviewsService {
 
   private toRichDto(row: any): ReviewResponseDto {
     return {
-      id: row.review_id,
-      variantId: row.phien_ban_id,
-      customerId: row.khach_hang_id,
-      orderId: row.don_hang_id,
-      rating: row.rating,
-      title: row.tieu_de ?? null,
-      content: row.noi_dung ?? null,
-      status: row.review_status,
-      hasReply: !!row.da_phan_hoi,
-      helpfulCount: row.helpful_count ?? 0,
-      approvedById: row.nguoi_duyet_id ?? null,
-      rejectReason: row.ly_do_tu_choi ?? null,
-      approvedAt: row.duyet_tai ?? null,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
-      tenSanPham: row.ten_san_pham ?? null,
-      tenPhienBan: row.ten_phien_ban ?? null,
-      anhPhienBan: row.anh_phien_ban ?? null,
-      khachHangTen: row.khach_hang_ten ?? null,
+      reviewId:      row.review_id,
+      phienBanId:    row.phien_ban_id,
+      khachHangId:   row.khach_hang_id,
+      donHangId:     row.don_hang_id,
+      rating:        row.rating,
+      tieuDe:        row.tieu_de ?? null,
+      noiDung:       row.noi_dung ?? null,
+      trangThai:     row.review_status,
+      daPhanHoi:     !!row.da_phan_hoi,
+      helpfulCount:  row.helpful_count ?? 0,
+      nguoiDuyetId:  row.nguoi_duyet_id ?? null,
+      lyDoTuChoi:    row.ly_do_tu_choi ?? null,
+      duyetTai:      row.duyet_tai ?? null,
+      nguon:         row.nguon_danh_gia ?? 'Website',
+      createdAt:     row.created_at,
+      updatedAt:     row.updated_at,
+      sanPhamId:     row.san_pham_id ?? null,
+      tenSanPham:    row.ten_san_pham ?? null,
+      tenPhienBan:   row.ten_phien_ban ?? null,
+      skuPhienBan:   row.sku_phien_ban ?? null,
+      anhPhienBan:   row.anh_phien_ban ?? null,
+      khachHangTen:  row.khach_hang_ten ?? null,
+      khachHangSdT:  row.khach_hang_sdt ?? null,
       khachHangAvatar: row.khach_hang_avatar ?? null,
-      maDonHang: row.ma_don_hang ?? null,
+      maDonHang:     row.ma_don_hang ?? null,
       nguoiDuyetTen: row.nguoi_duyet_ten ?? null,
+      nguoiDuyetMa:  row.nguoi_duyet_ma ?? null,
     };
   }
 
   private toDto(review: ProductReview): ReviewResponseDto {
     return {
-      id: review.id,
-      variantId: review.variantId,
-      customerId: review.customerId,
-      orderId: review.orderId,
-      rating: review.rating,
-      title: review.title,
-      content: review.content,
-      status: review.status,
-      hasReply: !!review.hasReply,
+      reviewId:     review.id,
+      phienBanId:   review.variantId,
+      khachHangId:  review.customerId,
+      donHangId:    review.orderId,
+      rating:       review.rating,
+      tieuDe:       review.title,
+      noiDung:      review.content,
+      trangThai:    review.status,
+      daPhanHoi:    !!review.hasReply,
       helpfulCount: review.helpfulCount,
-      approvedById: review.approvedById,
-      rejectReason: review.rejectReason,
-      approvedAt: review.approvedAt,
-      createdAt: review.createdAt,
-      updatedAt: review.updatedAt,
+      nguoiDuyetId: review.approvedById,
+      lyDoTuChoi:   review.rejectReason,
+      duyetTai:     review.approvedAt,
+      nguon:        review.nguon ?? 'Website',
+      createdAt:    review.createdAt,
+      updatedAt:    review.updatedAt,
     };
   }
 
-  // Maps raw SQL row (Vietnamese column names) → DTO
   private rawToDto(row: any): ReviewResponseDto {
     return {
-      id: row.review_id,
-      variantId: row.phien_ban_id,
-      customerId: row.khach_hang_id,
-      orderId: row.don_hang_id,
-      rating: row.rating,
-      title: row.tieu_de ?? null,
-      content: row.noi_dung ?? null,
-      status: row.review_status,
-      hasReply: !!row.da_phan_hoi,
+      reviewId:     row.review_id,
+      phienBanId:   row.phien_ban_id,
+      khachHangId:  row.khach_hang_id,
+      donHangId:    row.don_hang_id,
+      rating:       row.rating,
+      tieuDe:       row.tieu_de ?? null,
+      noiDung:      row.noi_dung ?? null,
+      trangThai:    row.review_status,
+      daPhanHoi:    !!row.da_phan_hoi,
       helpfulCount: row.helpful_count ?? 0,
-      approvedById: row.nguoi_duyet_id ?? null,
-      rejectReason: row.ly_do_tu_choi ?? null,
-      approvedAt: row.duyet_tai ?? null,
-      createdAt: row.created_at,
-      updatedAt: row.updated_at,
+      nguoiDuyetId: row.nguoi_duyet_id ?? null,
+      lyDoTuChoi:   row.ly_do_tu_choi ?? null,
+      duyetTai:     row.duyet_tai ?? null,
+      nguon:        row.nguon_danh_gia ?? 'Website',
+      sanPhamId:    row.san_pham_id ?? null,
+      skuPhienBan:  row.sku_phien_ban ?? null,
+      createdAt:    row.created_at,
+      updatedAt:    row.updated_at,
     };
   }
 
-  private toMessageDto(message: ReviewMessage): ReviewMessageResponseDto {
+  private toMessageDto(message: ReviewMessage, senderName = 'Hệ thống', senderAvatar: string | null = null): ReviewMessageResponseDto {
     return {
-      id: message.id,
-      reviewId: message.reviewId,
-      senderType: message.senderType,
-      senderId: message.senderId,
-      content: message.content,
-      messageType: message.messageType,
+      messageId:           message.id,
+      reviewId:            message.reviewId,
+      senderType:          message.senderType,
+      senderId:            message.senderId,
+      senderName,
+      senderAvatar,
+      noiDungTinNhan:      message.content,
+      messageType:         message.messageType,
       isVisibleToCustomer: !!message.isVisibleToCustomer,
-      createdAt: message.createdAt,
+      createdAt:           message.createdAt,
+      updatedAt:           message.updatedAt ?? null,
     };
   }
 }

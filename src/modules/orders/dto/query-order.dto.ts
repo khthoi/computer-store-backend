@@ -46,4 +46,10 @@ export class QueryOrderDto {
   @IsString()
   @MaxLength(4)
   sortOrder?: string;
+
+  @ApiPropertyOptional({ description: 'Lọc theo ID khách hàng' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  customerId?: number;
 }

@@ -13,7 +13,15 @@ import { ReportProcessor, REPORT_QUEUE } from './processors/report.processor';
 import { ReportScheduler } from './report-scheduler';
 import { ReportsController } from './reports.controller';
 import { AdminReportsController } from './admin-reports.controller';
+import { AdminReportsAggController } from './admin-reports-agg.controller';
 import { RedisModule } from '../../common/redis/redis.module';
+import { ReportsAggregateService }  from './reports-aggregate.service';
+import { ReportsAggRevenueService }    from './reports-agg-revenue.service';
+import { ReportsAggProductsService }   from './reports-agg-products.service';
+import { ReportsAggCustomersService }  from './reports-agg-customers.service';
+import { ReportsAggInventoryService }  from './reports-agg-inventory.service';
+import { ReportsAggPromotionsService } from './reports-agg-promotions.service';
+import { ReportsAggSupportService }    from './reports-agg-support.service';
 
 @Module({
   imports: [
@@ -27,13 +35,20 @@ import { RedisModule } from '../../common/redis/redis.module';
     BullModule.registerQueue({ name: REPORT_QUEUE }),
     RedisModule,
   ],
-  controllers: [ReportsController, AdminReportsController],
+  controllers: [ReportsController, AdminReportsController, AdminReportsAggController],
   providers: [
     ReportsQueryService,
     ReportsComputeService,
     ReportsExportService,
     ReportProcessor,
     ReportScheduler,
+    ReportsAggregateService,
+    ReportsAggRevenueService,
+    ReportsAggProductsService,
+    ReportsAggCustomersService,
+    ReportsAggInventoryService,
+    ReportsAggPromotionsService,
+    ReportsAggSupportService,
   ],
   exports: [ReportsQueryService],
 })

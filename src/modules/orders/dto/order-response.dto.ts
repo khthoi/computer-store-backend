@@ -71,6 +71,7 @@ export class OrderResponseDto {
 // ─── Admin list summary ───────────────────────────────────────────────────────
 
 export class AdminOrderSummaryDto {
+  numericId: number;
   id: string;
   createdAt: string;
   status: string;
@@ -118,6 +119,7 @@ export function mapToAdminOrderSummary(
   itemCount: number,
 ): AdminOrderSummaryDto {
   return {
+    numericId: order.id,
     id: order.maDonHang,
     createdAt: order.ngayDatHang.toISOString(),
     status: ORDER_STATUS_MAP[order.trangThaiDon] ?? 'pending',

@@ -127,6 +127,7 @@ export class EmployeesService {
       email: employee.email,
       hoTen: employee.hoTen,
       gioiTinh: employee.gioiTinh,
+      soDienThoai: employee.soDienThoai,
       anhDaiDien: employee.anhDaiDien,
       trangThai: employee.trangThai,
       ngayTao: employee.ngayTao,
