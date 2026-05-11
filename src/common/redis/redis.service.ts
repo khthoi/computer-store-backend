@@ -120,6 +120,20 @@ export class RedisService {
     return ms < 0 ? 0 : ms;
   }
 
+  // ─── Password reset token helpers ────────────────────────────────────────
+
+  async savePasswordResetToken(token: string, customerId: number, ttlSeconds: number): Promise<void> {
+    await this.set(`pwd_reset:customer:${token}`, String(customerId), ttlSeconds);
+  }
+
+  async getPasswordResetToken(token: string): Promise<string | null> {
+    return this.get(`pwd_reset:customer:${token}`);
+  }
+
+  async deletePasswordResetToken(token: string): Promise<void> {
+    await this.del(`pwd_reset:customer:${token}`);
+  }
+
   // ─── Generic cache helpers ────────────────────────────────────────────────
   async cache<T>(key: string, ttlSeconds: number, factory: () => Promise<T>): Promise<T> {
     const cached = await this.get(key);

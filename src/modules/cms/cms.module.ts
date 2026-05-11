@@ -12,6 +12,7 @@ import { Popup } from './entities/popup.entity';
 import { AnnouncementBar } from './entities/announcement-bar.entity';
 import { SiteConfig } from './entities/site-config.entity';
 import { RedisModule } from '../../common/redis/redis.module';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 import { BannersService } from './banners.service';
 import { HomepageService } from './homepage.service';
 import { HomepagePreviewService } from './homepage-preview.service';
@@ -43,6 +44,7 @@ import { AdminCmsAnnouncementsController } from './admin-cms-announcements.contr
       SiteConfig,
     ]),
     RedisModule,
+    AuditLogsModule,
   ],
   controllers: [
     CmsController,

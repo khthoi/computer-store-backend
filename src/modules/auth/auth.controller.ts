@@ -3,6 +3,7 @@ import {
   Post,
   Get,
   Body,
+  Query,
   UseGuards,
   Req,
   Res,
@@ -10,12 +11,15 @@ import {
   HttpStatus,
   UnauthorizedException,
 } from '@nestjs/common';
+import { Throttle } from '@nestjs/throttler';
 import { AuthGuard } from '@nestjs/passport';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiOkResponse, ApiResponse } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiOkResponse, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
 import { RegisterCustomerDto } from './dto/register-customer.dto';
 import { LoginDto } from './dto/login.dto';
+import { ForgotPasswordDto } from './dto/forgot-password.dto';
+import { ResetPasswordDto } from './dto/reset-password.dto';
 import { AuthLoginCustomerResponseDto, AuthLoginEmployeeResponseDto } from './dto/auth-login-response.dto';
 import { AuthTokenResponseDto } from './dto/auth-token-response.dto';
 import { Public } from '../../common/decorators/public.decorator';
@@ -75,7 +79,8 @@ export class AuthController {
   @ApiResponse({ status: 401, description: 'Email hoặc mật khẩu không đúng' })
   async loginEmployee(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0] ?? req.ip;
-    const { refreshToken, ...data } = await this.authService.loginEmployee(req.user as Employee, ip);
+    const userAgent = req.headers['user-agent'] as string | undefined;
+    const { refreshToken, ...data } = await this.authService.loginEmployee(req.user as Employee, ip, userAgent);
     res.cookie(RT_COOKIE, refreshToken, RT_COOKIE_OPTIONS);
     return data;
   }
@@ -110,6 +115,41 @@ export class AuthController {
     const rawToken = (req.headers['authorization'] ?? '').replace('Bearer ', '');
     await this.authService.logout(user, rawToken);
     res.clearCookie(RT_COOKIE, { path: '/api/auth' });
+  }
+
+  @Public()
+  @Post('forgot-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiOperation({ summary: 'Yêu cầu gửi email đặt lại mật khẩu' })
+  @ApiOkResponse({ schema: { example: { message: 'Nếu email tồn tại, bạn sẽ nhận được hướng dẫn trong vài phút.' } } })
+  async forgotPassword(@Body() dto: ForgotPasswordDto) {
+    await this.authService.forgotPassword(dto.email);
+    return { message: 'Nếu email tồn tại, bạn sẽ nhận được hướng dẫn trong vài phút.' };
+  }
+
+  @Public()
+  @Get('reset-password')
+  @Throttle({ default: { limit: 10, ttl: 60000 } })
+  @ApiOperation({ summary: 'Kiểm tra tính hợp lệ của reset token' })
+  @ApiQuery({ name: 'token', required: true })
+  @ApiOkResponse({ schema: { example: { valid: true } } })
+  @ApiResponse({ status: 200, description: 'valid: false nếu token không hợp lệ/hết hạn' })
+  async validateResetToken(@Query('token') token: string) {
+    const valid = await this.authService.validateResetToken(token ?? '');
+    return { valid };
+  }
+
+  @Public()
+  @Post('reset-password')
+  @HttpCode(HttpStatus.OK)
+  @Throttle({ default: { limit: 5, ttl: 60000 } })
+  @ApiOperation({ summary: 'Đặt lại mật khẩu bằng token' })
+  @ApiOkResponse({ schema: { example: { message: 'Mật khẩu đã được đặt lại thành công.' } } })
+  @ApiResponse({ status: 400, description: 'Token không hợp lệ hoặc đã hết hạn' })
+  async resetPassword(@Body() dto: ResetPasswordDto) {
+    await this.authService.resetPassword(dto.token, dto.newPassword);
+    return { message: 'Mật khẩu đã được đặt lại thành công.' };
   }
 
   @Get('me')

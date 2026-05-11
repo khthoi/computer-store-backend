@@ -1,6 +1,6 @@
 import {
   IsString, IsArray, IsOptional, IsInt, IsBoolean,
-  MinLength, Min, ArrayNotEmpty,
+  MinLength, ArrayNotEmpty,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
@@ -33,10 +33,9 @@ export class CreateConfigDto {
   @IsString()
   templateContent: string;
 
-  @ApiPropertyOptional({ default: 0 })
+  @ApiPropertyOptional({ default: 0, description: 'Giây delay. Âm = gửi trước sự kiện.' })
   @IsOptional()
   @IsInt()
-  @Min(0)
   delaySeconds?: number = 0;
 
   @ApiPropertyOptional({ default: true })

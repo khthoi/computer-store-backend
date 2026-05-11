@@ -6,6 +6,7 @@ import { RfmSnapshot } from './entities/rfm-snapshot.entity';
 import { RetentionCohort } from './entities/retention-cohort.entity';
 import { InventoryHealthReport } from './entities/inventory-health-report.entity';
 import { ReportJobLog } from './entities/report-job-log.entity';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 // RFM segment mapping — score combinations → segment label
 const RFM_SEGMENTS: Array<{ label: string; test: (r: number, f: number, m: number) => boolean }> = [
@@ -33,6 +34,7 @@ export class ReportsComputeService {
     @InjectRepository(ReportJobLog)
     private readonly jobLogRepo: Repository<ReportJobLog>,
     private readonly dataSource: DataSource,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async startJobLog(jobName: string): Promise<ReportJobLog> {
@@ -191,7 +193,16 @@ export class ReportsComputeService {
 
     await this.dataSource.query('TRUNCATE TABLE report_rfm_snapshot');
     await this.rfmRepo.save(snapshots, { chunk: 500 });
-    return snapshots.length;
+    const rowCount = snapshots.length;
+    this.auditLogsService.log({
+      entityType: 'ReportRfmSnapshot',
+      entityId:   'batch',
+      entityLabel: 'RFM Snapshot',
+      actionType: 'CapNhat',
+      actionDetail: `Job tái tính RFM snapshot: truncate + bulk-insert ${rowCount} bản ghi mới`,
+      after: JSON.stringify({ rowCount, computedAt: new Date().toISOString() }),
+    });
+    return rowCount;
   }
 
   async computeInventoryHealth(): Promise<number> {
@@ -270,7 +281,16 @@ export class ReportsComputeService {
 
     await this.dataSource.query('TRUNCATE TABLE report_inventory_health');
     await this.inventoryRepo.save(snapshots, { chunk: 500 });
-    return snapshots.length;
+    const rowCount = snapshots.length;
+    this.auditLogsService.log({
+      entityType: 'ReportInventoryHealth',
+      entityId:   'batch',
+      entityLabel: 'Inventory Health Report',
+      actionType: 'CapNhat',
+      actionDetail: `Job tái tính inventory health: truncate + bulk-insert ${rowCount} bản ghi mới`,
+      after: JSON.stringify({ rowCount, computedAt: new Date().toISOString() }),
+    });
+    return rowCount;
   }
 
   async computeRetentionCohort(): Promise<number> {

@@ -8,6 +8,7 @@ import { ReturnRequestItem } from './entities/return-request-item.entity';
 import { ReturnResolution } from './entities/return-resolution.entity';
 import { ProcessRefundResolutionDto, ProcessExchangeResolutionDto, ChangeResolutionDto } from './dto/process-resolution.dto';
 import { LoyaltyService } from '../loyalty/loyalty.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class ReturnsResolutionService {
@@ -20,6 +21,7 @@ export class ReturnsResolutionService {
     private readonly resolutionRepo: Repository<ReturnResolution>,
     private readonly dataSource: DataSource,
     private readonly loyaltyService: LoyaltyService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async processRefund(returnRequestId: number, dto: ProcessRefundResolutionDto, employeeId: number) {
@@ -35,7 +37,8 @@ export class ReturnsResolutionService {
     const returnItems = await this.returnItemRepo.find({ where: { yeuCauId: returnRequestId } });
     if (!returnItems.length) throw new BadRequestException('Yêu cầu không có sản phẩm nào để hoàn trả');
 
-    return this.dataSource.transaction(async (manager) => {
+    const statusCu = returnReq.status;
+    const result = await this.dataSource.transaction(async (manager) => {
       const [giaoDich]: Array<{ giao_dich_id: number }> = await manager.query(
         `SELECT giao_dich_id FROM giao_dich WHERE don_hang_id = ? LIMIT 1`,
         [returnReq.orderId],
@@ -95,6 +98,33 @@ export class ReturnsResolutionService {
 
       return { resolutionId: resolution.id, status: 'HoanThanh' };
     });
+
+    this.auditLogsService.log({
+      entityType:  'YeuCauDoiTra',
+      entityId:    String(returnRequestId),
+      entityLabel: `Yêu cầu đổi/trả #${returnRequestId}`,
+      actionType:  'DoiTrangThai',
+      actionDetail: `Nhân viên #${employeeId} hoàn tất hoàn tiền cho yêu cầu #${returnRequestId} (${dto.soTienHoan?.toLocaleString('vi-VN') ?? '?'} ₫, phương thức: ${dto.phuongThucHoan})`,
+      before: JSON.stringify({ status: statusCu }),
+      after:  JSON.stringify({ status: 'HoanThanh', resolutionId: result.resolutionId, soTienHoan: dto.soTienHoan, phuongThucHoan: dto.phuongThucHoan }),
+    });
+    this.auditLogsService.log({
+      entityType:  'DoiTraXuLy',
+      entityId:    String(result.resolutionId),
+      entityLabel: `Xử lý hoàn tiền — yêu cầu #${returnRequestId}`,
+      actionType:  'TaoMoi',
+      actionDetail: `Tạo bản ghi xử lý hoàn tiền ${dto.soTienHoan?.toLocaleString('vi-VN') ?? '?'} ₫ cho yêu cầu #${returnRequestId}`,
+      after: JSON.stringify({
+        id:              result.resolutionId,
+        yeuCauDoiTraId:  returnRequestId,
+        huongXuLy:       'HoanTien',
+        soTienHoan:      dto.soTienHoan,
+        phuongThucHoan:  dto.phuongThucHoan,
+        trangThai:       'HoanThanh',
+        nguoiXuLyId:     employeeId,
+      }),
+    });
+    return result;
   }
 
   async processExchange(returnRequestId: number, dto: ProcessExchangeResolutionDto, employeeId: number) {
@@ -109,6 +139,7 @@ export class ReturnsResolutionService {
 
     const returnItems = await this.returnItemRepo.find({ where: { yeuCauId: returnRequestId } });
     if (!returnItems.length) throw new BadRequestException('Yêu cầu không có sản phẩm nào để đổi');
+    const statusCu = returnReq.status;
 
     const [originalOrder]: Array<{
       khach_hang_id: number; dia_chi_giao_hang_id: number; phuong_thuc_van_chuyen: string;
@@ -142,7 +173,7 @@ export class ReturnsResolutionService {
       });
     }
 
-    return this.dataSource.transaction(async (manager) => {
+    const result = await this.dataSource.transaction(async (manager) => {
       const exchangeCode = `EXCH-${returnRequestId}-${Date.now()}`;
       const orderInsert: { insertId: number } = await manager.query(
         `INSERT INTO don_hang
@@ -206,6 +237,32 @@ export class ReturnsResolutionService {
 
       return { resolutionId: resolution.id, exchangeOrderId: newOrderId, exchangeOrderCode: exchangeCode };
     });
+
+    this.auditLogsService.log({
+      entityType:  'YeuCauDoiTra',
+      entityId:    String(returnRequestId),
+      entityLabel: `Yêu cầu đổi/trả #${returnRequestId}`,
+      actionType:  'DoiTrangThai',
+      actionDetail: `Nhân viên #${employeeId} khởi tạo đổi hàng cho yêu cầu #${returnRequestId} — tạo đơn đổi #${result.exchangeOrderId} (${result.exchangeOrderCode})`,
+      before: JSON.stringify({ status: statusCu }),
+      after:  JSON.stringify({ status: 'DangXuLy', exchangeOrderId: result.exchangeOrderId, resolutionId: result.resolutionId }),
+    });
+    this.auditLogsService.log({
+      entityType:  'DoiTraXuLy',
+      entityId:    String(result.resolutionId),
+      entityLabel: `Xử lý đổi hàng — yêu cầu #${returnRequestId}`,
+      actionType:  'TaoMoi',
+      actionDetail: `Tạo bản ghi xử lý đổi hàng, đơn đổi ${result.exchangeOrderCode} (#${result.exchangeOrderId}) cho yêu cầu #${returnRequestId}`,
+      after: JSON.stringify({
+        id:             result.resolutionId,
+        yeuCauDoiTraId: returnRequestId,
+        huongXuLy:      'GiaoHangMoi',
+        donHangDoiId:   result.exchangeOrderId,
+        trangThai:      'DangXuLy',
+        nguoiXuLyId:    employeeId,
+      }),
+    });
+    return result;
   }
 
   async changeResolution(returnRequestId: number, dto: ChangeResolutionDto, employeeId: number) {
@@ -229,9 +286,19 @@ export class ReturnsResolutionService {
       );
     }
 
+    const resolutionCu = returnReq.resolution;
     returnReq.resolution = dto.newResolution;
     returnReq.processedById = employeeId;
     await this.returnRepo.save(returnReq);
+    this.auditLogsService.log({
+      entityType:  'YeuCauDoiTra',
+      entityId:    String(returnRequestId),
+      entityLabel: `Yêu cầu đổi/trả #${returnRequestId}`,
+      actionType:  'CapNhat',
+      actionDetail: `Nhân viên #${employeeId} đổi hướng xử lý yêu cầu #${returnRequestId}: ${resolutionCu ?? 'chưa xác định'} → ${dto.newResolution}`,
+      before: JSON.stringify({ resolution: resolutionCu }),
+      after:  JSON.stringify({ resolution: dto.newResolution, processedById: employeeId }),
+    });
     return { id: returnRequestId, resolution: dto.newResolution };
   }
 
@@ -245,6 +312,7 @@ export class ReturnsResolutionService {
       throw new BadRequestException('Đã hoàn thành xử lý rồi');
     }
 
+    const trangThaiCu = resolution.trangThai;
     await this.dataSource.transaction(async (manager) => {
       if (resolution.donHangDoiId) {
         await manager.query(
@@ -262,6 +330,15 @@ export class ReturnsResolutionService {
       );
     });
 
+    this.auditLogsService.log({
+      entityType:  'DoiTraXuLy',
+      entityId:    String(resolutionId),
+      entityLabel: `Xử lý đổi hàng #${resolutionId}`,
+      actionType:  'DoiTrangThai',
+      actionDetail: `Nhân viên #${employeeId} xác nhận giao hàng đổi thành công — yêu cầu #${resolution.yeuCauDoiTraId} hoàn tất`,
+      before: JSON.stringify({ trangThai: trangThaiCu }),
+      after:  JSON.stringify({ trangThai: 'HoanThanh', donHangDoiId: resolution.donHangDoiId }),
+    });
     return { resolutionId, status: 'HoanThanh' };
   }
 

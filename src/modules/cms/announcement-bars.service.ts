@@ -5,12 +5,14 @@ import { AnnouncementBar, BarStatus, BarPosition } from './entities/announcement
 import { CreateAnnouncementBarDto } from './dto/create-announcement-bar.dto';
 import { UpdateAnnouncementBarDto } from './dto/update-announcement-bar.dto';
 import { AnnouncementBarResponseDto } from './dto/announcement-bar-response.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class AnnouncementBarsService {
   constructor(
     @InjectRepository(AnnouncementBar)
     private readonly repo: Repository<AnnouncementBar>,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async findAll(): Promise<AnnouncementBarResponseDto[]> {
@@ -38,6 +40,15 @@ export class AnnouncementBarsService {
     }
     const entity = this.repo.create({ ...dto, createdById });
     const saved = await this.repo.save(entity);
+    const bar = await this.repo.findOne({ where: { id: saved.id } });
+    this.auditLogsService.log({
+      entityType: 'AnnouncementBar',
+      entityId: String(saved.id),
+      entityLabel: bar!.name,
+      actionType: 'TaoMoi',
+      actionDetail: `Tạo thanh thông báo "${bar!.name}" (vị trí: ${bar!.position}, trạng thái: ${bar!.status})`,
+      after: JSON.stringify({ id: bar!.id, name: bar!.name, position: bar!.position, status: bar!.status, content: bar!.content, startDate: bar!.startDate, endDate: bar!.endDate }),
+    });
     return this.findOne(saved.id);
   }
 
@@ -52,6 +63,16 @@ export class AnnouncementBarsService {
       await this.checkScheduleOverlap(position, start!, end!, id);
     }
     await this.repo.update(id, dto);
+    const updated = await this.repo.findOne({ where: { id } });
+    this.auditLogsService.log({
+      entityType: 'AnnouncementBar',
+      entityId: String(id),
+      entityLabel: updated!.name,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật thanh thông báo "${updated!.name}"`,
+      before: JSON.stringify({ name: existing.name, position: existing.position, status: existing.status, content: existing.content, startDate: existing.startDate, endDate: existing.endDate }),
+      after: JSON.stringify({ name: updated!.name, position: updated!.position, status: updated!.status, content: updated!.content, startDate: updated!.startDate, endDate: updated!.endDate }),
+    });
     return this.findOne(id);
   }
 
@@ -59,6 +80,14 @@ export class AnnouncementBarsService {
     const existing = await this.repo.findOne({ where: { id } });
     if (!existing) throw new NotFoundException('Thanh thông báo không tồn tại');
     await this.repo.delete(id);
+    this.auditLogsService.log({
+      entityType: 'AnnouncementBar',
+      entityId: String(id),
+      entityLabel: existing.name,
+      actionType: 'Xoa',
+      actionDetail: `Xóa thanh thông báo "${existing.name}" (vị trí: ${existing.position})`,
+      before: JSON.stringify({ id: existing.id, name: existing.name, position: existing.position, status: existing.status }),
+    });
   }
 
   private async checkActiveConflict(position: BarPosition, excludeId?: number): Promise<void> {

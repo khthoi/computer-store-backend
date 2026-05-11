@@ -5,9 +5,10 @@ import { ProductBrand } from './entities/product-brand.entity';
 import { BrandsService } from './brands.service';
 import { BrandsController } from './brands.controller';
 import { AdminBrandsController } from './admin-brands.controller';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Brand, ProductBrand])],
+  imports: [TypeOrmModule.forFeature([Brand, ProductBrand]), AuditLogsModule],
   controllers: [BrandsController, AdminBrandsController],
   providers: [BrandsService],
   exports: [BrandsService, TypeOrmModule],

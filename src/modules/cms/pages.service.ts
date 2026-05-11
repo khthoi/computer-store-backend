@@ -1,10 +1,11 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { Repository, Like } from 'typeorm';
+import { Repository } from 'typeorm';
 import { Page } from './entities/page.entity';
 import { CreatePageDto } from './dto/create-page.dto';
 import { UpdatePageDto } from './dto/update-page.dto';
 import { PageResponseDto, toPageResponse } from './dto/page-response.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const STATUS_TO_DB: Record<string, string> = {
   draft: 'nhap',
@@ -29,6 +30,7 @@ export class PagesService {
   constructor(
     @InjectRepository(Page)
     private readonly repo: Repository<Page>,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async findAllPublic() {
@@ -97,6 +99,14 @@ export class PagesService {
       updatedById: createdById,
     });
     const saved = await this.repo.save(page);
+    this.auditLogsService.log({
+      entityType: 'Page',
+      entityId: String(saved.id),
+      entityLabel: saved.title,
+      actionType: 'TaoMoi',
+      actionDetail: `Tạo trang nội dung "${saved.title}" (slug: ${saved.slug}, loại: ${saved.type}, trạng thái: ${saved.status})`,
+      after: JSON.stringify({ id: saved.id, title: saved.title, slug: saved.slug, type: saved.type, status: saved.status, showInFooter: saved.showInFooter }),
+    });
     const withRelation = await this.repo.findOne({ where: { id: saved.id }, relations: ['createdBy'] });
     return toPageResponse(withRelation!);
   }
@@ -113,6 +123,16 @@ export class PagesService {
       ...(dto.status ? { status: mapStatus(dto.status) ?? dto.status } : {}),
       updatedById,
     });
+    const updated = await this.repo.findOne({ where: { id } });
+    this.auditLogsService.log({
+      entityType: 'Page',
+      entityId: String(id),
+      entityLabel: updated!.title,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật trang "${updated!.title}" (trạng thái: ${existing.status} → ${updated!.status})`,
+      before: JSON.stringify({ title: existing.title, slug: existing.slug, status: existing.status, content: (existing.content ?? '').substring(0, 100) + '...' }),
+      after: JSON.stringify({ title: updated!.title, slug: updated!.slug, status: updated!.status }),
+    });
     return this.findOne(id);
   }
 
@@ -120,11 +140,27 @@ export class PagesService {
     await Promise.all(
       ids.map((id, idx) => this.repo.update(Number(id), { sortOrder: idx + 1 })),
     );
+    this.auditLogsService.log({
+      entityType: 'Page',
+      entityId: 'batch',
+      entityLabel: 'Sắp xếp lại trang',
+      actionType: 'CapNhat',
+      actionDetail: `Sắp xếp lại thứ tự ${ids.length} trang nội dung`,
+      after: JSON.stringify({ newOrder: ids }),
+    });
   }
 
   async remove(id: number): Promise<void> {
     const existing = await this.repo.findOne({ where: { id } });
     if (!existing) throw new NotFoundException('Trang không tồn tại');
     await this.repo.delete(id);
+    this.auditLogsService.log({
+      entityType: 'Page',
+      entityId: String(id),
+      entityLabel: existing.title,
+      actionType: 'Xoa',
+      actionDetail: `Xóa trang nội dung "${existing.title}" (slug: ${existing.slug}, loại: ${existing.type})`,
+      before: JSON.stringify({ id: existing.id, title: existing.title, slug: existing.slug, type: existing.type, status: existing.status }),
+    });
   }
 }

@@ -20,6 +20,7 @@ import { OrderActivityStatus } from './entities/order-activity-log.entity';
 import { UpdateOrderShippingDto } from './dto/update-order-shipping.dto';
 import { AddOrderNoteDto } from './dto/add-order-note.dto';
 import { OrdersReturnsQueryService } from './orders-returns-query.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const STATUS_ACTIONS: Partial<Record<TrangThaiDon, string>> = {
   [TrangThaiDon.DA_XAC_NHAN]: 'Xác nhận đơn hàng',
@@ -49,6 +50,7 @@ export class OrdersService {
     private batchService: BatchService,
     private ordersReturnsQueryService: OrdersReturnsQueryService,
     private activityLogService: OrderActivityLogService,
+    private auditLogsService: AuditLogsService,
   ) {}
 
   async checkout(userId: number, dto: CheckoutDto): Promise<{ order: OrderResponseDto; paymentUrl?: string }> {
@@ -106,7 +108,9 @@ export class OrdersService {
 
     const tongThanhToan = tongTienHang + phiVanChuyen - soTienGiamGia;
 
-    return this.dataSource.transaction(async (manager) => {
+    let savedOrderCapture: { id: number; maDonHang: string } | null = null;
+
+    const result = await this.dataSource.transaction(async (manager) => {
       const maDonHang = this.generateOrderCode();
 
       const order = manager.create(Order, {
@@ -125,6 +129,7 @@ export class OrdersService {
         trangThaiDon: TrangThaiDon.CHO_XAC_NHAN,
       });
       const savedOrder = await manager.save(Order, order);
+      savedOrderCapture = { id: savedOrder.id, maDonHang: savedOrder.maDonHang };
 
       const items = orderItemsData.map((d) =>
         manager.create(OrderItem, { ...d, donHangId: savedOrder.id }),
@@ -159,6 +164,20 @@ export class OrdersService {
 
       return { order: this.toDto(fullOrder!) };
     });
+
+    if (savedOrderCapture) {
+      const capture = savedOrderCapture as { id: number; maDonHang: string };
+      this.auditLogsService.log({
+        entityType: 'DonHang',
+        entityId: String(capture.id),
+        entityLabel: `Đơn hàng #${capture.maDonHang}`,
+        actionType: 'TaoMoi',
+        actionDetail: `Khách hàng đặt hàng qua website, tổng thanh toán ${tongThanhToan}đ`,
+        after: JSON.stringify({ orderId: capture.id, orderCode: capture.maDonHang, tongThanhToan, phuongThucThanhToan: dto.phuongThucThanhToan }),
+      });
+    }
+
+    return result;
   }
 
   async findMyOrders(userId: number, query: QueryOrderDto) {
@@ -201,16 +220,36 @@ export class OrdersService {
   async updateStatus(id: number, dto: UpdateOrderStatusDto, adminId: number): Promise<OrderResponseDto> {
     const order = await this.orderRepo.findOne({ where: { id }, relations: ['items'] });
     if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
+    const oldStatus = order.trangThaiDon;
     this.validateStatusTransition(order.trangThaiDon, dto.trangThai);
     const updated = await this.changeStatus(order, dto.trangThai, adminId, dto.ghiChu, dto.trangThai === TrangThaiDon.DA_HUY);
+    this.auditLogsService.log({
+      entityType: 'DonHang',
+      entityId: String(id),
+      entityLabel: `Đơn hàng #${order.maDonHang}`,
+      actionType: 'DoiTrangThai',
+      actionDetail: `Đổi trạng thái ${oldStatus} → ${dto.trangThai}`,
+      before: JSON.stringify({ trangThai: oldStatus }),
+      after: JSON.stringify({ trangThai: dto.trangThai }),
+    });
     return this.toDto(updated);
   }
 
   async updateStatusAdmin(orderCode: string, dto: UpdateOrderStatusDto, adminId: number): Promise<OrderResponseDto> {
     const order = await this.orderRepo.findOne({ where: { maDonHang: orderCode }, relations: ['items'] });
     if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
+    const oldStatus = order.trangThaiDon;
     this.validateStatusTransition(order.trangThaiDon, dto.trangThai);
     const updated = await this.changeStatus(order, dto.trangThai, adminId, dto.ghiChu, dto.trangThai === TrangThaiDon.DA_HUY);
+    this.auditLogsService.log({
+      entityType: 'DonHang',
+      entityId: String(order.id),
+      entityLabel: `Đơn hàng #${orderCode}`,
+      actionType: 'DoiTrangThai',
+      actionDetail: `Đổi trạng thái ${oldStatus} → ${dto.trangThai}`,
+      before: JSON.stringify({ trangThai: oldStatus }),
+      after: JSON.stringify({ trangThai: dto.trangThai }),
+    });
     return this.toDto(updated);
   }
 
@@ -341,12 +380,22 @@ export class OrdersService {
   async updateShippingAdmin(orderCode: string, dto: UpdateOrderShippingDto): Promise<AdminOrderDetailDto> {
     const order = await this.orderRepo.findOne({ where: { maDonHang: orderCode } });
     if (!order) throw new NotFoundException('Đơn hàng không tồn tại');
+    const before = { carrier: order.carrier, trackingNumber: order.trackingNumber, estimatedDelivery: order.estimatedDelivery };
     if (dto.carrier !== undefined) order.carrier = dto.carrier;
     if (dto.trackingNumber !== undefined) order.trackingNumber = dto.trackingNumber;
     if (dto.estimatedDelivery !== undefined) {
       order.estimatedDelivery = dto.estimatedDelivery ? new Date(dto.estimatedDelivery) : null;
     }
     await this.orderRepo.save(order);
+    this.auditLogsService.log({
+      entityType: 'DonHang',
+      entityId: String(order.id),
+      entityLabel: `Đơn hàng #${orderCode}`,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật thông tin vận chuyển đơn hàng #${orderCode}`,
+      before: JSON.stringify(before),
+      after: JSON.stringify({ carrier: order.carrier, trackingNumber: order.trackingNumber, estimatedDelivery: order.estimatedDelivery }),
+    });
     return this.findOneAdmin(orderCode);
   }
 
@@ -362,6 +411,14 @@ export class OrdersService {
       `SELECT * FROM ghi_chu_don_hang WHERE ghi_chu_id = ?`,
       [result.insertId],
     );
+    this.auditLogsService.log({
+      entityType: 'GhiChuDonHang',
+      entityId: String(result.insertId),
+      entityLabel: `Ghi chú đơn hàng #${orderCode}`,
+      actionType: 'TaoMoi',
+      actionDetail: `Thêm ghi chú vào đơn hàng #${orderCode} bởi ${dto.authorName}`,
+      after: JSON.stringify({ noteId: result.insertId, text: dto.text, authorName: dto.authorName }),
+    });
     return {
       id:         String(row.ghi_chu_id),
       authorName: row.ten_tac_gia,

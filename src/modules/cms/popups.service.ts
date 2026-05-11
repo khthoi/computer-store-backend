@@ -5,12 +5,14 @@ import { Popup, PopupStatus } from './entities/popup.entity';
 import { CreatePopupDto } from './dto/create-popup.dto';
 import { UpdatePopupDto } from './dto/update-popup.dto';
 import { PopupResponseDto } from './dto/popup-response.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class PopupsService {
   constructor(
     @InjectRepository(Popup)
     private readonly repo: Repository<Popup>,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async findAll(): Promise<PopupResponseDto[]> {
@@ -37,7 +39,17 @@ export class PopupsService {
     }
     const entity = this.repo.create({ ...dto, createdById });
     const saved = await this.repo.save(entity);
-    return this.findOne(saved.id);
+    const result = await this.findOne(saved.id);
+    const popup = await this.repo.findOne({ where: { id: saved.id } });
+    this.auditLogsService.log({
+      entityType: 'Popup',
+      entityId: String(saved.id),
+      entityLabel: popup!.name ?? popup!.title ?? `Popup #${saved.id}`,
+      actionType: 'TaoMoi',
+      actionDetail: `Tạo popup "${popup!.name ?? popup!.title}" (trạng thái: ${popup!.status}, vị trí: ${popup!.position})`,
+      after: JSON.stringify({ id: popup!.id, name: popup!.name, title: popup!.title, status: popup!.status, position: popup!.position, startDate: popup!.startDate, endDate: popup!.endDate }),
+    });
+    return result;
   }
 
   async update(id: number, dto: UpdatePopupDto): Promise<PopupResponseDto> {
@@ -50,6 +62,16 @@ export class PopupsService {
       await this.checkScheduleOverlap(start!, end!, id);
     }
     await this.repo.update(id, dto);
+    const updated = await this.repo.findOne({ where: { id } });
+    this.auditLogsService.log({
+      entityType: 'Popup',
+      entityId: String(id),
+      entityLabel: updated!.name ?? updated!.title ?? `Popup #${id}`,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật popup "${updated!.name ?? updated!.title}"`,
+      before: JSON.stringify({ name: existing.name, title: existing.title, status: existing.status, position: existing.position, startDate: existing.startDate, endDate: existing.endDate }),
+      after: JSON.stringify({ name: updated!.name, title: updated!.title, status: updated!.status, position: updated!.position, startDate: updated!.startDate, endDate: updated!.endDate }),
+    });
     return this.findOne(id);
   }
 
@@ -57,6 +79,14 @@ export class PopupsService {
     const existing = await this.repo.findOne({ where: { id } });
     if (!existing) throw new NotFoundException('Popup không tồn tại');
     await this.repo.delete(id);
+    this.auditLogsService.log({
+      entityType: 'Popup',
+      entityId: String(id),
+      entityLabel: existing.name ?? existing.title ?? `Popup #${id}`,
+      actionType: 'Xoa',
+      actionDetail: `Xóa popup "${existing.name ?? existing.title}" (trạng thái: ${existing.status})`,
+      before: JSON.stringify({ id: existing.id, name: existing.name, title: existing.title, status: existing.status }),
+    });
   }
 
   async findActive(): Promise<PopupResponseDto[]> {

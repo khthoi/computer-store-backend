@@ -6,14 +6,16 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   ParseIntPipe,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiResponse, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { BrandsService } from './brands.service';
 import { CreateBrandDto } from './dto/create-brand.dto';
 import { UpdateBrandDto } from './dto/update-brand.dto';
+import { QueryBrandDto } from './dto/query-brand.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 
 @ApiTags('Admin — Brands')
@@ -24,35 +26,15 @@ export class AdminBrandsController {
   constructor(private readonly brandsService: BrandsService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Danh sách thương hiệu' })
-  @ApiOkResponse({
-    schema: {
-      example: [
-        {
-          id: 1,
-          name: 'Intel',
-          slug: 'intel',
-          logo: 'https://res.cloudinary.com/demo/image/upload/brands/intel-logo.png',
-          isVisible: true,
-          productCount: 38,
-          createdAt: '2024-01-01T00:00:00.000Z',
-        },
-        {
-          id: 2,
-          name: 'ASUS',
-          slug: 'asus',
-          logo: 'https://res.cloudinary.com/demo/image/upload/brands/asus-logo.png',
-          isVisible: true,
-          productCount: 74,
-          createdAt: '2024-01-01T00:00:00.000Z',
-        },
-      ],
-    },
-  })
+  @ApiOperation({ summary: 'Danh sách thương hiệu (có phân trang & tìm kiếm)' })
+  @ApiQuery({ name: 'q', required: false, description: 'Tìm theo tên hoặc mô tả' })
+  @ApiQuery({ name: 'active', required: false, description: 'Lọc theo trạng thái (true/false)' })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 20 })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
-  findAll() {
-    return this.brandsService.findAll();
+  findAll(@Query() query: QueryBrandDto) {
+    return this.brandsService.findAll(query);
   }
 
   @Get(':id')

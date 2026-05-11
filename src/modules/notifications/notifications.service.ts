@@ -9,6 +9,7 @@ import { AutoNotificationConfig } from './entities/auto-notification-config.enti
 import { QueryNotificationsDto } from './dto/query-notifications.dto';
 import { CreateConfigDto } from './dto/create-config.dto';
 import { UpdateConfigDto } from './dto/update-config.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class NotificationsService {
@@ -20,6 +21,7 @@ export class NotificationsService {
     private readonly notifRepo: Repository<Notification>,
     @InjectRepository(AutoNotificationConfig)
     private readonly configRepo: Repository<AutoNotificationConfig>,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   // ─── Customer ─────────────────────────────────────────────────────────────
@@ -120,18 +122,47 @@ export class NotificationsService {
 
   async createConfig(dto: CreateConfigDto, employeeId: number): Promise<AutoNotificationConfig> {
     const cfg = this.configRepo.create({ ...dto, updatedById: employeeId });
-    return this.configRepo.save(cfg);
+    const saved = await this.configRepo.save(cfg);
+    this.auditLogsService.log({
+      entityType: 'CauHinhThongBao',
+      entityId: String(saved.id),
+      entityLabel: saved.displayName,
+      actionType: 'TaoMoi',
+      actionDetail: `Tạo cấu hình thông báo tự động "${saved.displayName}" (${saved.triggerKey})`,
+      after: JSON.stringify({ id: saved.id, triggerKey: saved.triggerKey, displayName: saved.displayName, channels: saved.channels, isActive: saved.isActive }),
+    });
+    return saved;
   }
 
   async updateConfig(id: number, dto: UpdateConfigDto, employeeId: number): Promise<AutoNotificationConfig> {
     const cfg = await this.findOneConfig(id);
+    const before = { triggerKey: cfg.triggerKey, displayName: cfg.displayName, channels: cfg.channels, templateTitle: cfg.templateTitle, templateContent: cfg.templateContent, isActive: cfg.isActive };
     Object.assign(cfg, dto, { updatedById: employeeId });
-    return this.configRepo.save(cfg);
+    const saved = await this.configRepo.save(cfg);
+    this.auditLogsService.log({
+      entityType: 'CauHinhThongBao',
+      entityId: String(id),
+      entityLabel: saved.displayName,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật cấu hình thông báo tự động "${saved.displayName}"`,
+      before: JSON.stringify(before),
+      after: JSON.stringify({ displayName: saved.displayName, channels: saved.channels, templateTitle: saved.templateTitle, isActive: saved.isActive }),
+    });
+    return saved;
   }
 
   async deleteConfig(id: number): Promise<void> {
     const cfg = await this.findOneConfig(id);
+    const snapshot = { id: cfg.id, triggerKey: cfg.triggerKey, displayName: cfg.displayName, channels: cfg.channels, isActive: cfg.isActive };
     await this.configRepo.remove(cfg);
+    this.auditLogsService.log({
+      entityType: 'CauHinhThongBao',
+      entityId: String(snapshot.id),
+      entityLabel: snapshot.displayName,
+      actionType: 'Xoa',
+      actionDetail: `Xóa cấu hình thông báo tự động "${snapshot.displayName}" (${snapshot.triggerKey})`,
+      before: JSON.stringify(snapshot),
+    });
   }
 
   // ─── Internal ─────────────────────────────────────────────────────────────

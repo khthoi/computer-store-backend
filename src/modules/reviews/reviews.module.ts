@@ -5,9 +5,10 @@ import { ReviewMessage } from './entities/review-message.entity';
 import { ReviewsService } from './reviews.service';
 import { ReviewsController } from './reviews.controller';
 import { AdminReviewsController } from './admin-reviews.controller';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([ProductReview, ReviewMessage])],
+  imports: [TypeOrmModule.forFeature([ProductReview, ReviewMessage]), AuditLogsModule],
   controllers: [ReviewsController, AdminReviewsController],
   providers: [ReviewsService],
   exports: [ReviewsService],

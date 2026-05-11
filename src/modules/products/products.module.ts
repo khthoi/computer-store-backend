@@ -10,9 +10,10 @@ import { AdminProductsController } from './admin-products.controller';
 import { BrandsModule } from '../brands/brands.module';
 import { CategoriesModule } from '../categories/categories.module';
 import { SpecificationsModule } from '../specifications/specifications.module';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Product, ProductVariant, ProductImage]), BrandsModule, CategoriesModule, SpecificationsModule],
+  imports: [TypeOrmModule.forFeature([Product, ProductVariant, ProductImage]), BrandsModule, CategoriesModule, SpecificationsModule, AuditLogsModule],
   controllers: [ProductsController, AdminProductsController],
   providers: [ProductsService, ProductsSearchService],
   exports: [ProductsService, ProductsSearchService, TypeOrmModule],

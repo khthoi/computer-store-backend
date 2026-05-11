@@ -7,9 +7,10 @@ import { PaymentsController } from './payments.controller';
 import { AdminTransactionsController } from './admin-transactions.controller';
 import { AdminTransactionsService } from './admin-transactions.service';
 import { OrdersModule } from '../orders/orders.module';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Transaction, Order]), OrdersModule],
+  imports: [TypeOrmModule.forFeature([Transaction, Order]), OrdersModule, AuditLogsModule],
   controllers: [PaymentsController, AdminTransactionsController],
   providers: [PaymentsService, AdminTransactionsService],
   exports: [PaymentsService],

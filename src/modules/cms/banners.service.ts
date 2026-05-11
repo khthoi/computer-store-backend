@@ -8,12 +8,14 @@ import { UpdateBannerDto } from './dto/update-banner.dto';
 import { QueryBannersDto } from './dto/query-banners.dto';
 import { UpdateBannersLayoutDto } from './dto/update-banners-layout.dto';
 import { ReorderBannersDto } from './dto/reorder-banners.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class BannersService {
   constructor(
     @InjectRepository(Banner)
     private readonly repo: Repository<Banner>,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async findAll(query: QueryBannersDto) {
@@ -75,18 +77,45 @@ export class BannersService {
     }
     const banner = this.repo.create({ ...dto, createdById, updatedById: createdById });
     const saved = await this.repo.save(banner);
-    return mapBanner(await this.loadOne(saved.id));
+    const full = await this.loadOne(saved.id);
+    this.auditLogsService.log({
+      entityType: 'Banner',
+      entityId: String(full.id),
+      entityLabel: full.title,
+      actionType: 'TaoMoi',
+      actionDetail: `Tạo banner "${full.title}" (vị trí: ${full.position}, trạng thái: ${full.status})`,
+      after: JSON.stringify({ id: full.id, title: full.title, position: full.position, status: full.status, startDate: full.startDate, endDate: full.endDate }),
+    });
+    return mapBanner(full);
   }
 
   async update(id: number, dto: UpdateBannerDto, updatedById: number): Promise<BannerResponseDto> {
-    await this.loadOne(id);
+    const before = await this.loadOne(id);
     await this.repo.update(id, { ...dto, updatedById });
-    return mapBanner(await this.loadOne(id));
+    const updated = await this.loadOne(id);
+    this.auditLogsService.log({
+      entityType: 'Banner',
+      entityId: String(id),
+      entityLabel: updated.title,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật banner "${updated.title}"`,
+      before: JSON.stringify({ title: before.title, position: before.position, status: before.status, startDate: before.startDate, endDate: before.endDate, linkUrl: before.linkUrl }),
+      after: JSON.stringify({ title: updated.title, position: updated.position, status: updated.status, startDate: updated.startDate, endDate: updated.endDate, linkUrl: updated.linkUrl }),
+    });
+    return mapBanner(updated);
   }
 
   async remove(id: number): Promise<void> {
-    await this.loadOne(id);
+    const banner = await this.loadOne(id);
     await this.repo.delete(id);
+    this.auditLogsService.log({
+      entityType: 'Banner',
+      entityId: String(id),
+      entityLabel: banner.title,
+      actionType: 'Xoa',
+      actionDetail: `Xóa banner "${banner.title}" (vị trí: ${banner.position})`,
+      before: JSON.stringify({ id: banner.id, title: banner.title, position: banner.position, status: banner.status }),
+    });
   }
 
   async reorder(dto: ReorderBannersDto): Promise<void> {
@@ -95,6 +124,14 @@ export class BannersService {
         this.repo.update(Number(id), { sortOrder: idx + 1 }),
       ),
     );
+    this.auditLogsService.log({
+      entityType: 'Banner',
+      entityId: 'batch',
+      entityLabel: 'Sắp xếp lại banner',
+      actionType: 'CapNhat',
+      actionDetail: `Sắp xếp lại thứ tự ${dto.ids.length} banner`,
+      after: JSON.stringify({ newOrder: dto.ids }),
+    });
   }
 
   async updateLayout(dto: UpdateBannersLayoutDto): Promise<void> {
@@ -103,6 +140,14 @@ export class BannersService {
         this.repo.update(Number(id), { gridX, gridY, gridW, gridH }),
       ),
     );
+    this.auditLogsService.log({
+      entityType: 'Banner',
+      entityId: 'batch',
+      entityLabel: 'Cập nhật layout banner',
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật vị trí grid cho ${dto.items.length} banner`,
+      after: JSON.stringify({ items: dto.items.map(i => ({ id: i.id, gridX: i.gridX, gridY: i.gridY, gridW: i.gridW, gridH: i.gridH })) }),
+    });
   }
 
   private async loadOne(id: number): Promise<Banner> {

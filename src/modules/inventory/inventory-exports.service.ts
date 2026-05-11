@@ -10,6 +10,7 @@ import { QueryExportReceiptDto } from './dto/query-export-receipt.dto';
 import { ExportReceiptDetailDto, ExportReceiptSummaryDto } from './dto/export-receipt-response.dto';
 import { InventoryService } from './inventory.service';
 import { BatchService } from './batch.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class InventoryExportsService {
@@ -21,6 +22,7 @@ export class InventoryExportsService {
     private readonly inventoryService: InventoryService,
     private readonly batchService: BatchService,
     private readonly dataSource: DataSource,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async create(dto: CreateExportReceiptDto, nhanVienId: number): Promise<ExportReceiptDetailDto> {
@@ -117,7 +119,16 @@ export class InventoryExportsService {
 
     // Gọi findOne SAU KHI transaction commit — this.exportRepo dùng connection riêng
     // không thấy data trong transaction chưa commit
-    return this.findOne(receiptId);
+    const result = await this.findOne(receiptId);
+    this.auditLogsService.log({
+      entityType: 'NhapXuat',
+      entityId: String(receiptId),
+      entityLabel: `Phiếu xuất ${result.receiptCode}`,
+      actionType: 'TaoMoi',
+      actionDetail: `Tạo phiếu xuất ${result.receiptCode} (${result.loaiPhieu})`,
+      after: JSON.stringify({ receiptCode: result.receiptCode, loaiPhieu: result.loaiPhieu, soLuongDong: result.lineItems.length, tongGiaVon: result.tongGiaVon }),
+    });
+    return result;
   }
 
   async findAll(query: QueryExportReceiptDto = {}): Promise<{

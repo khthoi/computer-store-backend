@@ -1,20 +1,27 @@
 import {
-  Controller, Get, Post, Put, Delete, Body, Param, ParseIntPipe, HttpCode, Request, Query, DefaultValuePipe,
+  Controller, Get, Post, Put, Patch, Delete, Body, Param, ParseIntPipe, HttpCode, Request, Query, DefaultValuePipe,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
+import { ApiTags, ApiOperation, ApiOkResponse, ApiCreatedResponse, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
+import { MembershipTierResponseDto } from './dto/loyalty-response.dto';
 import { Roles } from '../../common/decorators/roles.decorator';
 import { LoyaltyService } from './loyalty.service';
+import { MembershipTierService } from './membership-tier.service';
 import { CreateEarnRuleDto } from './dto/create-earn-rule.dto';
 import { CreateRedemptionCatalogDto } from './dto/create-redemption-catalog.dto';
 import { UpdateRedemptionCatalogDto } from './dto/update-redemption-catalog.dto';
 import { AdjustPointsDto } from './dto/adjust-points.dto';
+import { CreateMembershipTierDto } from './dto/create-membership-tier.dto';
+import { UpdateMembershipTierDto } from './dto/update-membership-tier.dto';
 
 @ApiTags('Admin — Loyalty')
 @Controller('admin/loyalty')
 @Roles('admin', 'staff')
 @ApiBearerAuth()
 export class AdminLoyaltyController {
-  constructor(private readonly loyaltyService: LoyaltyService) {}
+  constructor(
+    private readonly loyaltyService: LoyaltyService,
+    private readonly membershipTierService: MembershipTierService,
+  ) {}
 
   // ─── Earn Rules ───────────────────────────────────────────────────────────
 
@@ -133,5 +140,71 @@ export class AdminLoyaltyController {
   @ApiResponse({ status: 403, description: 'Forbidden' })
   adjustPoints(@Body() dto: AdjustPointsDto) {
     return this.loyaltyService.adjustPoints(dto);
+  }
+
+  // ─── Membership Tiers ─────────────────────────────────────────────────────
+
+  @Get('tiers')
+  @ApiOperation({ summary: 'Danh sách hạng thành viên (phân trang, tìm kiếm)' })
+  @ApiQuery({ name: 'page', required: false, type: Number })
+  @ApiQuery({ name: 'limit', required: false, type: Number })
+  @ApiQuery({ name: 'search', required: false, type: String })
+  @ApiQuery({ name: 'activeOnly', required: false, type: Boolean })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  getMembershipTiers(
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(10), ParseIntPipe) limit: number,
+    @Query('search') search?: string,
+    @Query('activeOnly') activeOnly?: string,
+  ) {
+    return this.membershipTierService.findAll(page, limit, search, activeOnly === 'true');
+  }
+
+  @Get('tiers/:id')
+  @ApiOperation({ summary: 'Chi tiết một hạng thành viên' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiOkResponse({ type: MembershipTierResponseDto })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  getMembershipTierById(@Param('id', ParseIntPipe) id: number) {
+    return this.membershipTierService.findById(id);
+  }
+
+  @Post('tiers')
+  @ApiOperation({ summary: 'Tạo hạng thành viên mới (validate overlap)' })
+  @ApiCreatedResponse({ type: MembershipTierResponseDto })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
+  @ApiResponse({ status: 409, description: 'Tên trùng hoặc khoảng điểm bị chồng lấp' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  createMembershipTier(@Body() dto: CreateMembershipTierDto) {
+    return this.membershipTierService.create(dto);
+  }
+
+  @Patch('tiers/:id')
+  @ApiOperation({ summary: 'Cập nhật hạng thành viên (validate overlap với các hạng khác)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiOkResponse({ type: MembershipTierResponseDto })
+  @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy' })
+  @ApiResponse({ status: 409, description: 'Tên trùng hoặc khoảng điểm bị chồng lấp' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  updateMembershipTier(
+    @Param('id', ParseIntPipe) id: number,
+    @Body() dto: UpdateMembershipTierDto,
+  ) {
+    return this.membershipTierService.update(id, dto);
+  }
+
+  @Delete('tiers/:id')
+  @HttpCode(204)
+  @ApiOperation({ summary: 'Xóa hạng thành viên (từ chối nếu có khách hàng đang ở bậc này)' })
+  @ApiParam({ name: 'id', example: 1 })
+  @ApiResponse({ status: 204, description: 'Đã xóa thành công' })
+  @ApiResponse({ status: 404, description: 'Không tìm thấy' })
+  @ApiResponse({ status: 409, description: 'Vẫn còn khách hàng đang ở bậc này' })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  deleteMembershipTier(@Param('id', ParseIntPipe) id: number) {
+    return this.membershipTierService.remove(id);
   }
 }

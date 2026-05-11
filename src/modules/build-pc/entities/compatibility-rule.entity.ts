@@ -1,4 +1,4 @@
-import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn } from 'typeorm';
+import { Entity, PrimaryGeneratedColumn, Column, ManyToOne, JoinColumn, CreateDateColumn, UpdateDateColumn } from 'typeorm';
 import { BuildSlot } from './build-slot.entity';
 
 @Entity('buildpc_quy_tac_tuong_thich')
@@ -41,6 +41,18 @@ export class CompatibilityRule {
   @Column({ name: 'is_active', type: 'tinyint', default: 1 })
   isActive: boolean;
 
+  @Column({ name: 'bat_buoc', type: 'tinyint', default: 1 })
+  batBuoc: boolean;
+
+  @Column({ name: 'gia_tri_mac_dinh', length: 100, nullable: true })
+  giaTriMacDinh: string | null;
+
   @Column({ name: 'thu_tu', type: 'smallint', default: 0 })
   thuTu: number;
+
+  @CreateDateColumn({ name: 'ngay_tao' })
+  ngayTao: Date;
+
+  @UpdateDateColumn({ name: 'ngay_cap_nhat' })
+  ngayCapNhat: Date;
 }

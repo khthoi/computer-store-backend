@@ -6,12 +6,17 @@ import {
 } from '@nestjs/common';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
+import { ClsService } from 'nestjs-cls';
 import * as bcrypt from 'bcryptjs';
-import { randomUUID } from 'crypto';
+import { randomBytes, randomUUID } from 'crypto';
 import { UsersService } from '../users/users.service';
 import { EmployeesService } from '../employees/employees.service';
 import { ProfileService } from '../employees/profile.service';
 import { RedisService } from '../../common/redis/redis.service';
+import { MailService } from '../mail/mail.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AuditAction, EntityType } from '../audit-logs/audit-log.constants';
+import { parseUserAgent, truncate500 } from '../../common/helpers/log.helper';
 import { Customer } from '../users/entities/customer.entity';
 import { Employee } from '../employees/entities/employee.entity';
 import { RegisterCustomerDto } from './dto/register-customer.dto';
@@ -33,6 +38,8 @@ const ACCESS_TOKEN_TTL = parseTtlSeconds(ACCESS_EXPIRES_IN);
 const REFRESH_TOKEN_TTL = parseTtlSeconds(process.env.JWT_REFRESH_EXPIRES_IN ?? '30d');
 const REFRESH_SHORT_TOKEN_TTL = parseTtlSeconds(process.env.JWT_REFRESH_SHORT_TTL ?? '1d');
 
+const RESET_TOKEN_TTL = 24 * 3600; // 24 hours
+
 @Injectable()
 export class AuthService {
   constructor(
@@ -42,6 +49,9 @@ export class AuthService {
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
+    private readonly mailService: MailService,
+    private readonly auditLogsService: AuditLogsService,
+    private readonly cls: ClsService,
   ) {}
 
   // ─── Validate helpers (dùng bởi Passport strategies) ─────────────────────
@@ -92,13 +102,65 @@ export class AuthService {
   async loginEmployee(
     employee: Employee,
     ipAddress?: string,
+    userAgent?: string,
   ): Promise<{ user: AuthEmployeeDto; accessToken: string; refreshToken: string }> {
     const fullEmployee = await this.employeesService.findByIdWithRoles(employee.id);
     if (!fullEmployee) throw new UnauthorizedException();
     const tokens = await this.issueEmployeeTokens(fullEmployee);
-    // fire-and-forget: update lastLoginAt + audit log (non-blocking)
-    void this.profileService.recordLogin(employee.id, ipAddress);
+    const allRoles = fullEmployee.roles?.map((r) => r.tenVaiTro) ?? [];
+
+    void this.profileService.recordLogin(employee.id, ipAddress, userAgent);
+
+    const uaLabel = userAgent ? parseUserAgent(userAgent) : null;
+    const detailParts = [
+      ipAddress ? `IP: ${ipAddress}` : null,
+      uaLabel,
+    ].filter(Boolean);
+    const actionDetail = truncate500(`Đăng nhập thành công${detailParts.length ? ' — ' + detailParts.join(' | ') : ''}`);
+
+    this.auditLogsService.log({
+      entityType: EntityType.EMPLOYEE,
+      entityId: String(fullEmployee.id),
+      entityLabel: fullEmployee.hoTen,
+      actionType: AuditAction.LOGIN,
+      actionDetail,
+      actor: {
+        actorId: fullEmployee.id,
+        actorName: fullEmployee.hoTen,
+        actorCode: fullEmployee.maNhanVien,
+        actorRole: allRoles,
+        ipAddress: ipAddress ?? undefined,
+        userAgent: userAgent ?? undefined,
+      },
+    });
     return { user: this.toEmployeeDto(fullEmployee), ...tokens };
+  }
+
+  // ─── Failed login logging (called by LocalEmployeeStrategy) ───────────────
+
+  async recordLoginFailed(email: string, ipAddress?: string, reason = 'Sai mật khẩu'): Promise<void> {
+    const employee = await this.employeesService.findByEmail(email);
+    const entityId = employee ? String(employee.id) : '0';
+    const entityLabel = employee ? employee.hoTen : '(không tìm thấy)';
+    const actionDetail = truncate500(`Đăng nhập thất bại — Lý do: ${reason}${ipAddress ? ` — IP: ${ipAddress}` : ''}`);
+
+    this.auditLogsService.log({
+      entityType: EntityType.EMPLOYEE,
+      entityId,
+      entityLabel,
+      actionType: AuditAction.LOGIN_FAILED,
+      actionDetail,
+      actor: {
+        actorId: null,
+        actorName: email,
+        actorRole: 'guest',
+        ipAddress: ipAddress ?? undefined,
+      },
+    });
+
+    if (employee) {
+      void this.profileService.recordLoginFailed(employee.id, ipAddress, reason);
+    }
   }
 
   // ─── Refresh Token ────────────────────────────────────────────────────────
@@ -127,7 +189,6 @@ export class AuthService {
       throw new UnauthorizedException('Refresh token đã bị thu hồi');
     }
 
-    // Xoá session cũ rồi phát session mới (rotate refresh token)
     await this.redisService.removeCustomerSession(payload.sub, sessionJti);
     await this.redisService.removeCustomerRefreshToken(payload.sub, sessionJti);
 
@@ -166,8 +227,18 @@ export class AuthService {
 
   async logout(user: JwtPayload, rawToken: string): Promise<void> {
     void rawToken;
+    if (user.type === 'employee') {
+      const ip = this.cls.get<string | null>('ipAddress') ?? undefined;
+      this.auditLogsService.log({
+        entityType: EntityType.EMPLOYEE,
+        entityId: String(user.sub),
+        entityLabel: user.name ?? user.email,
+        actionType: AuditAction.LOGOUT,
+        actionDetail: ip ? `Đăng xuất — IP: ${ip}` : 'Đăng xuất',
+      });
+      void this.profileService.recordLogout(user.sub, ip);
+    }
     if (user.type === 'customer') {
-      // Chỉ xoá phiên hiện tại, không ảnh hưởng thiết bị khác
       if (user.jti) {
         await this.redisService.removeCustomerSession(user.sub, user.jti);
         await this.redisService.removeCustomerRefreshToken(user.sub, user.jti);
@@ -193,7 +264,6 @@ export class AuthService {
 
     const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET', 'refresh_fallback');
     const refreshJti = randomUUID();
-    // sessionJti liên kết refresh token này với access token vừa phát
     const refreshPayload: JwtPayload = { sub: customer.id, email: customer.email, type: 'customer', roles: [], jti: refreshJti, sessionJti: jti };
     const refreshToken = this.jwtService.sign(refreshPayload, { secret: refreshSecret, expiresIn: refreshTtl });
     await this.redisService.addCustomerRefreshToken(customer.id, jti, refreshToken);
@@ -207,7 +277,7 @@ export class AuthService {
 
     const jti = randomUUID();
     const roles = employee.roles?.map((r) => r.tenVaiTro) ?? [];
-    const accessPayload: JwtPayload = { sub: employee.id, email: employee.email, type: 'employee', roles, jti };
+    const accessPayload: JwtPayload = { sub: employee.id, email: employee.email, name: employee.hoTen, code: employee.maNhanVien, type: 'employee', roles, jti };
     const accessToken = this.jwtService.sign(accessPayload, { expiresIn: ACCESS_EXPIRES_IN });
     await this.redisService.saveActiveJti(employee.id, 'employee', jti, ACCESS_TOKEN_TTL);
 
@@ -218,6 +288,47 @@ export class AuthService {
     await this.redisService.saveRefreshToken(employee.id, 'employee', refreshToken, REFRESH_TOKEN_TTL);
 
     return { accessToken, refreshToken };
+  }
+
+  // ─── Password reset ───────────────────────────────────────────────────────
+
+  async forgotPassword(email: string): Promise<void> {
+    const customer = await this.usersService.findByEmail(email);
+    if (!customer) return;
+
+    const token = randomBytes(32).toString('hex');
+    await this.redisService.savePasswordResetToken(token, customer.id, RESET_TOKEN_TTL);
+
+    const clientUrl = this.configService.get<string>('CLIENT_FRONTEND_URL', 'http://localhost:3000');
+    const resetLink = `${clientUrl}/reset-password?token=${token}`;
+
+    try {
+      await this.mailService.sendWelcomeWithResetLink({
+        to: email,
+        fullName: customer.hoTen,
+        resetLink,
+        expiresHours: RESET_TOKEN_TTL / 3600,
+      });
+    } catch {
+      // Swallow email errors — don't reveal email existence via error response
+    }
+  }
+
+  async validateResetToken(token: string): Promise<boolean> {
+    const stored = await this.redisService.getPasswordResetToken(token);
+    return stored !== null;
+  }
+
+  async resetPassword(token: string, newPassword: string): Promise<void> {
+    const storedId = await this.redisService.getPasswordResetToken(token);
+    if (!storedId) throw new BadRequestException('Link đặt lại mật khẩu không hợp lệ hoặc đã hết hạn');
+
+    const customerId = Number(storedId);
+    const newHash = await bcrypt.hash(newPassword, 12);
+
+    await this.usersService.updatePasswordHash(customerId, newHash);
+    await this.redisService.deletePasswordResetToken(token);
+    await this.redisService.clearAllCustomerSessions(customerId);
   }
 
   // ─── Response mappers ─────────────────────────────────────────────────────

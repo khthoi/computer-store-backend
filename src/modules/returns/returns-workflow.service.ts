@@ -11,6 +11,7 @@ import { ProcessReturnDto, RejectAfterInspectionDto } from './dto/process-return
 import { ConfirmGoodsReceivedDto } from './dto/confirm-received.dto';
 import { ReturnRequestResponseDto } from './dto/return-response.dto';
 import { ReturnsQueryService } from './returns-query.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const DEFAULT_RETURN_WINDOW_DAYS = 7;
 
@@ -25,6 +26,7 @@ export class ReturnsWorkflowService {
     private readonly returnItemRepo: Repository<ReturnRequestItem>,
     private readonly dataSource: DataSource,
     private readonly queryService: ReturnsQueryService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async submitReturn(dto: CreateReturnDto, customerId: number): Promise<ReturnRequestResponseDto> {
@@ -120,6 +122,23 @@ export class ReturnsWorkflowService {
       return result;
     });
 
+    this.auditLogsService.log({
+      entityType:  'YeuCauDoiTra',
+      entityId:    String(saved.id),
+      entityLabel: `Yêu cầu đổi/trả #${saved.id} — đơn hàng #${dto.orderId}`,
+      actionType:  'TaoMoi',
+      actionDetail: `Khách hàng #${customerId} tạo yêu cầu ${dto.requestType} cho đơn hàng #${dto.orderId} (lý do: ${dto.reason}, ${dto.items?.length ?? 0} sản phẩm)`,
+      after: JSON.stringify({
+        id:          saved.id,
+        orderId:     dto.orderId,
+        customerId,
+        requestType: dto.requestType,
+        reason:      dto.reason,
+        status:      'ChoDuyet',
+        soSanPham:   dto.items?.length ?? 0,
+      }),
+    });
+
     return this.queryService.toDto(saved);
   }
 
@@ -127,6 +146,7 @@ export class ReturnsWorkflowService {
     const returnReq = await this.returnRepo.findOne({ where: { id } });
     if (!returnReq) throw new NotFoundException(`Yêu cầu đổi/trả #${id} không tồn tại`);
 
+    const statusCu = returnReq.status;
     returnReq.status = dto.status;
     returnReq.processedById = employeeId;
     if (dto.status === 'DaDuyet') returnReq.approvedAt = new Date();
@@ -134,6 +154,21 @@ export class ReturnsWorkflowService {
     if (dto.resolution) returnReq.resolution = dto.resolution;
 
     await this.returnRepo.save(returnReq);
+    this.auditLogsService.log({
+      entityType:  'YeuCauDoiTra',
+      entityId:    String(id),
+      entityLabel: `Yêu cầu đổi/trả #${id}`,
+      actionType:  'DoiTrangThai',
+      actionDetail: `Nhân viên xử lý yêu cầu #${id}: ${statusCu} → ${dto.status}`,
+      before: JSON.stringify({ status: statusCu }),
+      after: JSON.stringify({
+        status:           dto.status,
+        processedById:    employeeId,
+        approvedAt:       dto.status === 'DaDuyet' ? new Date().toISOString() : undefined,
+        inspectionResult: dto.inspectionResult ?? undefined,
+        resolution:       dto.resolution ?? undefined,
+      }),
+    });
     return this.queryService.findOne(id);
   }
 
@@ -144,6 +179,7 @@ export class ReturnsWorkflowService {
       throw new BadRequestException('Chỉ có thể xác nhận nhận hàng khi yêu cầu ở trạng thái ChoDuyet hoặc DaDuyet');
     }
 
+    const statusCu = returnReq.status;
     returnReq.status = 'DaNhanHang';
     returnReq.returnReceivedAt = new Date();
     returnReq.returnReceivedById = employeeId;
@@ -151,6 +187,21 @@ export class ReturnsWorkflowService {
     if (dto.returnCarrier) returnReq.returnCarrier = dto.returnCarrier;
 
     await this.returnRepo.save(returnReq);
+    this.auditLogsService.log({
+      entityType:  'YeuCauDoiTra',
+      entityId:    String(id),
+      entityLabel: `Yêu cầu đổi/trả #${id}`,
+      actionType:  'DoiTrangThai',
+      actionDetail: `Nhân viên #${employeeId} xác nhận đã nhận hàng cho yêu cầu #${id}`,
+      before: JSON.stringify({ status: statusCu }),
+      after: JSON.stringify({
+        status:              'DaNhanHang',
+        returnReceivedAt:    returnReq.returnReceivedAt,
+        returnReceivedById:  employeeId,
+        returnTrackingCode:  returnReq.returnTrackingCode ?? null,
+        returnCarrier:       returnReq.returnCarrier ?? null,
+      }),
+    });
     return this.queryService.findOne(id);
   }
 
@@ -166,6 +217,17 @@ export class ReturnsWorkflowService {
     returnReq.inspectionResult = inspectionResult;
     returnReq.processedById = returnReq.processedById ?? employeeId;
     await this.returnRepo.save(returnReq);
+    this.auditLogsService.log({
+      entityType:  'YeuCauDoiTra',
+      entityId:    String(id),
+      entityLabel: `Yêu cầu đổi/trả #${id}`,
+      actionType:  'CapNhat',
+      actionDetail: `Nhân viên #${employeeId} ghi kết quả kiểm tra hàng cho yêu cầu #${id}`,
+      after: JSON.stringify({
+        inspectionResult,
+        processedById: returnReq.processedById,
+      }),
+    });
     return this.queryService.findOne(id);
   }
 
@@ -187,10 +249,24 @@ export class ReturnsWorkflowService {
       throw new BadRequestException('Vui lòng thêm ít nhất 1 ảnh bằng chứng kiểm tra');
     }
 
+    const statusCu = returnReq.status;
     returnReq.status = 'DaKiemTra';
     returnReq.inspectedAt = new Date();
     returnReq.processedById = returnReq.processedById ?? employeeId;
     await this.returnRepo.save(returnReq);
+    this.auditLogsService.log({
+      entityType:  'YeuCauDoiTra',
+      entityId:    String(id),
+      entityLabel: `Yêu cầu đổi/trả #${id}`,
+      actionType:  'DoiTrangThai',
+      actionDetail: `Nhân viên #${employeeId} xác nhận hoàn tất kiểm tra hàng cho yêu cầu #${id}`,
+      before: JSON.stringify({ status: statusCu }),
+      after: JSON.stringify({
+        status:       'DaKiemTra',
+        inspectedAt:  returnReq.inspectedAt,
+        processedById: returnReq.processedById,
+      }),
+    });
     return this.queryService.findOne(id);
   }
 
@@ -201,6 +277,7 @@ export class ReturnsWorkflowService {
       throw new BadRequestException('Chỉ có thể từ chối nhận hàng khi yêu cầu ở trạng thái DaKiemTra');
     }
 
+    const statusCu = returnReq.status;
     returnReq.status = 'TuChoiNhanHang';
     returnReq.processedById = returnReq.processedById ?? employeeId;
     if (dto.rejectTrackingCode) returnReq.rejectTrackingCode = dto.rejectTrackingCode;
@@ -210,6 +287,22 @@ export class ReturnsWorkflowService {
     returnReq.rejectedById = employeeId;
 
     await this.returnRepo.save(returnReq);
+    this.auditLogsService.log({
+      entityType:  'YeuCauDoiTra',
+      entityId:    String(id),
+      entityLabel: `Yêu cầu đổi/trả #${id}`,
+      actionType:  'DoiTrangThai',
+      actionDetail: `Nhân viên #${employeeId} từ chối nhận hàng sau kiểm tra cho yêu cầu #${id}`,
+      before: JSON.stringify({ status: statusCu }),
+      after: JSON.stringify({
+        status:             'TuChoiNhanHang',
+        rejectedAt:         returnReq.rejectedAt,
+        rejectedById:       employeeId,
+        rejectTrackingCode: returnReq.rejectTrackingCode ?? null,
+        rejectCarrier:      returnReq.rejectCarrier ?? null,
+        rejectNotes:        returnReq.rejectNotes ?? null,
+      }),
+    });
     return this.queryService.findOne(id);
   }
 
@@ -229,6 +322,20 @@ export class ReturnsWorkflowService {
 
     const asset = this.assetRepo.create({ returnRequestId, assetId, loaiAsset, sortOrder });
     await this.assetRepo.save(asset);
+    this.auditLogsService.log({
+      entityType:  'YeuCauDoiTraAsset',
+      entityId:    String(asset.id),
+      entityLabel: `Asset #${asset.id} — yêu cầu #${returnRequestId}`,
+      actionType:  'TaoMoi',
+      actionDetail: `Nhân viên thêm bằng chứng ${loaiAsset === 'inspection_evidence' ? 'kiểm tra' : 'khách hàng'} cho yêu cầu #${returnRequestId} (assetId: ${assetId})`,
+      after: JSON.stringify({
+        id:              asset.id,
+        returnRequestId,
+        assetId,
+        loaiAsset,
+        sortOrder:       asset.sortOrder,
+      }),
+    });
     return this.queryService.getReturnAssets(returnRequestId);
   }
 

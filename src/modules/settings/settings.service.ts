@@ -3,6 +3,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { SiteConfig } from '../cms/entities/site-config.entity';
 import { RedisService } from '../../common/redis/redis.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const CACHE_TTL = 600;
 const CACHE_KEY_ALL = 'site_config:all'; // shared with CmsModule — must invalidate on update
@@ -42,6 +43,7 @@ export class SettingsService {
     @InjectRepository(SiteConfig)
     private readonly repo: Repository<SiteConfig>,
     private readonly redisService: RedisService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async getGroup(group: GroupName): Promise<Record<string, string>> {
@@ -68,6 +70,7 @@ export class SettingsService {
     updatedById: number,
   ): Promise<Record<string, string>> {
     const prefix = GROUP_PREFIX[group];
+    const beforeSnapshot = await this.getGroup(group);
     const entries = Object.entries(data).filter(([, v]) => v !== undefined) as [string, string][];
 
     if (entries.length > 0) {
@@ -85,6 +88,20 @@ export class SettingsService {
 
     await this.redisService.invalidate(`settings:${group}`);
     await this.redisService.invalidate(CACHE_KEY_ALL);
+
+    const afterSnapshot = Object.fromEntries(
+      entries.map(([k, v]) => [k, SENSITIVE_KEYS.has(`${prefix}${k}`) ? '***' : v]),
+    );
+
+    this.auditLogsService.log({
+      entityType: 'CaiDat',
+      entityId: group,
+      entityLabel: `Cài đặt nhóm ${group}`,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật cài đặt nhóm ${group}`,
+      before: JSON.stringify(beforeSnapshot),
+      after: JSON.stringify(afterSnapshot),
+    });
 
     return this.getGroup(group);
   }

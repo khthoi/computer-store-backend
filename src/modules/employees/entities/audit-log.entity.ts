@@ -23,7 +23,8 @@ export class AuditLog {
   employee: Employee;
 
   @Column({ name: 'hanh_dong', length: 50 })
-  action: string; // 'login' | 'logout' | 'profile_edit' | 'role_assign' | 'role_remove' | 'report_view'
+  // Valid values: login_success | login_failed | logout | profile_edit | password_requested | password_changed | avatar_changed | role_changed | status_changed
+  action: string;
 
   @Column({ name: 'chi_tiet', length: 500, nullable: true })
   details: string | null;

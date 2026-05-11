@@ -22,6 +22,7 @@ import { InventoryController } from './inventory.controller';
 import { AdminInventoryController } from './admin-inventory.controller';
 import { LowStockProcessor, LOW_STOCK_QUEUE } from './processors/low-stock.processor';
 import { LowStockScheduler } from './low-stock.scheduler';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -39,6 +40,7 @@ import { LowStockScheduler } from './low-stock.scheduler';
       InventoryHealthReport,
     ]),
     BullModule.registerQueue({ name: LOW_STOCK_QUEUE }),
+    AuditLogsModule,
   ],
   controllers: [InventoryController, AdminInventoryController],
   providers: [

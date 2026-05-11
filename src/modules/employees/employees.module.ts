@@ -8,9 +8,10 @@ import { EmployeesController } from './employees.controller';
 import { ProfileService } from './profile.service';
 import { AdminProfileController } from './admin-profile.controller';
 import { MediaModule } from '../media/media.module';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Employee, Role, AuditLog]), MediaModule],
+  imports: [TypeOrmModule.forFeature([Employee, Role, AuditLog]), MediaModule, AuditLogsModule],
   controllers: [EmployeesController, AdminProfileController],
   providers: [EmployeesService, ProfileService],
   exports: [EmployeesService, ProfileService],

@@ -69,8 +69,10 @@ export class AdminProfileController {
   changePassword(
     @CurrentUser() user: JwtPayload,
     @Body() dto: ChangePasswordDto,
+    @Req() req: Request,
   ): Promise<{ message: string }> {
-    return this.profileService.requestPasswordChange(user.sub, dto);
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0] ?? req.ip;
+    return this.profileService.requestPasswordChange(user.sub, dto, ip);
   }
 
   @Get('confirm-password-change')
@@ -80,10 +82,12 @@ export class AdminProfileController {
   @ApiResponse({ status: 200, description: 'Trả về trang HTML thông báo kết quả' })
   async confirmPasswordChange(
     @Query('token') token: string,
+    @Req() req: Request,
     @Res() res: Response,
   ): Promise<void> {
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0] ?? req.ip;
     try {
-      const { employeeEmail } = await this.profileService.confirmPasswordChange(token);
+      const { employeeEmail } = await this.profileService.confirmPasswordChange(token, ip);
       res.setHeader('Content-Type', 'text/html; charset=utf-8');
       res.send(successHtml(employeeEmail));
     } catch (err: unknown) {
@@ -107,23 +111,29 @@ export class AdminProfileController {
   updateAvatar(
     @CurrentUser() user: JwtPayload,
     @UploadedFile() file: Express.Multer.File,
+    @Req() req: Request,
   ): Promise<AvatarResponseDto> {
-    return this.profileService.updateAvatar(user.sub, file);
+    const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0] ?? req.ip;
+    return this.profileService.updateAvatar(user.sub, file, ip);
   }
 
   @Get('audit-logs')
   @ApiOperation({ summary: 'Lịch sử hoạt động của nhân viên đang đăng nhập (có phân trang)' })
-  @ApiQuery({ name: 'page', required: false, example: 1, description: 'Số trang (mặc định 1)' })
-  @ApiQuery({ name: 'limit', required: false, example: 20, description: 'Số bản ghi mỗi trang (mặc định 20, tối đa 100)' })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 20, description: 'Tối đa 100' })
+  @ApiQuery({ name: 'q', required: false, description: 'Tìm theo nội dung chi tiết' })
+  @ApiQuery({ name: 'action', required: false, description: 'Lọc loại hành động, nhiều giá trị cách nhau bởi dấu phẩy' })
   @ApiOkResponse({ type: PaginatedAuditLogDto })
   getAuditLogs(
     @CurrentUser() user: JwtPayload,
     @Query('page') page?: string,
     @Query('limit') limit?: string,
+    @Query('q') q?: string,
+    @Query('action') action?: string,
   ) {
     const p = Math.max(1, parseInt(page ?? '1', 10) || 1);
     const l = Math.min(100, Math.max(1, parseInt(limit ?? '20', 10) || 20));
-    return this.profileService.getAuditLogs(user.sub, p, l);
+    return this.profileService.getAuditLogs(user.sub, p, l, q, action);
   }
 }
 

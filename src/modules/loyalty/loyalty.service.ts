@@ -17,7 +17,10 @@ import {
   LoyaltyTransactionResponseDto,
   LoyaltyRedemptionResponseDto,
   RedemptionCatalogResponseDto,
+  MembershipTierResponseDto,
 } from './dto/loyalty-response.dto';
+import { MembershipTier } from './entities/membership-tier.entity';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class LoyaltyService {
@@ -32,14 +35,26 @@ export class LoyaltyService {
     private readonly catalogRepo: Repository<RedemptionCatalog>,
     @InjectRepository(LoyaltyRedemption)
     private readonly redemptionRepo: Repository<LoyaltyRedemption>,
+    @InjectRepository(MembershipTier)
+    private readonly tierRepo: Repository<MembershipTier>,
     private readonly dataSource: DataSource,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   // ─── Earn Rules ───────────────────────────────────────────────────────────
 
   async createEarnRule(dto: CreateEarnRuleDto, createdBy: number): Promise<EarnRuleResponseDto> {
     const rule = this.earnRuleRepo.create({ ...dto, createdBy });
-    return this.toEarnRuleDto(await this.earnRuleRepo.save(rule));
+    const saved = await this.earnRuleRepo.save(rule);
+    this.auditLogsService.log({
+      entityType: 'LoyaltyEarnRule',
+      entityId: String(saved.id),
+      entityLabel: saved.name,
+      actionType: 'TaoMoi',
+      actionDetail: `Tạo quy tắc tích điểm "${saved.name}"`,
+      after: JSON.stringify({ name: saved.name, pointsPerUnit: saved.pointsPerUnit, spendPerUnit: Number(saved.spendPerUnit), isActive: saved.isActive }),
+    });
+    return this.toEarnRuleDto(saved);
   }
 
   async findAllEarnRules(page = 1, limit = 20, search?: string): Promise<{ data: EarnRuleResponseDto[]; total: number; totalPages: number }> {
@@ -77,6 +92,7 @@ export class LoyaltyService {
     const rule = await this.earnRuleRepo.findOne({ where: { id }, relations: ['scopes'] });
     if (!rule) throw new NotFoundException(`Earn rule #${id} không tồn tại`);
 
+    const beforeSnapshot = { name: rule.name, isActive: rule.isActive, pointsPerUnit: rule.pointsPerUnit, spendPerUnit: Number(rule.spendPerUnit) };
     const { scopes, ...rest } = dto;
     Object.assign(rule, rest);
 
@@ -87,13 +103,31 @@ export class LoyaltyService {
       );
     }
 
-    return this.toEarnRuleDto(await this.earnRuleRepo.save(rule));
+    const saved = await this.earnRuleRepo.save(rule);
+    this.auditLogsService.log({
+      entityType: 'LoyaltyEarnRule',
+      entityId: String(id),
+      entityLabel: saved.name,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật quy tắc tích điểm "${saved.name}"`,
+      before: JSON.stringify(beforeSnapshot),
+      after: JSON.stringify({ name: saved.name, isActive: saved.isActive, pointsPerUnit: saved.pointsPerUnit, spendPerUnit: Number(saved.spendPerUnit) }),
+    });
+    return this.toEarnRuleDto(saved);
   }
 
   async deleteEarnRule(id: number): Promise<void> {
     const rule = await this.earnRuleRepo.findOne({ where: { id } });
     if (!rule) throw new NotFoundException(`Earn rule #${id} không tồn tại`);
     await this.earnRuleRepo.remove(rule);
+    this.auditLogsService.log({
+      entityType: 'LoyaltyEarnRule',
+      entityId: String(id),
+      entityLabel: rule.name,
+      actionType: 'Xoa',
+      actionDetail: `Xóa quy tắc tích điểm "${rule.name}"`,
+      before: JSON.stringify({ name: rule.name, isActive: rule.isActive }),
+    });
   }
 
   // ─── Point Balance ────────────────────────────────────────────────────────
@@ -142,13 +176,23 @@ export class LoyaltyService {
     if (rule.maxPointsPerOrder) earned = Math.min(earned, rule.maxPointsPerOrder);
     if (earned <= 0) return 0;
 
-    await this.writeTransaction(manager, {
+    const tx = await this.writeTransaction(manager, {
       khachHangId,
       loaiGiaoDich: 'earn',
       diem: earned,
       moTa: `Tích điểm đơn hàng #${orderId}`,
       loaiThamChieu: 'don_hang',
       thamChieuId: orderId,
+    });
+
+    this.auditLogsService.log({
+      entityType: 'DiemTichLuy',
+      entityId: String(khachHangId),
+      entityLabel: `Khách hàng #${khachHangId}`,
+      actionType: 'CapNhat',
+      actionDetail: `Tích ${earned} điểm từ đơn hàng #${orderId}`,
+      before: JSON.stringify({ diemHienTai: tx.soDuTruoc }),
+      after: JSON.stringify({ diemHienTai: tx.soDuSau }),
     });
 
     return earned;
@@ -163,13 +207,22 @@ export class LoyaltyService {
     if (earnedPoints <= 0) return;
     const balance = await this.getBalance(khachHangId);
     const actual = Math.min(earnedPoints, balance);
-    await this.writeTransaction(manager, {
+    const tx = await this.writeTransaction(manager, {
       khachHangId,
       loaiGiaoDich: 'adjust',
       diem: -actual,
       moTa: `Hoàn điểm do trả hàng đơn #${orderId}`,
       loaiThamChieu: 'don_hang',
       thamChieuId: orderId,
+    });
+    this.auditLogsService.log({
+      entityType: 'DiemTichLuy',
+      entityId: String(khachHangId),
+      entityLabel: `Khách hàng #${khachHangId}`,
+      actionType: 'CapNhat',
+      actionDetail: `Trừ ${actual} điểm do hoàn trả đơn hàng #${orderId}`,
+      before: JSON.stringify({ diemHienTai: tx.soDuTruoc }),
+      after: JSON.stringify({ diemHienTai: tx.soDuSau }),
     });
   }
 
@@ -184,6 +237,15 @@ export class LoyaltyService {
         thamChieuId: dto.thamChieuId ?? null,
       }),
     );
+    this.auditLogsService.log({
+      entityType: 'DiemTichLuy',
+      entityId: String(dto.khachHangId),
+      entityLabel: `Khách hàng #${dto.khachHangId}`,
+      actionType: 'CapNhat',
+      actionDetail: `Điều chỉnh điểm ${dto.diem >= 0 ? '+' : ''}${dto.diem} — ${dto.moTa}`,
+      before: JSON.stringify({ diemHienTai: tx.soDuTruoc }),
+      after: JSON.stringify({ diemHienTai: tx.soDuSau }),
+    });
     return this.toTransactionDto(tx);
   }
 
@@ -231,6 +293,14 @@ export class LoyaltyService {
       where: { id: saved.id },
       relations: ['promotion'],
     });
+    this.auditLogsService.log({
+      entityType: 'LoyaltyCatalog',
+      entityId: String(saved.id),
+      entityLabel: saved.ten,
+      actionType: 'TaoMoi',
+      actionDetail: `Tạo phần thưởng đổi điểm "${saved.ten}"`,
+      after: JSON.stringify({ ten: saved.ten, diemCan: saved.diemCan, laHoatDong: saved.laHoatDong }),
+    });
     return this.toCatalogDto(withPromotion!);
   }
 
@@ -262,11 +332,21 @@ export class LoyaltyService {
   async updateCatalogItem(id: number, dto: UpdateRedemptionCatalogDto): Promise<RedemptionCatalogResponseDto> {
     const catalog = await this.catalogRepo.findOne({ where: { id } });
     if (!catalog) throw new NotFoundException(`Catalog item #${id} không tồn tại`);
+    const beforeSnapshot = { ten: catalog.ten, diemCan: catalog.diemCan, laHoatDong: catalog.laHoatDong };
     Object.assign(catalog, dto);
     await this.catalogRepo.save(catalog);
     const withPromotion = await this.catalogRepo.findOne({
       where: { id },
       relations: ['promotion'],
+    });
+    this.auditLogsService.log({
+      entityType: 'LoyaltyCatalog',
+      entityId: String(id),
+      entityLabel: catalog.ten,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật phần thưởng đổi điểm "${catalog.ten}"`,
+      before: JSON.stringify(beforeSnapshot),
+      after: JSON.stringify({ ten: catalog.ten, diemCan: catalog.diemCan, laHoatDong: catalog.laHoatDong }),
     });
     return this.toCatalogDto(withPromotion!);
   }
@@ -275,6 +355,14 @@ export class LoyaltyService {
     const catalog = await this.catalogRepo.findOne({ where: { id } });
     if (!catalog) throw new NotFoundException(`Catalog item #${id} không tồn tại`);
     await this.catalogRepo.remove(catalog);
+    this.auditLogsService.log({
+      entityType: 'LoyaltyCatalog',
+      entityId: String(id),
+      entityLabel: catalog.ten,
+      actionType: 'Xoa',
+      actionDetail: `Xóa phần thưởng đổi điểm "${catalog.ten}"`,
+      before: JSON.stringify({ ten: catalog.ten, diemCan: catalog.diemCan }),
+    });
   }
 
   // ─── Redeem Points ────────────────────────────────────────────────────────
@@ -401,5 +489,27 @@ export class LoyaltyService {
       status: r.trangThai,
       redeemedAt: r.ngayDoi,
     };
+  }
+
+  // ─── Membership Tiers ─────────────────────────────────────────────────────
+
+  /** @deprecated Use MembershipTierService.findAll() instead */
+  async findAllMembershipTiers(activeOnly = false): Promise<MembershipTierResponseDto[]> {
+    const where = activeOnly ? { isActive: true } : {};
+    const tiers = await this.tierRepo.find({ where, order: { minPoints: 'ASC' } });
+    return tiers.map((t) => ({
+      id: t.id,
+      name: t.name,
+      displayName: t.displayName,
+      minPoints: t.minPoints,
+      maxPoints: t.maxPoints,
+      color: t.color,
+      description: t.description,
+      sortOrder: t.sortOrder,
+      isActive: t.isActive,
+      customerCount: 0,
+      createdAt: t.createdAt,
+      updatedAt: t.updatedAt,
+    }));
   }
 }

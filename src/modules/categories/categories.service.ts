@@ -10,6 +10,7 @@ import { Category } from './entities/category.entity';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { slugify } from '../../common/helpers/slugify';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class CategoriesService {
@@ -17,6 +18,7 @@ export class CategoriesService {
     @InjectRepository(Category)
     private readonly repo: Repository<Category>,
     private readonly dataSource: DataSource,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async create(dto: CreateCategoryDto): Promise<Category> {
@@ -35,7 +37,24 @@ export class CategoriesService {
       slug,
       capDoHienThi: capDo,
     });
-    return this.repo.save(category);
+    const saved = await this.repo.save(category);
+    this.auditLogsService.log({
+      entityType: 'DanhMuc',
+      entityId: String(saved.id),
+      entityLabel: saved.tenDanhMuc,
+      actionType: 'TaoMoi',
+      actionDetail: `Tạo danh mục "${saved.tenDanhMuc}" (slug: ${saved.slug}, cấp: ${saved.capDoHienThi}${saved.danhMucChaId ? ', danh mục cha #' + saved.danhMucChaId : ''})`,
+      after: JSON.stringify({
+        id: saved.id,
+        tenDanhMuc: saved.tenDanhMuc,
+        slug: saved.slug,
+        nodeType: saved.nodeType,
+        capDoHienThi: saved.capDoHienThi,
+        danhMucChaId: saved.danhMucChaId,
+        trangThai: saved.trangThai,
+      }),
+    });
+    return saved;
   }
 
   async getTree(): Promise<Category[]> {
@@ -83,6 +102,15 @@ export class CategoriesService {
 
   async update(id: number, dto: UpdateCategoryDto): Promise<Category> {
     const cat = await this.findOne(id);
+    const before = {
+      tenDanhMuc: cat.tenDanhMuc,
+      slug: cat.slug,
+      trangThai: cat.trangThai,
+      capDoHienThi: cat.capDoHienThi,
+      danhMucChaId: cat.danhMucChaId,
+      moTa: cat.moTa,
+      hinhAnh: cat.hinhAnh,
+    };
 
     if (dto.slug && dto.slug !== cat.slug) {
       await this.assertSlugUnique(dto.slug);
@@ -99,7 +127,25 @@ export class CategoriesService {
     }
 
     Object.assign(cat, dto);
-    return this.repo.save(cat);
+    const updated = await this.repo.save(cat);
+    this.auditLogsService.log({
+      entityType: 'DanhMuc',
+      entityId: String(id),
+      entityLabel: updated.tenDanhMuc,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật danh mục "${updated.tenDanhMuc}"`,
+      before: JSON.stringify(before),
+      after: JSON.stringify({
+        tenDanhMuc: updated.tenDanhMuc,
+        slug: updated.slug,
+        trangThai: updated.trangThai,
+        capDoHienThi: updated.capDoHienThi,
+        danhMucChaId: updated.danhMucChaId,
+        moTa: updated.moTa,
+        hinhAnh: updated.hinhAnh,
+      }),
+    });
+    return updated;
   }
 
   async remove(id: number): Promise<void> {
@@ -108,12 +154,35 @@ export class CategoriesService {
       throw new BadRequestException('Không thể xoá danh mục có danh mục con');
     }
     await this.repo.remove(cat);
+    this.auditLogsService.log({
+      entityType: 'DanhMuc',
+      entityId: String(id),
+      entityLabel: cat.tenDanhMuc,
+      actionType: 'Xoa',
+      actionDetail: `Xóa danh mục "${cat.tenDanhMuc}" (slug: ${cat.slug}, cấp: ${cat.capDoHienThi})`,
+      before: JSON.stringify({
+        id,
+        tenDanhMuc: cat.tenDanhMuc,
+        slug: cat.slug,
+        capDoHienThi: cat.capDoHienThi,
+        danhMucChaId: cat.danhMucChaId,
+        trangThai: cat.trangThai,
+      }),
+    });
   }
 
   async reorderCategories(orderedIds: number[]): Promise<void> {
     await Promise.all(
       orderedIds.map((id, idx) => this.repo.update({ id }, { thuTuHienThi: idx })),
     );
+    this.auditLogsService.log({
+      entityType: 'DanhMuc',
+      entityId: 'batch',
+      entityLabel: 'Sắp xếp lại danh mục',
+      actionType: 'CapNhat',
+      actionDetail: `Sắp xếp lại thứ tự hiển thị ${orderedIds.length} danh mục`,
+      after: JSON.stringify({ newOrder: orderedIds }),
+    });
   }
 
   async getProductCountMap(): Promise<Map<number, number>> {

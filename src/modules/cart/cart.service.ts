@@ -11,6 +11,7 @@ import { CartItem } from './entities/cart-item.entity';
 import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { CartItemResponseDto, CartResponseDto } from './dto/cart-response.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class CartService {
@@ -18,6 +19,7 @@ export class CartService {
     @InjectRepository(Cart) private cartRepo: Repository<Cart>,
     @InjectRepository(CartItem) private itemRepo: Repository<CartItem>,
     private dataSource: DataSource,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async getMyCart(userId: number): Promise<CartResponseDto> {
@@ -58,13 +60,23 @@ export class CartService {
     });
 
     if (existing) {
+      const soLuongCu = existing.soLuong;
       const newQty = existing.soLuong + dto.soLuong;
       if (stock < newQty) throw new BadRequestException('Số lượng tồn kho không đủ');
       existing.soLuong = newQty;
       existing.giaTaiThoiDiem = variant[0].gia_ban;
       await this.itemRepo.save(existing);
+      this.auditLogsService.log({
+        entityType: 'ChiTietGioHang',
+        entityId: String(existing.id),
+        entityLabel: `Giỏ hàng #${existing.gioHangId} — phiên bản #${existing.phienBanId}`,
+        actionType: 'CapNhat',
+        actionDetail: `Khách hàng tăng số lượng sản phẩm (phiên bản #${existing.phienBanId}) trong giỏ hàng từ ${soLuongCu} lên ${existing.soLuong}`,
+        before: JSON.stringify({ soLuong: soLuongCu }),
+        after: JSON.stringify({ soLuong: existing.soLuong }),
+      });
     } else {
-      await this.itemRepo.save(
+      const cartItem = await this.itemRepo.save(
         this.itemRepo.create({
           gioHangId: cart.id,
           phienBanId: dto.phienBanId,
@@ -72,6 +84,14 @@ export class CartService {
           giaTaiThoiDiem: variant[0].gia_ban,
         }),
       );
+      this.auditLogsService.log({
+        entityType: 'ChiTietGioHang',
+        entityId: String(cartItem.id),
+        entityLabel: `Giỏ hàng #${cartItem.gioHangId} — phiên bản #${cartItem.phienBanId}`,
+        actionType: 'TaoMoi',
+        actionDetail: `Khách hàng thêm sản phẩm (phiên bản #${cartItem.phienBanId}) vào giỏ hàng (số lượng: ${cartItem.soLuong}, giá tại thời điểm: ${cartItem.giaTaiThoiDiem})`,
+        after: JSON.stringify({ gioHangId: cartItem.gioHangId, phienBanId: cartItem.phienBanId, soLuong: cartItem.soLuong, giaTaiThoiDiem: cartItem.giaTaiThoiDiem }),
+      });
     }
 
     return this.getMyCart(userId);
@@ -88,8 +108,18 @@ export class CartService {
     const stock = await this.getTotalStock(item.phienBanId);
     if (stock < dto.soLuong) throw new BadRequestException('Số lượng tồn kho không đủ');
 
+    const soLuongCu = item.soLuong;
     item.soLuong = dto.soLuong;
     await this.itemRepo.save(item);
+    this.auditLogsService.log({
+      entityType: 'ChiTietGioHang',
+      entityId: String(itemId),
+      entityLabel: `Giỏ hàng #${item.gioHangId} — phiên bản #${item.phienBanId}`,
+      actionType: 'CapNhat',
+      actionDetail: `Khách hàng cập nhật số lượng sản phẩm (phiên bản #${item.phienBanId}) từ ${soLuongCu} thành ${item.soLuong}`,
+      before: JSON.stringify({ soLuong: soLuongCu }),
+      after: JSON.stringify({ soLuong: item.soLuong }),
+    });
     return this.getMyCart(userId);
   }
 
@@ -102,13 +132,30 @@ export class CartService {
     if (item.cart.khachHangId !== userId) throw new ForbiddenException();
 
     await this.itemRepo.remove(item);
+    this.auditLogsService.log({
+      entityType: 'ChiTietGioHang',
+      entityId: String(itemId),
+      entityLabel: `Giỏ hàng #${item.gioHangId} — phiên bản #${item.phienBanId}`,
+      actionType: 'Xoa',
+      actionDetail: `Khách hàng xóa sản phẩm (phiên bản #${item.phienBanId}) khỏi giỏ hàng (số lượng lúc xóa: ${item.soLuong})`,
+      before: JSON.stringify({ gioHangId: item.gioHangId, phienBanId: item.phienBanId, soLuong: item.soLuong }),
+    });
     return this.getMyCart(userId);
   }
 
   async clearCart(userId: number): Promise<void> {
     const cart = await this.cartRepo.findOne({ where: { khachHangId: userId } });
     if (cart) {
+      const soItemBiXoa = await this.itemRepo.count({ where: { gioHangId: cart.id } });
       await this.itemRepo.delete({ gioHangId: cart.id });
+      this.auditLogsService.log({
+        entityType: 'GioHang',
+        entityId: String(cart.id),
+        entityLabel: `Giỏ hàng #${cart.id}`,
+        actionType: 'Xoa',
+        actionDetail: `Khách hàng xóa toàn bộ giỏ hàng (${soItemBiXoa} sản phẩm)`,
+        before: JSON.stringify({ soItem: soItemBiXoa, gioHangId: cart.id }),
+      });
     }
   }
 

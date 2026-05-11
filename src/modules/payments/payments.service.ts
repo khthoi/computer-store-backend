@@ -12,6 +12,7 @@ import { CreatePaymentDto } from './dto/create-payment.dto';
 import { VNPayReturnDto } from './dto/vnpay-return.dto';
 import { OrdersService } from '../orders/orders.service';
 import { TrangThaiDon } from '../orders/entities/order.entity';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class PaymentsService {
@@ -19,6 +20,7 @@ export class PaymentsService {
     @InjectRepository(Transaction) private txRepo: Repository<Transaction>,
     private ordersService: OrdersService,
     private configService: ConfigService,
+    private auditLogsService: AuditLogsService,
   ) {}
 
   async createTransaction(dto: CreatePaymentDto): Promise<{ transaction: Transaction; paymentUrl?: string }> {
@@ -31,11 +33,21 @@ export class PaymentsService {
 
     let tx: Transaction;
     if (existing) {
+      const before = { trangThaiGiaoDich: existing.trangThaiGiaoDich, phuongThucThanhToan: existing.phuongThucThanhToan };
       existing.phuongThucThanhToan = dto.phuongThucThanhToan as PhuongThucThanhToan;
       existing.soTien = order.totalAmount;
       existing.nganHangVi = dto.nganHangVi ?? null;
       existing.trangThaiGiaoDich = TrangThaiGiaoDich.CHO;
       tx = await this.txRepo.save(existing);
+      this.auditLogsService.log({
+        entityType: 'GiaoDich',
+        entityId: String(tx.id),
+        entityLabel: `Giao dịch đơn hàng #${order.orderCode}`,
+        actionType: 'CapNhat',
+        actionDetail: `Cập nhật giao dịch đơn hàng #${order.orderCode}`,
+        before: JSON.stringify(before),
+        after: JSON.stringify({ trangThaiGiaoDich: tx.trangThaiGiaoDich, phuongThucThanhToan: tx.phuongThucThanhToan }),
+      });
     } else {
       tx = await this.txRepo.save(
         this.txRepo.create({
@@ -46,6 +58,14 @@ export class PaymentsService {
           trangThaiGiaoDich: TrangThaiGiaoDich.CHO,
         }),
       );
+      this.auditLogsService.log({
+        entityType: 'GiaoDich',
+        entityId: String(tx.id),
+        entityLabel: `Giao dịch đơn hàng #${order.orderCode}`,
+        actionType: 'TaoMoi',
+        actionDetail: `Tạo giao dịch ${dto.phuongThucThanhToan} cho đơn hàng #${order.orderCode}`,
+        after: JSON.stringify({ id: tx.id, phuongThucThanhToan: tx.phuongThucThanhToan, soTien: tx.soTien, trangThaiGiaoDich: tx.trangThaiGiaoDich }),
+      });
     }
 
     if (dto.phuongThucThanhToan === PhuongThucThanhToan.COD) {
@@ -73,6 +93,8 @@ export class PaymentsService {
     const tx = await this.txRepo.findOne({ where: { id: parseInt(txnRef) } });
     if (!tx) return { success: false, message: 'Giao dịch không tồn tại' };
 
+    const before = { trangThaiGiaoDich: tx.trangThaiGiaoDich };
+
     if (success) {
       tx.trangThaiGiaoDich = TrangThaiGiaoDich.THANH_CONG;
       tx.maGiaoDichNgoai = query.vnp_TransactionNo ?? null;
@@ -81,15 +103,33 @@ export class PaymentsService {
       await this.txRepo.save(tx);
 
       // Cập nhật trạng thái đơn hàng
-      await this.ordersService.updateStatus(
+      const orderDto = await this.ordersService.updateStatus(
         tx.donHangId,
         { trangThai: TrangThaiDon.DA_XAC_NHAN, ghiChu: 'Thanh toán VNPay thành công' },
         0,
       );
+      this.auditLogsService.log({
+        entityType: 'GiaoDich',
+        entityId: String(tx.id),
+        entityLabel: `Giao dịch #${tx.id}`,
+        actionType: 'CapNhat',
+        actionDetail: `Thanh toán VNPay thành công đơn hàng #${orderDto.orderCode}`,
+        before: JSON.stringify(before),
+        after: JSON.stringify({ trangThaiGiaoDich: TrangThaiGiaoDich.THANH_CONG, maGiaoDichNgoai: tx.maGiaoDichNgoai }),
+      });
     } else {
       tx.trangThaiGiaoDich = TrangThaiGiaoDich.THAT_BAI;
       tx.ghiChuLoi = `VNPay ResponseCode: ${query.vnp_ResponseCode}`;
       await this.txRepo.save(tx);
+      this.auditLogsService.log({
+        entityType: 'GiaoDich',
+        entityId: String(tx.id),
+        entityLabel: `Giao dịch #${tx.id}`,
+        actionType: 'CapNhat',
+        actionDetail: `Thanh toán VNPay thất bại: ResponseCode ${query.vnp_ResponseCode}`,
+        before: JSON.stringify(before),
+        after: JSON.stringify({ trangThaiGiaoDich: TrangThaiGiaoDich.THAT_BAI }),
+      });
     }
 
     return { success, message: success ? 'Thanh toán thành công' : 'Thanh toán thất bại' };
@@ -103,21 +143,41 @@ export class PaymentsService {
     const tx = await this.txRepo.findOne({ where: { id: parseInt(orderId) } });
     if (!tx) return { success: false };
 
+    const before = { trangThaiGiaoDich: tx.trangThaiGiaoDich };
+
     if (success) {
       tx.trangThaiGiaoDich = TrangThaiGiaoDich.THANH_CONG;
       tx.maGiaoDichNgoai = body.transId?.toString() ?? null;
       tx.thoiDiemThanhToan = new Date();
       await this.txRepo.save(tx);
 
-      await this.ordersService.updateStatus(
+      const orderDto = await this.ordersService.updateStatus(
         tx.donHangId,
         { trangThai: TrangThaiDon.DA_XAC_NHAN, ghiChu: 'Thanh toán MoMo thành công' },
         0,
       );
+      this.auditLogsService.log({
+        entityType: 'GiaoDich',
+        entityId: String(tx.id),
+        entityLabel: `Giao dịch #${tx.id}`,
+        actionType: 'CapNhat',
+        actionDetail: `Thanh toán MoMo thành công đơn hàng #${orderDto.orderCode}`,
+        before: JSON.stringify(before),
+        after: JSON.stringify({ trangThaiGiaoDich: TrangThaiGiaoDich.THANH_CONG, maGiaoDichNgoai: tx.maGiaoDichNgoai }),
+      });
     } else {
       tx.trangThaiGiaoDich = TrangThaiGiaoDich.THAT_BAI;
       tx.ghiChuLoi = `MoMo resultCode: ${body?.resultCode}`;
       await this.txRepo.save(tx);
+      this.auditLogsService.log({
+        entityType: 'GiaoDich',
+        entityId: String(tx.id),
+        entityLabel: `Giao dịch #${tx.id}`,
+        actionType: 'CapNhat',
+        actionDetail: `Thanh toán MoMo thất bại: resultCode ${body?.resultCode}`,
+        before: JSON.stringify(before),
+        after: JSON.stringify({ trangThaiGiaoDich: TrangThaiGiaoDich.THAT_BAI }),
+      });
     }
 
     return { success };
@@ -130,15 +190,25 @@ export class PaymentsService {
       throw new BadRequestException('Đây không phải đơn hàng COD');
     }
 
+    const before = { trangThaiGiaoDich: tx.trangThaiGiaoDich };
     tx.trangThaiGiaoDich = TrangThaiGiaoDich.THANH_CONG;
     tx.thoiDiemThanhToan = new Date();
     await this.txRepo.save(tx);
 
-    await this.ordersService.updateStatus(
+    const orderDto = await this.ordersService.updateStatus(
       donHangId,
       { trangThai: TrangThaiDon.DA_GIAO, ghiChu: 'Xác nhận giao COD thành công' },
       adminId,
     );
+    this.auditLogsService.log({
+      entityType: 'GiaoDich',
+      entityId: String(tx.id),
+      entityLabel: `Giao dịch COD đơn hàng #${orderDto.orderCode}`,
+      actionType: 'CapNhat',
+      actionDetail: `Xác nhận thanh toán COD đơn hàng #${orderDto.orderCode}`,
+      before: JSON.stringify(before),
+      after: JSON.stringify({ trangThaiGiaoDich: TrangThaiGiaoDich.THANH_CONG }),
+    });
 
     return tx;
   }

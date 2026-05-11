@@ -8,6 +8,7 @@ import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
+import { ClsService } from 'nestjs-cls';
 import { Employee } from './entities/employee.entity';
 import { AuditLog } from './entities/audit-log.entity';
 import { Role } from '../roles/entities/role.entity';
@@ -24,11 +25,16 @@ import {
   AuditLogEntryDto,
   AvatarResponseDto,
 } from './dto/profile-response.dto';
+import { truncate500, parseUserAgent, detailUpdate } from '../../common/helpers/log.helper';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AuditAction, EntityType } from '../audit-logs/audit-log.constants';
 
 // ─── Constants ────────────────────────────────────────────────────────────────
 
 const PWD_CONFIRM_TTL = 15 * 60; // 15 minutes in seconds
 const PWD_CONFIRM_KEY = (token: string) => `pwd_confirm:${token}`;
+
+const STATUS_DISPLAY: Record<string, string> = { DangLam: 'Đang làm', NghiViec: 'Nghỉ việc' };
 
 // ─── Gender mapping helpers ───────────────────────────────────────────────────
 
@@ -103,7 +109,6 @@ function buildProfileEditDetails(o: {
     ? `Cập nhật hồ sơ — ${parts.join('; ')}`
     : 'Cập nhật hồ sơ — không có thay đổi';
 
-  // details column is VARCHAR(500)
   return result.length > 500 ? result.slice(0, 497) + '...' : result;
 }
 
@@ -122,7 +127,27 @@ export class ProfileService {
     private readonly mailService: MailService,
     private readonly redisService: RedisService,
     private readonly configService: ConfigService,
+    private readonly auditLogsService: AuditLogsService,
+    private readonly cls: ClsService,
   ) {}
+
+  private buildActorSuffix(): string {
+    const name = this.cls.get<string>('actorName');
+    if (!name) return 'hệ thống';
+    const code = this.cls.get<string | null>('actorCode');
+    const rawRole = this.cls.get<string>('actorRole') ?? '[]';
+    let roles: string[] = [];
+    try {
+      const parsed = JSON.parse(rawRole);
+      roles = Array.isArray(parsed) ? (parsed as string[]) : [String(parsed)];
+    } catch {
+      roles = rawRole ? [rawRole] : [];
+    }
+    let suffix = `[${name}]`;
+    if (code) suffix += ` - [${code}]`;
+    if (roles.length) suffix += ` - {[${roles.join('], [')}]}`;
+    return suffix;
+  }
 
   // ─── GET /admin/me ─────────────────────────────────────────────────────────
 
@@ -162,7 +187,6 @@ export class ProfileService {
     });
     if (!employee) throw new NotFoundException('Nhân viên không tồn tại');
 
-    // Snapshot old values before mutating
     const oldFullName = employee.hoTen;
     const oldPhone = employee.soDienThoai ?? '';
     const oldGender = genderToFrontend(employee.gioiTinh);
@@ -197,15 +221,32 @@ export class ProfileService {
       }),
     );
 
+    const newGenderLabel = labelGender(genderToFrontend(saved.gioiTinh));
+    const newDob = toDateString(saved.ngaySinh);
+    this.auditLogsService.log({
+      entityType: EntityType.EMPLOYEE,
+      entityId: String(employeeId),
+      entityLabel: saved.hoTen,
+      actionType: AuditAction.UPDATE,
+      actionDetail: detailUpdate(
+        `hồ sơ ${saved.hoTen}`,
+        { hoTen: oldFullName, soDienThoai: oldPhone, gioiTinh: labelGender(oldGender), ngaySinh: oldDob },
+        { hoTen: saved.hoTen, soDienThoai: saved.soDienThoai ?? '', gioiTinh: newGenderLabel, ngaySinh: newDob },
+        { hoTen: 'Họ tên', soDienThoai: 'Số điện thoại', gioiTinh: 'Giới tính', ngaySinh: 'Ngày sinh' },
+      ),
+      before: JSON.stringify({ hoTen: oldFullName, soDienThoai: oldPhone, gioiTinh: oldGender, ngaySinh: oldDob }),
+      after: JSON.stringify({ hoTen: saved.hoTen, soDienThoai: saved.soDienThoai ?? '', gioiTinh: genderToFrontend(saved.gioiTinh), ngaySinh: newDob }),
+    });
+
     return this.toEmployeeDto(saved);
   }
 
   // ─── POST /admin/me/change-password ────────────────────────────────────────
-  // Validates current password, stores new password hash in Redis, sends confirmation email.
 
   async requestPasswordChange(
     employeeId: number,
     dto: ChangePasswordDto,
+    ipAddress?: string,
   ): Promise<{ message: string }> {
     const employee = await this.employeeRepo.findOne({
       where: { id: employeeId },
@@ -232,14 +273,24 @@ export class ProfileService {
       expiresMinutes: PWD_CONFIRM_TTL / 60,
     });
 
+    const ipSuffix = ipAddress ? ` — IP: ${ipAddress}` : '';
+    const pwdRequestDetail = truncate500(`Yêu cầu đổi mật khẩu — email xác nhận gửi đến ${employee.email} (hiệu lực ${PWD_CONFIRM_TTL / 60} phút)${ipSuffix}`);
     await this.auditLogRepo.save(
       this.auditLogRepo.create({
         employeeId,
-        action: 'profile_edit',
-        details: `Yêu cầu đổi mật khẩu — email xác nhận đã gửi đến ${employee.email} (hiệu lực ${PWD_CONFIRM_TTL / 60} phút)`,
-        ipAddress: null,
+        action: 'password_requested',
+        details: pwdRequestDetail,
+        ipAddress: ipAddress ?? null,
       }),
     );
+
+    this.auditLogsService.log({
+      entityType: EntityType.EMPLOYEE,
+      entityId: String(employeeId),
+      entityLabel: employee.hoTen,
+      actionType: AuditAction.REQUEST_PASSWORD_CHANGE,
+      actionDetail: pwdRequestDetail,
+    });
 
     return {
       message: `Email xác nhận đã được gửi đến ${employee.email}. Vui lòng kiểm tra hộp thư và nhấn vào đường link để hoàn tất thay đổi mật khẩu (hiệu lực ${PWD_CONFIRM_TTL / 60} phút).`,
@@ -247,9 +298,8 @@ export class ProfileService {
   }
 
   // ─── GET /admin/me/confirm-password-change?token=TOKEN ────────────────────
-  // Called when user clicks the email link — confirms and applies the password change.
 
-  async confirmPasswordChange(token: string): Promise<{ employeeEmail: string }> {
+  async confirmPasswordChange(token: string, ipAddress?: string): Promise<{ employeeEmail: string }> {
     if (!token) throw new BadRequestException('Token không hợp lệ');
 
     const raw = await this.redisService.get(PWD_CONFIRM_KEY(token));
@@ -264,22 +314,33 @@ export class ProfileService {
 
     const employee = await this.employeeRepo.findOne({
       where: { id: employeeId },
-      select: ['id', 'email'],
+      select: ['id', 'email', 'hoTen', 'maNhanVien'],
     });
     if (!employee) throw new NotFoundException('Nhân viên không tồn tại');
 
+    const changedAt = new Date().toISOString();
     await Promise.all([
       this.employeeRepo.update(employeeId, { matKhauHash: newPasswordHash }),
       this.redisService.del(PWD_CONFIRM_KEY(token)),
       this.auditLogRepo.save(
         this.auditLogRepo.create({
           employeeId,
-          action: 'profile_edit',
-          details: 'Đổi mật khẩu thành công qua email xác nhận',
-          ipAddress: null,
+          action: 'password_changed',
+          details: `Đổi mật khẩu thành công qua email xác nhận${ipAddress ? ` — IP: ${ipAddress}` : ''}`,
+          ipAddress: ipAddress ?? null,
         }),
       ),
     ]);
+
+    this.auditLogsService.log({
+      entityType: EntityType.EMPLOYEE,
+      entityId: String(employeeId),
+      entityLabel: employee.hoTen,
+      actionType: AuditAction.UPDATE,
+      actionDetail: `Đổi mật khẩu thành công (xác nhận qua email)`,
+      before: JSON.stringify({ matKhau: '[đã hash]' }),
+      after: JSON.stringify({ matKhau: '[đã cập nhật]', thoiGian: changedAt }),
+    });
 
     return { employeeEmail: employee.email };
   }
@@ -289,10 +350,11 @@ export class ProfileService {
   async updateAvatar(
     employeeId: number,
     file: Express.Multer.File,
+    ipAddress?: string,
   ): Promise<AvatarResponseDto> {
     const before = await this.employeeRepo.findOne({
       where: { id: employeeId },
-      select: ['id', 'anhDaiDien'],
+      select: ['id', 'anhDaiDien', 'maNhanVien', 'hoTen'],
     });
 
     const asset = await this.mediaService.upload(file, employeeId);
@@ -301,45 +363,124 @@ export class ProfileService {
       assetIdAvatar: asset.id,
     });
 
-    const action = before?.anhDaiDien ? 'Cập nhật ảnh đại diện' : 'Thêm ảnh đại diện';
+    const action = before?.anhDaiDien ? 'Cập nhật' : 'Thêm mới';
     await this.auditLogRepo.save(
       this.auditLogRepo.create({
         employeeId,
-        action: 'profile_edit',
-        details: `${action} — file: "${file.originalname}" (${(file.size / 1024).toFixed(0)} KB)`,
-        ipAddress: null,
+        action: 'avatar_changed',
+        details: truncate500(`${action} ảnh đại diện — ${file.originalname} (${(file.size / 1024).toFixed(0)} KB)`),
+        ipAddress: ipAddress ?? null,
       }),
     );
+
+    this.auditLogsService.log({
+      entityType: 'NhanVien',
+      entityId: String(employeeId),
+      entityLabel: before?.hoTen ?? String(employeeId),
+      actionType: 'CapNhat',
+      actionDetail: `${action} ảnh đại diện — ${file.originalname}`,
+      before: JSON.stringify({ anhDaiDien: before?.anhDaiDien ?? null }),
+      after: JSON.stringify({ anhDaiDien: asset.urlGoc }),
+    });
 
     return { avatarUrl: asset.urlGoc };
   }
 
   // ─── GET /admin/me/audit-logs ──────────────────────────────────────────────
 
-  async getAuditLogs(employeeId: number, page = 1, limit = 20) {
-    const [logs, total] = await this.auditLogRepo.findAndCount({
-      where: { employeeId },
-      order: { createdAt: 'DESC' },
-      skip: (page - 1) * limit,
-      take: limit,
-    });
+  async getAuditLogs(employeeId: number, page = 1, limit = 20, q?: string, action?: string) {
+    const qb = this.auditLogRepo
+      .createQueryBuilder('l')
+      .where('l.employeeId = :employeeId', { employeeId })
+      .orderBy('l.createdAt', 'DESC')
+      .skip((page - 1) * limit)
+      .take(limit);
+
+    if (q?.trim()) {
+      qb.andWhere('l.details LIKE :q', { q: `%${q.trim()}%` });
+    }
+    if (action?.trim()) {
+      const actions = action.split(',').map((a) => a.trim()).filter(Boolean);
+      if (actions.length > 0) qb.andWhere('l.action IN (:...actions)', { actions });
+    }
+
+    const [logs, total] = await qb.getManyAndCount();
     return { items: logs.map((l) => this.toAuditLogDto(l)), total, page, limit, totalPages: Math.ceil(total / limit) };
   }
 
   // ─── Called by AuthService on login ────────────────────────────────────────
 
-  async recordLogin(employeeId: number, ipAddress?: string): Promise<void> {
+  async recordLogin(employeeId: number, ipAddress?: string, userAgent?: string): Promise<void> {
+    const uaPart = userAgent ? `, ${parseUserAgent(userAgent)}` : '';
+    const details = truncate500(`Đăng nhập thành công — IP: ${ipAddress ?? '(không rõ)'}${uaPart}`);
     await Promise.all([
       this.employeeRepo.update(employeeId, { dangNhapCuoi: new Date() }),
       this.auditLogRepo.save(
         this.auditLogRepo.create({
           employeeId,
-          action: 'login',
-          details: 'Đăng nhập thành công',
+          action: 'login_success',
+          details,
           ipAddress: ipAddress ?? null,
         }),
       ),
     ]);
+  }
+
+  async recordLoginFailed(employeeId: number, ipAddress?: string, reason = 'Sai mật khẩu'): Promise<void> {
+    const details = truncate500(`Đăng nhập thất bại — Lý do: ${reason}${ipAddress ? ` — IP: ${ipAddress}` : ''}`);
+    try {
+      await this.auditLogRepo.save(
+        this.auditLogRepo.create({
+          employeeId,
+          action: 'login_failed',
+          details,
+          ipAddress: ipAddress ?? null,
+        }),
+      );
+    } catch {}
+  }
+
+  async recordLogout(employeeId: number, ipAddress?: string): Promise<void> {
+    try {
+      await this.auditLogRepo.save(
+        this.auditLogRepo.create({
+          employeeId,
+          action: 'logout',
+          details: `Đăng xuất${ipAddress ? ` — IP: ${ipAddress}` : ''}`,
+          ipAddress: ipAddress ?? null,
+        }),
+      );
+    } catch {}
+  }
+
+  async recordRoleChanged(employeeId: number, oldRoleNames: string[], newRoleNames: string[]): Promise<void> {
+    const oldLabel = oldRoleNames.length ? oldRoleNames.join(', ') : '(chưa có)';
+    const newLabel = newRoleNames.length ? newRoleNames.join(', ') : '(chưa có)';
+    try {
+      await this.auditLogRepo.save(
+        this.auditLogRepo.create({
+          employeeId,
+          action: 'role_changed',
+          details: truncate500(`Vai trò cập nhật bởi ${this.buildActorSuffix()} — Trước: ${oldLabel}; Sau: ${newLabel}`),
+          ipAddress: null,
+        }),
+      );
+    } catch {}
+  }
+
+  async recordStatusChanged(employeeId: number, oldStatus: string, newStatus: string): Promise<void> {
+    const oldLabel = STATUS_DISPLAY[oldStatus] ?? oldStatus;
+    const newLabel = STATUS_DISPLAY[newStatus] ?? newStatus;
+    try {
+      await this.auditLogRepo.save(
+        this.auditLogRepo.create({
+          employeeId,
+          action: 'status_changed',
+          details: truncate500(`Trạng thái cập nhật bởi ${this.buildActorSuffix()} — ${oldLabel} → ${newLabel}`),
+          ipAddress: null,
+        }),
+      );
+    } catch {}
   }
 
   // ─── Mappers ───────────────────────────────────────────────────────────────

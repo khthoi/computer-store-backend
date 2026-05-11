@@ -12,8 +12,15 @@ export class QueryEmployeesDto extends PaginationDto {
   @Min(1)
   override limit?: number = 20;
 
-  @ApiPropertyOptional({ enum: ['DangLam', 'NghiViec'] })
+  @ApiPropertyOptional({ enum: ['active', 'inactive'] })
   @IsOptional()
-  @IsEnum(['DangLam', 'NghiViec'])
-  trangThai?: string;
+  @IsEnum(['active', 'inactive'])
+  status?: 'active' | 'inactive';
+
+  @ApiPropertyOptional({ description: 'Lọc theo ID vai trò', example: 1 })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(1)
+  roleId?: number;
 }

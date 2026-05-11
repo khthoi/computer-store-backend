@@ -10,6 +10,7 @@ import {
   ProcessWarrantyReturnDto, UpdateWarrantyStatusDto,
   UpdateDefectiveHandlingDto, CompleteReuseDto,
 } from './dto/process-resolution.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class ReturnsWarrantyService {
@@ -21,6 +22,7 @@ export class ReturnsWarrantyService {
     @InjectRepository(ReturnResolution)
     private readonly resolutionRepo: Repository<ReturnResolution>,
     private readonly dataSource: DataSource,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async initWarrantyResolution(returnRequestId: number, phieuNhapKhoId: number | null, employeeId: number) {
@@ -47,6 +49,21 @@ export class ReturnsWarrantyService {
       [returnRequestId],
     );
 
+    this.auditLogsService.log({
+      entityType:  'DoiTraXuLy',
+      entityId:    String(resolution.id),
+      entityLabel: `Xử lý bảo hành — yêu cầu #${returnRequestId}`,
+      actionType:  'TaoMoi',
+      actionDetail: `Nhân viên #${employeeId} khởi tạo quy trình bảo hành cho yêu cầu #${returnRequestId}`,
+      after: JSON.stringify({
+        id:             resolution.id,
+        yeuCauDoiTraId: returnRequestId,
+        huongXuLy:      'BaoHanh',
+        trangThai:      'DangXuLy',
+        phieuNhapKhoId: phieuNhapKhoId ?? null,
+        nguoiXuLyId:    employeeId,
+      }),
+    });
     return resolution;
   }
 
@@ -57,6 +74,16 @@ export class ReturnsWarrantyService {
       throw new BadRequestException('Bản ghi xử lý không phải loại bảo hành');
     }
 
+    const before = {
+      maBaoHanhHang:          resolution.maBaoHanhHang,
+      ngayGuiHangBaoHanh:     resolution.ngayGuiHangBaoHanh,
+      trackingGuiNhaSanXuat:  resolution.trackingGuiNhaSanXuat,
+      carrierGuiNhaSanXuat:   resolution.carrierGuiNhaSanXuat,
+      ngayNhanHangVe:         resolution.ngayNhanHangVe,
+      ketQuaBaoHanh:          resolution.ketQuaBaoHanh,
+      tinhTrangHangNhan:      resolution.tinhTrangHangNhan,
+    };
+
     if (dto.maBaoHanhHang !== undefined) resolution.maBaoHanhHang = dto.maBaoHanhHang;
     if (dto.ngayGuiHangBaoHanh !== undefined) resolution.ngayGuiHangBaoHanh = new Date(dto.ngayGuiHangBaoHanh);
     if (dto.trackingGuiNhaSanXuat !== undefined) resolution.trackingGuiNhaSanXuat = dto.trackingGuiNhaSanXuat;
@@ -65,7 +92,25 @@ export class ReturnsWarrantyService {
     if (dto.ketQuaBaoHanh !== undefined) resolution.ketQuaBaoHanh = dto.ketQuaBaoHanh;
     if (dto.tinhTrangHangNhan !== undefined) resolution.tinhTrangHangNhan = dto.tinhTrangHangNhan;
 
-    return this.resolutionRepo.save(resolution);
+    const saved = await this.resolutionRepo.save(resolution);
+    this.auditLogsService.log({
+      entityType:  'DoiTraXuLy',
+      entityId:    String(resolutionId),
+      entityLabel: `Xử lý bảo hành #${resolutionId}`,
+      actionType:  'CapNhat',
+      actionDetail: `Cập nhật trạng thái bảo hành cho resolution #${resolutionId}`,
+      before: JSON.stringify(before),
+      after: JSON.stringify({
+        maBaoHanhHang:         saved.maBaoHanhHang,
+        ngayGuiHangBaoHanh:    saved.ngayGuiHangBaoHanh,
+        trackingGuiNhaSanXuat: saved.trackingGuiNhaSanXuat,
+        carrierGuiNhaSanXuat:  saved.carrierGuiNhaSanXuat,
+        ngayNhanHangVe:        saved.ngayNhanHangVe,
+        ketQuaBaoHanh:         saved.ketQuaBaoHanh,
+        tinhTrangHangNhan:     saved.tinhTrangHangNhan,
+      }),
+    });
+    return saved;
   }
 
   async processWarranty(returnRequestId: number, dto: ProcessWarrantyReturnDto, employeeId: number) {
@@ -86,7 +131,9 @@ export class ReturnsWarrantyService {
     const returnItems = await this.returnItemRepo.find({ where: { yeuCauId: returnRequestId } });
     if (!returnItems.length) throw new BadRequestException('Yêu cầu không có sản phẩm nào');
 
-    return this.dataSource.transaction(async (manager) => {
+    const statusCuReq = returnReq.status;
+    const trangThaiCuResolution = resolution.trangThai;
+    const result = await this.dataSource.transaction(async (manager) => {
       for (const item of returnItems) {
         await manager.query(
           `INSERT INTO lich_su_nhap_xuat (phien_ban_id, loai_giao_dich, so_luong, nguoi_thuc_hien_id, ghi_chu)
@@ -114,6 +161,31 @@ export class ReturnsWarrantyService {
 
       return { resolutionId: resolution.id, status: 'HoanThanh' };
     });
+
+    this.auditLogsService.log({
+      entityType:  'DoiTraXuLy',
+      entityId:    String(result.resolutionId),
+      entityLabel: `Xử lý bảo hành #${result.resolutionId}`,
+      actionType:  'DoiTrangThai',
+      actionDetail: `Nhân viên #${employeeId} hoàn tất bảo hành trả khách cho yêu cầu #${returnRequestId} (tracking: ${dto.trackingTraKhach ?? 'N/A'}, hãng: ${dto.carrierTraKhach ?? 'N/A'})`,
+      before: JSON.stringify({ trangThai: trangThaiCuResolution }),
+      after: JSON.stringify({
+        trangThai:       'HoanThanh',
+        trackingTraKhach: dto.trackingTraKhach ?? null,
+        carrierTraKhach:  dto.carrierTraKhach ?? null,
+        nguoiXuLyId:      employeeId,
+      }),
+    });
+    this.auditLogsService.log({
+      entityType:  'YeuCauDoiTra',
+      entityId:    String(returnRequestId),
+      entityLabel: `Yêu cầu đổi/trả #${returnRequestId}`,
+      actionType:  'DoiTrangThai',
+      actionDetail: `Yêu cầu bảo hành #${returnRequestId} hoàn tất xử lý`,
+      before: JSON.stringify({ status: statusCuReq }),
+      after:  JSON.stringify({ status: 'HoanThanh' }),
+    });
+    return result;
   }
 
   async updateDefectiveHandling(resolutionId: number, dto: UpdateDefectiveHandlingDto, employeeId: number) {
@@ -123,12 +195,28 @@ export class ReturnsWarrantyService {
       throw new BadRequestException('Chỉ ghi nhận xử lý hàng lỗi sau khi resolution đã HoanThanh');
     }
 
+    const handlingCu = resolution.defectiveHandling;
     resolution.defectiveHandling = dto.defectiveHandling;
     resolution.defectiveHandledAt = new Date();
     resolution.defectiveHandledById = employeeId;
     resolution.defectiveNotes = dto.defectiveNotes ?? null;
 
-    return this.resolutionRepo.save(resolution);
+    const saved = await this.resolutionRepo.save(resolution);
+    this.auditLogsService.log({
+      entityType:  'DoiTraXuLy',
+      entityId:    String(resolutionId),
+      entityLabel: `Xử lý đổi/trả #${resolutionId} — hàng lỗi`,
+      actionType:  'CapNhat',
+      actionDetail: `Nhân viên #${employeeId} ghi nhận xử lý hàng lỗi cho resolution #${resolutionId}: ${dto.defectiveHandling}`,
+      before: JSON.stringify({ defectiveHandling: handlingCu }),
+      after: JSON.stringify({
+        defectiveHandling:    dto.defectiveHandling,
+        defectiveHandledAt:   saved.defectiveHandledAt,
+        defectiveHandledById: employeeId,
+        defectiveNotes:       dto.defectiveNotes ?? null,
+      }),
+    });
+    return saved;
   }
 
   async completeDefectiveReuse(resolutionId: number, dto: CompleteReuseDto, employeeId: number) {
@@ -162,6 +250,19 @@ export class ReturnsWarrantyService {
     if (dto.ghiChu) resolution.defectiveNotes = dto.ghiChu;
 
     await this.resolutionRepo.save(resolution);
+    this.auditLogsService.log({
+      entityType:  'DoiTraXuLy',
+      entityId:    String(resolutionId),
+      entityLabel: `Xử lý đổi/trả #${resolutionId} — tái sử dụng hàng lỗi`,
+      actionType:  'CapNhat',
+      actionDetail: `Nhân viên #${employeeId} hoàn tất tái sử dụng hàng lỗi — liên kết phiếu nhập kho #${dto.phieuNhapKhoId} với resolution #${resolutionId}`,
+      after: JSON.stringify({
+        phieuNhapKhoId:       dto.phieuNhapKhoId,
+        defectiveHandledAt:   resolution.defectiveHandledAt,
+        defectiveHandledById: employeeId,
+        ghiChu:               dto.ghiChu ?? null,
+      }),
+    });
     return { resolutionId, phieuNhapKhoId: dto.phieuNhapKhoId, status: 'completed' };
   }
 }

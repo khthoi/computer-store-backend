@@ -9,6 +9,7 @@ import { LocalCustomerStrategy } from './strategies/local-customer.strategy';
 import { LocalEmployeeStrategy } from './strategies/local-employee.strategy';
 import { UsersModule } from '../users/users.module';
 import { EmployeesModule } from '../employees/employees.module';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -23,6 +24,7 @@ import { EmployeesModule } from '../employees/employees.module';
     }),
     UsersModule,
     EmployeesModule,
+    AuditLogsModule,
   ],
   controllers: [AuthController],
   providers: [AuthService, JwtStrategy, LocalCustomerStrategy, LocalEmployeeStrategy],

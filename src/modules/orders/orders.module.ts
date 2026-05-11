@@ -11,9 +11,10 @@ import { OrdersController } from './orders.controller';
 import { AdminOrdersController } from './admin-orders.controller';
 import { CartModule } from '../cart/cart.module';
 import { InventoryModule } from '../inventory/inventory.module';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, OrderItem, OrderNote, OrderActivityLog]), CartModule, InventoryModule],
+  imports: [TypeOrmModule.forFeature([Order, OrderItem, OrderNote, OrderActivityLog]), CartModule, InventoryModule, AuditLogsModule],
   controllers: [OrdersController, AdminOrdersController],
   providers: [OrdersService, OrdersReturnsQueryService, OrderActivityLogService],
   exports: [OrdersService],

@@ -21,6 +21,7 @@ import {
   PromotionUsageStatsResponseDto,
   PromotionActionResponseDto,
 } from './dto/promotion-response.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const FULL_RELATIONS = ['scopes', 'conditions', 'actions', 'actions.bulkTiers', 'actions.bulkComponents'];
 
@@ -38,6 +39,7 @@ export class PromotionsService {
     @InjectRepository(LoyaltyRedemption) private readonly redemptionRepo: Repository<LoyaltyRedemption>,
     @InjectRepository(RedemptionCatalog) private readonly redemptionCatalogRepo: Repository<RedemptionCatalog>,
     private readonly redisService: RedisService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async create(dto: CreatePromotionDto, createdBy: number): Promise<PromotionResponseDto> {
@@ -47,6 +49,28 @@ export class PromotionsService {
     }
     const promotion = this.promotionRepo.create({ ...dto, createdBy, status: dto.status ?? PromotionStatus.DRAFT });
     const saved = await this.promotionRepo.save(promotion);
+    const entityType = saved.isCoupon ? 'MaGiamGia' : 'KhuyenMai';
+    this.auditLogsService.log({
+      entityType,
+      entityId: String(saved.id),
+      entityLabel: saved.name,
+      actionType: 'TaoMoi',
+      actionDetail: `Tạo ${saved.name}`,
+      after: JSON.stringify({
+        id:                saved.id,
+        name:              saved.name,
+        type:              saved.type,
+        isCoupon:          saved.isCoupon,
+        code:              saved.code,
+        status:            saved.status,
+        priority:          saved.priority,
+        stackingPolicy:    saved.stackingPolicy,
+        startDate:         saved.startDate,
+        endDate:           saved.endDate,
+        totalUsageLimit:   saved.totalUsageLimit,
+        perCustomerLimit:  saved.perCustomerLimit,
+      }),
+    });
     return this.findOne(saved.id);
   }
 
@@ -127,9 +151,23 @@ export class PromotionsService {
 
   async update(id: number, dto: UpdatePromotionDto): Promise<PromotionResponseDto> {
     const promotion = await this.findOneRaw(id);
+    const beforeSnapshot = {
+      name:             promotion.name,
+      description:      promotion.description,
+      type:             promotion.type,
+      isCoupon:         promotion.isCoupon,
+      code:             promotion.code,
+      status:           promotion.status,
+      priority:         promotion.priority,
+      stackingPolicy:   promotion.stackingPolicy,
+      startDate:        promotion.startDate,
+      endDate:          promotion.endDate,
+      totalUsageLimit:  promotion.totalUsageLimit,
+      perCustomerLimit: promotion.perCustomerLimit,
+    };
     const { scopes, conditions, actions, ...scalar } = dto as any;
     Object.assign(promotion, scalar);
-    await this.promotionRepo.save(promotion);
+    const updated = await this.promotionRepo.save(promotion);
 
     if (scopes !== undefined) {
       await this.scopeRepo.delete({ promotionId: id });
@@ -154,22 +192,69 @@ export class PromotionsService {
         }
       }
     }
+    const entityType = promotion.isCoupon ? 'MaGiamGia' : 'KhuyenMai';
+    this.auditLogsService.log({
+      entityType,
+      entityId: String(id),
+      entityLabel: promotion.name,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật thông tin ${promotion.name}`,
+      before: JSON.stringify(beforeSnapshot),
+      after: JSON.stringify({
+        name:             updated.name,
+        description:      updated.description,
+        type:             updated.type,
+        isCoupon:         updated.isCoupon,
+        code:             updated.code,
+        status:           updated.status,
+        priority:         updated.priority,
+        stackingPolicy:   updated.stackingPolicy,
+        startDate:        updated.startDate,
+        endDate:          updated.endDate,
+        totalUsageLimit:  updated.totalUsageLimit,
+        perCustomerLimit: updated.perCustomerLimit,
+      }),
+    });
     return this.findOne(id);
   }
 
   async setStatus(id: number, status: PromotionStatus): Promise<PromotionResponseDto> {
-    await this.findOneRaw(id);
+    const promotion = await this.findOneRaw(id);
+    const oldStatus = promotion.status;
     await this.promotionRepo.update(id, { status });
+    const entityType = promotion.isCoupon ? 'MaGiamGia' : 'KhuyenMai';
+    this.auditLogsService.log({
+      entityType,
+      entityId: String(id),
+      entityLabel: promotion.name,
+      actionType: 'DoiTrangThai',
+      actionDetail: `Đổi trạng thái ${oldStatus} → ${status}`,
+      before: JSON.stringify({ status: oldStatus }),
+      after: JSON.stringify({ status }),
+    });
     return this.findOne(id);
   }
 
   async cancel(id: number): Promise<void> {
-    await this.findOneRaw(id);
+    const promotion = await this.findOneRaw(id);
+    const oldStatus = promotion.status;
     await this.promotionRepo.update(id, { status: PromotionStatus.CANCELLED });
+    const entityType = promotion.isCoupon ? 'MaGiamGia' : 'KhuyenMai';
+    this.auditLogsService.log({
+      entityType,
+      entityId: String(id),
+      entityLabel: promotion.name,
+      actionType: 'DoiTrangThai',
+      actionDetail: `Đổi trạng thái ${oldStatus} → ${PromotionStatus.CANCELLED}`,
+      before: JSON.stringify({ status: oldStatus }),
+      after: JSON.stringify({ status: PromotionStatus.CANCELLED }),
+    });
   }
 
   async remove(id: number): Promise<void> {
     const promotion = await this.findOneRaw(id);
+    const entityType = promotion.isCoupon ? 'MaGiamGia' : 'KhuyenMai';
+    const label = promotion.name;
     await this.redemptionRepo.delete({ promotionId: id });
     await this.redemptionCatalogRepo.delete({ promotionId: id });
     await this.usageRepo.delete({ promotionId: id });
@@ -178,6 +263,24 @@ export class PromotionsService {
     const actions = await this.actionRepo.find({ where: { promotionId: id } });
     if (actions.length) await this.actionRepo.remove(actions);
     await this.promotionRepo.remove(promotion);
+    this.auditLogsService.log({
+      entityType,
+      entityId: String(id),
+      entityLabel: label,
+      actionType: 'Xoa',
+      actionDetail: `Xóa ${label}`,
+      before: JSON.stringify({
+        id:               promotion.id,
+        name:             promotion.name,
+        type:             promotion.type,
+        isCoupon:         promotion.isCoupon,
+        code:             promotion.code,
+        status:           promotion.status,
+        startDate:        promotion.startDate,
+        endDate:          promotion.endDate,
+        usageCount:       promotion.usageCount,
+      }),
+    });
   }
 
   private async buildUniqueCopyCode(baseCode: string): Promise<string> {
@@ -252,6 +355,26 @@ export class PromotionsService {
         if (bulkComponents?.length) await this.usageRepo.manager.getRepository(BulkComponent).save(bulkComponents.map(({ id: _c, actionId: __, ...c }: any) => ({ ...c, actionId: newAction.id })));
       }
     }
+    const entityType = saved.isCoupon ? 'MaGiamGia' : 'KhuyenMai';
+    this.auditLogsService.log({
+      entityType,
+      entityId:    String(saved.id),
+      entityLabel: saved.name,
+      actionType:  'TaoMoi',
+      actionDetail: `Nhân bản ${saved.isCoupon ? 'mã giảm giá' : 'khuyến mãi'} từ #${id} → "${saved.name}" (trạng thái: draft${saved.code ? ', mã mới: ' + saved.code : ''})`,
+      after: JSON.stringify({
+        id:          saved.id,
+        sourceId:    id,
+        name:        saved.name,
+        type:        saved.type,
+        isCoupon:    saved.isCoupon,
+        code:        saved.code,
+        status:      saved.status,
+        priority:    saved.priority,
+        startDate:   saved.startDate,
+        endDate:     saved.endDate,
+      }),
+    });
     return this.findOne(saved.id);
   }
 
@@ -288,6 +411,14 @@ export class PromotionsService {
   async recordUsage(promotionId: number, customerId: number, orderId: number, discountAmount: number): Promise<void> {
     await this.usageRepo.save({ promotionId, customerId, orderId, discountAmount });
     await this.promotionRepo.increment({ id: promotionId }, 'usageCount', 1);
+    this.auditLogsService.log({
+      entityType:  'PromotionUsage',
+      entityId:    String(promotionId),
+      entityLabel: `Khuyến mãi #${promotionId}`,
+      actionType:  'CapNhat',
+      actionDetail: `Khách hàng #${customerId} sử dụng khuyến mãi #${promotionId} trong đơn hàng #${orderId} (giảm: ${discountAmount.toLocaleString('vi-VN')} ₫)`,
+      after: JSON.stringify({ promotionId, customerId, orderId, discountAmount }),
+    });
   }
 
   private toActionDto(a: PromotionAction): PromotionActionResponseDto {

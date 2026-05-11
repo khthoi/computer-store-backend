@@ -12,6 +12,7 @@ import { ModerateReviewDto } from './dto/moderate-review.dto';
 import { ReplyReviewDto } from './dto/reply-review.dto';
 import { BulkModerateDto } from './dto/bulk-moderate.dto';
 import { ReviewResponseDto, ReviewMessageResponseDto } from './dto/review-response.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class ReviewsService {
@@ -21,6 +22,7 @@ export class ReviewsService {
     @InjectRepository(ReviewMessage)
     private readonly messageRepo: Repository<ReviewMessage>,
     private readonly dataSource: DataSource,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   // ─── Public ───────────────────────────────────────────────────────────────
@@ -265,12 +267,23 @@ export class ReviewsService {
     if (!review) throw new NotFoundException(`Đánh giá #${id} không tồn tại`);
     if (review.status === 'Approved') throw new BadRequestException('Đánh giá đã được duyệt');
 
+    const oldStatus = review.status;
     review.status = 'Approved';
     review.approvedById = employeeId;
     review.approvedAt = new Date().toISOString();
     await this.reviewRepo.save(review);
 
     await this.recomputeProductRating(review.variantId);
+
+    this.auditLogsService.log({
+      entityType: 'DanhGia',
+      entityId: String(id),
+      entityLabel: `Đánh giá #${id}`,
+      actionType: 'DoiTrangThai',
+      actionDetail: `Đổi trạng thái ${oldStatus} → Approved`,
+      before: JSON.stringify({ status: oldStatus }),
+      after: JSON.stringify({ status: 'Approved' }),
+    });
 
     return this.toDto(review);
   }
@@ -279,13 +292,24 @@ export class ReviewsService {
     const review = await this.reviewRepo.findOne({ where: { id } });
     if (!review) throw new NotFoundException(`Đánh giá #${id} không tồn tại`);
 
-    const wasApproved = review.status === 'Approved';
+    const oldStatus = review.status;
+    const wasApproved = oldStatus === 'Approved';
     review.status = 'Rejected';
     review.approvedById = employeeId;
     review.rejectReason = dto.reason ?? null;
     const saved = await this.reviewRepo.save(review);
 
     if (wasApproved) await this.recomputeProductRating(review.variantId);
+
+    this.auditLogsService.log({
+      entityType: 'DanhGia',
+      entityId: String(id),
+      entityLabel: `Đánh giá #${id}`,
+      actionType: 'DoiTrangThai',
+      actionDetail: `Đổi trạng thái ${oldStatus} → Rejected`,
+      before: JSON.stringify({ status: oldStatus }),
+      after: JSON.stringify({ status: 'Rejected' }),
+    });
 
     return this.toDto(saved);
   }
@@ -294,13 +318,24 @@ export class ReviewsService {
     const review = await this.reviewRepo.findOne({ where: { id } });
     if (!review) throw new NotFoundException(`Đánh giá #${id} không tồn tại`);
 
-    const wasApproved = review.status === 'Approved';
+    const oldStatus = review.status;
+    const wasApproved = oldStatus === 'Approved';
     review.status = 'Hidden';
     review.approvedById = employeeId;
     review.rejectReason = dto.reason ?? null;
     const saved = await this.reviewRepo.save(review);
 
     if (wasApproved) await this.recomputeProductRating(review.variantId);
+
+    this.auditLogsService.log({
+      entityType: 'DanhGia',
+      entityId: String(id),
+      entityLabel: `Đánh giá #${id}`,
+      actionType: 'DoiTrangThai',
+      actionDetail: `Đổi trạng thái ${oldStatus} → Hidden`,
+      before: JSON.stringify({ status: oldStatus }),
+      after: JSON.stringify({ status: 'Hidden' }),
+    });
 
     return this.toDto(saved);
   }
@@ -323,6 +358,20 @@ export class ReviewsService {
     if (messageType === 'Reply') {
       await this.reviewRepo.update(id, { hasReply: 1 });
     }
+
+    this.auditLogsService.log({
+      entityType: 'DanhGia',
+      entityId: String(id),
+      entityLabel: `Đánh giá #${id}`,
+      actionType: 'CapNhat',
+      actionDetail: `Nhân viên thêm ${messageType === 'InternalNote' ? 'ghi chú nội bộ' : 'phản hồi công khai'} vào đánh giá #${id}`,
+      after: JSON.stringify({
+        messageId: saved.id,
+        type: saved.messageType,
+        content: saved.content?.substring(0, 200),
+        reviewId: id,
+      }),
+    });
 
     return this.toMessageDto(saved);
   }

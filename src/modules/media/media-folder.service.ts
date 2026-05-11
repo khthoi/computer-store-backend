@@ -5,6 +5,7 @@ import { MediaFolder } from './entities/media-folder.entity';
 import { MediaAsset } from './entities/media-asset.entity';
 import { CreateMediaFolderDto } from './dto/create-media-folder.dto';
 import { UpdateMediaFolderDto } from './dto/update-media-folder.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class MediaFolderService {
@@ -13,6 +14,7 @@ export class MediaFolderService {
     private readonly repo: Repository<MediaFolder>,
     @InjectRepository(MediaAsset)
     private readonly assetRepo: Repository<MediaAsset>,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async findAll(onlyActive = false): Promise<(MediaFolder & { fileCount: number })[]> {
@@ -60,7 +62,16 @@ export class MediaFolderService {
       isActive: dto.isActive ?? true,
       phamVi: dto.phamVi ?? 'public',
     });
-    return this.repo.save(folder);
+    const saved = await this.repo.save(folder);
+    this.auditLogsService.log({
+      entityType: 'MediaFolder',
+      entityId: String(saved.id),
+      entityLabel: saved.tenHienThi,
+      actionType: 'TaoMoi',
+      actionDetail: `Tạo thư mục media "${saved.tenHienThi}" (${saved.duongDan})`,
+      after: JSON.stringify({ id: saved.id, tenHienThi: saved.tenHienThi, duongDan: saved.duongDan, phamVi: saved.phamVi }),
+    });
+    return saved;
   }
 
   async update(id: number, dto: UpdateMediaFolderDto): Promise<MediaFolder> {
@@ -69,12 +80,32 @@ export class MediaFolderService {
       const conflict = await this.repo.findOne({ where: { duongDan: dto.duongDan } });
       if (conflict) throw new ConflictException('Đường dẫn thư mục đã tồn tại');
     }
+    const before = { tenHienThi: folder.tenHienThi, duongDan: folder.duongDan, moTa: folder.moTa, loaiChoPhep: folder.loaiChoPhep, thuTu: folder.thuTu, isActive: folder.isActive, phamVi: folder.phamVi };
     Object.assign(folder, dto);
-    return this.repo.save(folder);
+    const saved = await this.repo.save(folder);
+    this.auditLogsService.log({
+      entityType: 'MediaFolder',
+      entityId: String(id),
+      entityLabel: saved.tenHienThi,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật thư mục media "${saved.tenHienThi}"`,
+      before: JSON.stringify(before),
+      after: JSON.stringify({ tenHienThi: saved.tenHienThi, duongDan: saved.duongDan, moTa: saved.moTa, loaiChoPhep: saved.loaiChoPhep, thuTu: saved.thuTu, isActive: saved.isActive, phamVi: saved.phamVi }),
+    });
+    return saved;
   }
 
   async remove(id: number): Promise<void> {
     const folder = await this.findOne(id);
+    const snapshot = { id: folder.id, tenHienThi: folder.tenHienThi, duongDan: folder.duongDan, phamVi: folder.phamVi, isActive: folder.isActive };
     await this.repo.remove(folder);
+    this.auditLogsService.log({
+      entityType: 'MediaFolder',
+      entityId: String(snapshot.id),
+      entityLabel: snapshot.tenHienThi,
+      actionType: 'Xoa',
+      actionDetail: `Xóa thư mục media "${snapshot.tenHienThi}" (${snapshot.duongDan})`,
+      before: JSON.stringify(snapshot),
+    });
   }
 }

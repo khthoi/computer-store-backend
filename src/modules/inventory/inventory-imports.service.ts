@@ -9,6 +9,7 @@ import { ImportReceiptSummaryDto, ImportReceiptDetailDto } from './dto/import-re
 import { QueryImportReceiptDto } from './dto/query-import-receipt.dto';
 import { InventoryService } from './inventory.service';
 import { BatchService } from './batch.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class InventoryImportsService {
@@ -20,6 +21,7 @@ export class InventoryImportsService {
     private readonly inventoryService: InventoryService,
     private readonly batchService: BatchService,
     private readonly dataSource: DataSource,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   // ─── Mappers ─────────────────────────────────────────────────────────────────
@@ -207,7 +209,18 @@ export class InventoryImportsService {
         where: { id: savedReceipt.id },
         relations: { items: { phienBan: { product: true } }, nhaCungCap: true, nhanVienNhap: true },
       });
-      return this.mapToDetail(saved!);
+      const detail = this.mapToDetail(saved!);
+
+      this.auditLogsService.log({
+        entityType: 'NhapXuat',
+        entityId: String(savedReceipt.id),
+        entityLabel: `Phiếu nhập ${maPhieuNhap}`,
+        actionType: 'TaoMoi',
+        actionDetail: `Tạo phiếu nhập ${maPhieuNhap}`,
+        after: JSON.stringify({ maPhieuNhap, soLuongDong: dto.items.length, nhaCungCapId: dto.nhaCungCapId ?? null }),
+      });
+
+      return detail;
     });
   }
 
@@ -291,7 +304,9 @@ export class InventoryImportsService {
         const damagedQty = override !== undefined ? (override.damaged ?? 0) : (item.soLuongHuHong ?? 0);
         return (actualQty - damagedQty) >= item.soLuongDuKien;
       });
-      receipt.trangThai = allFulfilled ? 'DaDuyet' : 'TiepNhanMot';
+      const newStatus = allFulfilled ? 'DaDuyet' : 'TiepNhanMot';
+      const oldStatus = receipt.trangThai;
+      receipt.trangThai = newStatus;
       receipt.ngayDuyet = new Date();
       await manager.save(ImportReceipt, receipt);
 
@@ -304,7 +319,19 @@ export class InventoryImportsService {
         where: { id: receipt.id },
         relations: { items: { phienBan: { product: true } }, nhaCungCap: true, nhanVienNhap: true, phieuTienNhiem: true, phieuKeTiep: true },
       });
-      return this.mapToDetail(final!);
+      const detail = this.mapToDetail(final!);
+
+      this.auditLogsService.log({
+        entityType: 'NhapXuat',
+        entityId: String(receipt.id),
+        entityLabel: `Phiếu nhập ${receipt.maPhieuNhap}`,
+        actionType: 'DoiTrangThai',
+        actionDetail: `Đổi trạng thái ${oldStatus} → ${newStatus}`,
+        before: JSON.stringify({ trangThai: oldStatus }),
+        after: JSON.stringify({ trangThai: newStatus }),
+      });
+
+      return detail;
     });
   }
 
@@ -320,8 +347,18 @@ export class InventoryImportsService {
     if (receipt.phieuKeTiepId != null) {
       throw new BadRequestException('Phiếu đã có phiếu bổ sung đang xử lý, không thể hoàn tất thủ công');
     }
+    const oldStatus = receipt.trangThai;
     receipt.trangThai = 'DaDuyet';
     await this.receiptRepo.save(receipt);
+    this.auditLogsService.log({
+      entityType: 'NhapXuat',
+      entityId: String(id),
+      entityLabel: `Phiếu nhập ${receipt.maPhieuNhap}`,
+      actionType: 'DoiTrangThai',
+      actionDetail: `Hoàn tất phiếu nhập ${receipt.maPhieuNhap}: ${oldStatus} → DaDuyet`,
+      before: JSON.stringify({ trangThai: oldStatus }),
+      after: JSON.stringify({ trangThai: 'DaDuyet' }),
+    });
     return this.mapToDetail(receipt);
   }
 
@@ -334,8 +371,18 @@ export class InventoryImportsService {
     if (receipt.trangThai !== 'ChoDuyet') {
       throw new BadRequestException('Phiếu nhập đã được xử lý');
     }
+    const oldStatus = receipt.trangThai;
     receipt.trangThai = 'TuChoi';
     await this.receiptRepo.save(receipt);
+    this.auditLogsService.log({
+      entityType: 'NhapXuat',
+      entityId: String(id),
+      entityLabel: `Phiếu nhập ${receipt.maPhieuNhap}`,
+      actionType: 'DoiTrangThai',
+      actionDetail: `Từ chối phiếu nhập ${receipt.maPhieuNhap}: ${oldStatus} → TuChoi`,
+      before: JSON.stringify({ trangThai: oldStatus }),
+      after: JSON.stringify({ trangThai: 'TuChoi' }),
+    });
     return this.mapToDetail(receipt);
   }
 
@@ -393,6 +440,24 @@ export class InventoryImportsService {
         where: { id: savedNew.id },
         relations: { items: { phienBan: { product: true } }, nhaCungCap: true, nhanVienNhap: true, phieuTienNhiem: true, phieuKeTiep: true },
       });
+
+      this.auditLogsService.log({
+        entityType: 'NhapXuat',
+        entityId: String(receipt.id),
+        entityLabel: `Phiếu nhập ${receipt.maPhieuNhap}`,
+        actionType: 'CapNhat',
+        actionDetail: `Tạo phiếu bổ sung ${maPhieuMoi} từ ${receipt.maPhieuNhap} (${shortItems.length} dòng thiếu)`,
+        after: JSON.stringify({ phieuKeTiepId: savedNew.id, maPhieuKeTiep: maPhieuMoi }),
+      });
+      this.auditLogsService.log({
+        entityType: 'NhapXuat',
+        entityId: String(savedNew.id),
+        entityLabel: `Phiếu nhập ${maPhieuMoi}`,
+        actionType: 'TaoMoi',
+        actionDetail: `Tạo phiếu bổ sung ${maPhieuMoi} từ ${receipt.maPhieuNhap}`,
+        after: JSON.stringify({ maPhieuNhap: maPhieuMoi, phieuTienNhiemId: receipt.id, soLuongDong: shortItems.length }),
+      });
+
       return this.mapToDetail(final!);
     });
   }

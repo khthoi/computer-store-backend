@@ -6,9 +6,10 @@ import { MediaService } from './media.service';
 import { MediaFolderService } from './media-folder.service';
 import { MediaController } from './media.controller';
 import { AdminMediaController } from './admin-media.controller';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([MediaAsset, MediaFolder])],
+  imports: [TypeOrmModule.forFeature([MediaAsset, MediaFolder]), AuditLogsModule],
   controllers: [MediaController, AdminMediaController],
   providers: [MediaService, MediaFolderService],
   exports: [MediaService, MediaFolderService, TypeOrmModule],

@@ -15,6 +15,7 @@ import { ReportsController } from './reports.controller';
 import { AdminReportsController } from './admin-reports.controller';
 import { AdminReportsAggController } from './admin-reports-agg.controller';
 import { RedisModule } from '../../common/redis/redis.module';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 import { ReportsAggregateService }  from './reports-aggregate.service';
 import { ReportsAggRevenueService }    from './reports-agg-revenue.service';
 import { ReportsAggProductsService }   from './reports-agg-products.service';
@@ -34,6 +35,7 @@ import { ReportsAggSupportService }    from './reports-agg-support.service';
     ]),
     BullModule.registerQueue({ name: REPORT_QUEUE }),
     RedisModule,
+    AuditLogsModule,
   ],
   controllers: [ReportsController, AdminReportsController, AdminReportsAggController],
   providers: [

@@ -146,6 +146,44 @@ export class RedemptionCatalogResponseDto {
   updatedAt: Date;
 }
 
+export class MembershipTierResponseDto {
+  @ApiProperty({ example: 1 })
+  id: number;
+
+  @ApiProperty({ example: 'Gold' })
+  name: string;
+
+  @ApiProperty({ example: 'Hạng Vàng' })
+  displayName: string;
+
+  @ApiProperty({ example: 3000 })
+  minPoints: number;
+
+  @ApiPropertyOptional({ example: 4999, nullable: true })
+  maxPoints: number | null;
+
+  @ApiPropertyOptional({ example: '#FFD700', nullable: true })
+  color: string | null;
+
+  @ApiPropertyOptional({ example: 'Đặc quyền dành cho hạng Vàng', nullable: true })
+  description: string | null;
+
+  @ApiProperty({ example: 3 })
+  sortOrder: number;
+
+  @ApiProperty({ example: true })
+  isActive: boolean;
+
+  @ApiProperty({ example: 42, description: 'Số khách hàng hiện đang ở bậc này' })
+  customerCount: number;
+
+  @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
+  createdAt: Date;
+
+  @ApiProperty({ example: '2024-01-15T10:30:00.000Z' })
+  updatedAt: Date;
+}
+
 export class LoyaltyRedemptionResponseDto {
   @ApiProperty({ example: 1 })
   id: number;

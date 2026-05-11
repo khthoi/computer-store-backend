@@ -9,6 +9,7 @@ import { CreateFaqItemDto } from './dto/create-faq-item.dto';
 import { UpdateFaqItemDto } from './dto/update-faq-item.dto';
 import { FaqGroupResponseDto } from './dto/faq-group-response.dto';
 import { FaqItemResponseDto } from './dto/faq-item-response.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class FaqService {
@@ -17,6 +18,7 @@ export class FaqService {
     private readonly groupRepo: Repository<FaqGroup>,
     @InjectRepository(FaqItem)
     private readonly itemRepo: Repository<FaqItem>,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async findAllPublic() {
@@ -50,6 +52,14 @@ export class FaqService {
     const existing = await this.groupRepo.findOne({ where: { slug: dto.slug } });
     if (existing) throw new ConflictException('Slug đã tồn tại');
     const saved = await this.groupRepo.save(this.groupRepo.create(dto));
+    this.auditLogsService.log({
+      entityType: 'FaqGroup',
+      entityId: String(saved.id),
+      entityLabel: saved.name,
+      actionType: 'TaoMoi',
+      actionDetail: `Tạo nhóm FAQ "${saved.name}" (slug: ${saved.slug})`,
+      after: JSON.stringify({ id: saved.id, name: saved.name, slug: saved.slug, sortOrder: saved.sortOrder }),
+    });
     return this.findOneGroup(saved.id);
   }
 
@@ -60,7 +70,18 @@ export class FaqService {
       const existing = await this.groupRepo.findOne({ where: { slug: dto.slug } });
       if (existing && existing.id !== id) throw new ConflictException('Slug đã tồn tại');
     }
+    const before = { name: group.name, slug: group.slug, description: group.description, isVisible: group.isVisible };
     await this.groupRepo.update(id, dto);
+    const updated = await this.groupRepo.findOne({ where: { id } });
+    this.auditLogsService.log({
+      entityType: 'FaqGroup',
+      entityId: String(id),
+      entityLabel: updated!.name,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật nhóm FAQ "${updated!.name}"`,
+      before: JSON.stringify(before),
+      after: JSON.stringify({ name: updated!.name, slug: updated!.slug, description: updated!.description, isVisible: updated!.isVisible }),
+    });
     return this.findOneGroup(id);
   }
 
@@ -68,14 +89,38 @@ export class FaqService {
     const group = await this.groupRepo.findOne({ where: { id } });
     if (!group) throw new NotFoundException('Nhóm FAQ không tồn tại');
     await this.groupRepo.delete(id);
+    this.auditLogsService.log({
+      entityType: 'FaqGroup',
+      entityId: String(id),
+      entityLabel: group.name,
+      actionType: 'Xoa',
+      actionDetail: `Xóa nhóm FAQ "${group.name}" (slug: ${group.slug})`,
+      before: JSON.stringify({ id: group.id, name: group.name, slug: group.slug }),
+    });
   }
 
   async reorderGroups(ids: number[]): Promise<void> {
     await Promise.all(ids.map((id, idx) => this.groupRepo.update(id, { sortOrder: idx + 1 })));
+    this.auditLogsService.log({
+      entityType: 'FaqGroup',
+      entityId: 'batch',
+      entityLabel: 'Sắp xếp lại nhóm FAQ',
+      actionType: 'CapNhat',
+      actionDetail: `Sắp xếp lại thứ tự ${ids.length} nhóm FAQ`,
+      after: JSON.stringify({ newOrder: ids }),
+    });
   }
 
   async reorderItems(ids: number[]): Promise<void> {
     await Promise.all(ids.map((id, idx) => this.itemRepo.update(id, { sortOrder: idx + 1 })));
+    this.auditLogsService.log({
+      entityType: 'FaqItem',
+      entityId: 'batch',
+      entityLabel: 'Sắp xếp lại câu hỏi FAQ',
+      actionType: 'CapNhat',
+      actionDetail: `Sắp xếp lại thứ tự ${ids.length} câu hỏi FAQ`,
+      after: JSON.stringify({ newOrder: ids }),
+    });
   }
 
   async findAllItems(params: {
@@ -115,20 +160,46 @@ export class FaqService {
     const group = await this.groupRepo.findOne({ where: { id: dto.groupId } });
     if (!group) throw new NotFoundException('Nhóm FAQ không tồn tại');
     const saved = await this.itemRepo.save(this.itemRepo.create(dto));
+    this.auditLogsService.log({
+      entityType: 'FaqItem',
+      entityId: String(saved.id),
+      entityLabel: saved.question,
+      actionType: 'TaoMoi',
+      actionDetail: `Tạo câu hỏi FAQ "${saved.question.substring(0, 80)}..." (nhóm #${saved.groupId})`,
+      after: JSON.stringify({ id: saved.id, groupId: saved.groupId, question: saved.question, sortOrder: saved.sortOrder }),
+    });
     const item = await this.findOneItem(saved.id);
     return FaqItemResponseDto.from(item);
   }
 
   async updateItem(id: number, dto: UpdateFaqItemDto): Promise<FaqItemResponseDto> {
-    await this.findOneItem(id);
-    await this.itemRepo.update(id, dto);
     const item = await this.findOneItem(id);
-    return FaqItemResponseDto.from(item);
+    const before = { question: item.question, isVisible: item.isVisible, groupId: item.groupId };
+    await this.itemRepo.update(id, dto);
+    const updated = await this.findOneItem(id);
+    this.auditLogsService.log({
+      entityType: 'FaqItem',
+      entityId: String(id),
+      entityLabel: updated.question,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật câu hỏi FAQ "${updated.question.substring(0, 80)}..."`,
+      before: JSON.stringify(before),
+      after: JSON.stringify({ question: updated.question, isVisible: updated.isVisible, groupId: updated.groupId }),
+    });
+    return FaqItemResponseDto.from(updated);
   }
 
   async removeItem(id: number): Promise<void> {
-    await this.findOneItem(id);
+    const item = await this.findOneItem(id);
     await this.itemRepo.delete(id);
+    this.auditLogsService.log({
+      entityType: 'FaqItem',
+      entityId: String(id),
+      entityLabel: item.question,
+      actionType: 'Xoa',
+      actionDetail: `Xóa câu hỏi FAQ "${item.question.substring(0, 80)}..." (nhóm #${item.groupId})`,
+      before: JSON.stringify({ id: item.id, groupId: item.groupId, question: item.question }),
+    });
   }
 
   async incrementHelpful(id: number): Promise<void> {

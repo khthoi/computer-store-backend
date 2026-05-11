@@ -2,6 +2,7 @@ import {
   Entity,
   PrimaryGeneratedColumn,
   Column,
+  CreateDateColumn,
   ManyToOne,
   JoinColumn,
 } from 'typeorm';
@@ -30,6 +31,9 @@ export class ShippingAddress {
   @Column({ name: 'dia_chi_chi_tiet', length: 500 })
   diaChiChiTiet: string;
 
+  @Column({ name: 'phuong_xa', length: 200, default: '' })
+  phuongXa: string;
+
   @Column({ name: 'quan_huyen', length: 200 })
   quanHuyen: string;
 
@@ -38,4 +42,7 @@ export class ShippingAddress {
 
   @Column({ name: 'la_mac_dinh', default: false })
   laMacDinh: boolean;
+
+  @CreateDateColumn({ name: 'ngay_tao' })
+  ngayTao: Date;
 }

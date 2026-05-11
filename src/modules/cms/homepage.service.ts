@@ -9,6 +9,7 @@ import {
   HomepageSectionResponseDto,
   toHomepageSectionResponse,
 } from './dto/homepage-section-response.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class HomepageService {
@@ -17,6 +18,7 @@ export class HomepageService {
     private readonly sectionRepo: Repository<HomepageSection>,
     @InjectRepository(HomepageSectionItem)
     private readonly itemRepo: Repository<HomepageSectionItem>,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   private baseQuery() {
@@ -71,11 +73,20 @@ export class HomepageService {
       );
       await this.itemRepo.save(sectionItems);
     }
-    return this.findOne(saved.id);
+    const result = await this.findOneEntity(saved.id);
+    this.auditLogsService.log({
+      entityType: 'HomepageSection',
+      entityId: String(saved.id),
+      entityLabel: result.title ?? `Section #${saved.id}`,
+      actionType: 'TaoMoi',
+      actionDetail: `Tạo section homepage "${result.title}" (loại: ${result.type}, layout: ${result.layout}, ${result.items?.length ?? 0} items)`,
+      after: JSON.stringify({ id: result.id, title: result.title, type: result.type, layout: result.layout, isVisible: result.isVisible, sortOrder: result.sortOrder }),
+    });
+    return toHomepageSectionResponse(result);
   }
 
   async update(id: number, dto: UpdateHomepageSectionDto): Promise<HomepageSectionResponseDto> {
-    await this.findOneEntity(id);
+    const before = await this.findOneEntity(id);
     const { items, ...sectionData } = dto;
     await this.sectionRepo.update(id, sectionData);
     if (items !== undefined) {
@@ -87,12 +98,30 @@ export class HomepageService {
         await this.itemRepo.save(sectionItems);
       }
     }
-    return this.findOne(id);
+    const updated = await this.findOneEntity(id);
+    this.auditLogsService.log({
+      entityType: 'HomepageSection',
+      entityId: String(id),
+      entityLabel: updated.title ?? `Section #${id}`,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật section homepage "${updated.title}"${dto.items !== undefined ? ` (thay thế ${dto.items.length} items)` : ''}`,
+      before: JSON.stringify({ title: before.title, type: before.type, layout: before.layout, isVisible: before.isVisible }),
+      after: JSON.stringify({ title: updated.title, type: updated.type, layout: updated.layout, isVisible: updated.isVisible }),
+    });
+    return toHomepageSectionResponse(updated);
   }
 
   async remove(id: number): Promise<void> {
-    await this.findOneEntity(id);
+    const section = await this.findOneEntity(id);
     await this.sectionRepo.delete(id);
+    this.auditLogsService.log({
+      entityType: 'HomepageSection',
+      entityId: String(id),
+      entityLabel: section.title ?? `Section #${id}`,
+      actionType: 'Xoa',
+      actionDetail: `Xóa section homepage "${section.title}" (loại: ${section.type})`,
+      before: JSON.stringify({ id: section.id, title: section.title, type: section.type, isVisible: section.isVisible }),
+    });
   }
 
   async clone(id: number, createdById: number): Promise<HomepageSectionResponseDto> {
@@ -127,10 +156,27 @@ export class HomepageService {
       await this.itemRepo.save(clonedItems);
     }
 
-    return this.findOne(saved.id);
+    const cloned = await this.findOneEntity(saved.id);
+    this.auditLogsService.log({
+      entityType: 'HomepageSection',
+      entityId: String(cloned.id),
+      entityLabel: cloned.title ?? `Section #${cloned.id}`,
+      actionType: 'TaoMoi',
+      actionDetail: `Nhân bản section homepage từ section #${id} → "${cloned.title}" (ẩn, chờ chỉnh sửa)`,
+      after: JSON.stringify({ id: cloned.id, title: cloned.title, sourceId: id, isVisible: false }),
+    });
+    return toHomepageSectionResponse(cloned);
   }
 
   async reorder(ids: number[]): Promise<void> {
     await Promise.all(ids.map((id, idx) => this.sectionRepo.update(id, { sortOrder: idx })));
+    this.auditLogsService.log({
+      entityType: 'HomepageSection',
+      entityId: 'batch',
+      entityLabel: 'Sắp xếp lại homepage',
+      actionType: 'CapNhat',
+      actionDetail: `Sắp xếp lại thứ tự ${ids.length} section homepage`,
+      after: JSON.stringify({ newOrder: ids }),
+    });
   }
 }

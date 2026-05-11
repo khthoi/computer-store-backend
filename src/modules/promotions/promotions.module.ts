@@ -13,6 +13,7 @@ import { PromotionsService } from './promotions.service';
 import { PromotionEvaluatorService } from './promotion-evaluator.service';
 import { PromotionsController } from './promotions.controller';
 import { AdminPromotionsController } from './admin-promotions.controller';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { AdminPromotionsController } from './admin-promotions.controller';
       LoyaltyRedemption,
       RedemptionCatalog,
     ]),
+    AuditLogsModule,
   ],
   controllers: [PromotionsController, AdminPromotionsController],
   providers: [PromotionsService, PromotionEvaluatorService],

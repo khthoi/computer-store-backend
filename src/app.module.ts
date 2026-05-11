@@ -1,15 +1,18 @@
-import { Module } from '@nestjs/common';
+import { Module, MiddlewareConsumer, NestModule } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ThrottlerModule } from '@nestjs/throttler';
 import { BullModule } from '@nestjs/bull';
 import { ScheduleModule } from '@nestjs/schedule';
 import { APP_GUARD } from '@nestjs/core';
+import { ClsModule } from 'nestjs-cls';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import databaseConfig from './config/database.config';
 import jwtConfig from './config/jwt.config';
 import redisConfig from './config/redis.config';
+import { AuditContextMiddleware } from './common/middleware/audit-context.middleware';
+import { AuditLogsModule } from './modules/audit-logs/audit-logs.module';
 
 // Common
 import { RedisModule } from './common/redis/redis.module';
@@ -102,8 +105,11 @@ import { RolesGuard } from './common/guards/roles.guard';
 
     ScheduleModule.forRoot(),
 
+    ClsModule.forRoot({ global: true, middleware: { mount: false } }),
+
     RedisModule,
     MailModule,
+    AuditLogsModule,
 
     // Phase 1
     AuthModule,
@@ -159,4 +165,8 @@ import { RolesGuard } from './common/guards/roles.guard';
     { provide: APP_GUARD, useClass: RolesGuard },
   ],
 })
-export class AppModule {}
+export class AppModule implements NestModule {
+  configure(consumer: MiddlewareConsumer) {
+    consumer.apply(AuditContextMiddleware).forRoutes('*');
+  }
+}

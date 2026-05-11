@@ -11,6 +11,7 @@ import { MediaAsset } from './entities/media-asset.entity';
 import { MediaFolderService } from './media-folder.service';
 import { QueryMediaDto } from './dto/query-media.dto';
 import { UpdateMediaDto } from './dto/update-media.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const RAW_RENDERABLE_IMAGE_EXTENSIONS = new Set([
   '.svg',
@@ -63,6 +64,7 @@ export class MediaService {
     private readonly repo: Repository<MediaAsset>,
     private readonly config: ConfigService,
     private readonly folderService: MediaFolderService,
+    private readonly auditLogsService: AuditLogsService,
   ) {
     cloudinary.config({
       cloud_name: config.get<string>('CLOUDINARY_CLOUD_NAME'),
@@ -169,7 +171,16 @@ export class MediaService {
     });
 
     const saved = await this.repo.save(asset);
-    return this.findOne(saved.id);
+    const uploaded = await this.findOne(saved.id);
+    this.auditLogsService.log({
+      entityType: 'MediaAsset',
+      entityId: String(uploaded.id),
+      entityLabel: uploaded.tenFileGoc,
+      actionType: 'TaoMoi',
+      actionDetail: `Upload file "${uploaded.tenFileGoc}" vào thư mục ${uploaded.thuMuc}`,
+      after: JSON.stringify({ id: uploaded.id, tenFileGoc: uploaded.tenFileGoc, thuMuc: uploaded.thuMuc, loaiFile: uploaded.loaiFile }),
+    });
+    return uploaded;
   }
 
   async findAll(query: QueryMediaDto) {
@@ -213,24 +224,55 @@ export class MediaService {
     if (asset.soLanSuDung > 0) {
       throw new BadRequestException('Asset đang được sử dụng, không thể xoá');
     }
+    const snapshot = { id: asset.id, tenFileGoc: asset.tenFileGoc, cloudinaryId: asset.cloudinaryId, loaiFile: asset.loaiFile, thuMuc: asset.thuMuc };
     await cloudinary.uploader.destroy(asset.cloudinaryId, {
       resource_type: asset.loaiFile as 'image' | 'video' | 'raw',
     });
     await this.repo.remove(asset);
+    this.auditLogsService.log({
+      entityType: 'MediaAsset',
+      entityId: String(snapshot.id),
+      entityLabel: snapshot.tenFileGoc,
+      actionType: 'Xoa',
+      actionDetail: `Xóa file media "${snapshot.tenFileGoc}" khỏi Cloudinary`,
+      before: JSON.stringify(snapshot),
+    });
   }
 
   async update(id: number, dto: UpdateMediaDto): Promise<MediaAsset> {
     const asset = await this.findOne(id);
+    const before = { tenFileGoc: asset.tenFileGoc, altText: asset.altText, caption: asset.caption };
     if (dto.originalName !== undefined) asset.tenFileGoc = dto.originalName;
     if (dto.altText !== undefined) asset.altText = dto.altText;
     if (dto.caption !== undefined) asset.caption = dto.caption;
-    return this.repo.save(asset);
+    const saved = await this.repo.save(asset);
+    this.auditLogsService.log({
+      entityType: 'MediaAsset',
+      entityId: String(id),
+      entityLabel: saved.tenFileGoc,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật thông tin file media #${id}`,
+      before: JSON.stringify(before),
+      after: JSON.stringify({ tenFileGoc: saved.tenFileGoc, altText: saved.altText, caption: saved.caption }),
+    });
+    return saved;
   }
 
   async archive(id: number): Promise<MediaAsset> {
     const asset = await this.findOne(id);
+    const before = { trangThai: asset.trangThai };
     asset.trangThai = 'archived';
-    return this.repo.save(asset);
+    const saved = await this.repo.save(asset);
+    this.auditLogsService.log({
+      entityType: 'MediaAsset',
+      entityId: String(id),
+      entityLabel: saved.tenFileGoc,
+      actionType: 'CapNhat',
+      actionDetail: `Archive file media "${saved.tenFileGoc}"`,
+      before: JSON.stringify(before),
+      after: JSON.stringify({ trangThai: 'archived' }),
+    });
+    return saved;
   }
 
   private uploadToCloudinary(

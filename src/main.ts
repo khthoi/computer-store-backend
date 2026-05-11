@@ -14,6 +14,9 @@ async function bootstrap() {
   const app = await NestFactory.create(AppModule, { bufferLogs: true });
   const logger = new Logger('Bootstrap');
 
+  // Trust one proxy hop (nginx) so req.ip reads X-Forwarded-For correctly in production
+  app.getHttpAdapter().getInstance().set('trust proxy', 1);
+
   // Security headers
   app.use(helmet());
 

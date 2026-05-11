@@ -5,6 +5,7 @@ import { Menu } from './entities/menu.entity';
 import { MenuItem } from './entities/menu-item.entity';
 import { CreateMenuItemDto } from './dto/create-menu-item.dto';
 import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 export interface MenuItemNode extends MenuItem {
   children: MenuItemNode[];
@@ -17,6 +18,7 @@ export class MenuService {
     private readonly menuRepo: Repository<Menu>,
     @InjectRepository(MenuItem)
     private readonly itemRepo: Repository<MenuItem>,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async getMenuByPosition(position: string) {
@@ -56,6 +58,14 @@ export class MenuService {
     for (let i = 0; i < itemIds.length; i++) {
       await this.itemRepo.update({ id: itemIds[i], menuId }, { sortOrder: i + 1 });
     }
+    this.auditLogsService.log({
+      entityType: 'MenuItem',
+      entityId: 'batch',
+      entityLabel: `Sắp xếp lại menu #${menuId}`,
+      actionType: 'CapNhat',
+      actionDetail: `Sắp xếp lại thứ tự ${itemIds.length} mục trong menu #${menuId}`,
+      after: JSON.stringify({ menuId, newOrder: itemIds }),
+    });
   }
 
   private mapItem(item: MenuItemNode): Record<string, unknown> {
@@ -86,14 +96,32 @@ export class MenuService {
     const menu = await this.menuRepo.findOne({ where: { id: menuId } });
     if (!menu) throw new NotFoundException('Menu không tồn tại');
     const saved = await this.itemRepo.save(this.itemRepo.create({ ...dto, menuId }));
+    this.auditLogsService.log({
+      entityType: 'MenuItem',
+      entityId: String(saved.id),
+      entityLabel: saved.label,
+      actionType: 'TaoMoi',
+      actionDetail: `Thêm mục menu "${saved.label}" vào menu #${menuId} (url: ${saved.url}, loại: ${saved.type})`,
+      after: JSON.stringify({ id: saved.id, menuId, label: saved.label, url: saved.url, type: saved.type, parentId: saved.parentId, sortOrder: saved.sortOrder, openInNewTab: saved.openInNewTab }),
+    });
     return this.mapItem({ ...saved, children: [] });
   }
 
   async updateItem(menuId: number, itemId: number, dto: UpdateMenuItemDto) {
     const item = await this.itemRepo.findOne({ where: { id: itemId, menuId } });
     if (!item) throw new NotFoundException('Menu item không tồn tại');
+    const before = { label: item.label, url: item.url, type: item.type, isVisible: item.isVisible, openInNewTab: item.openInNewTab };
     await this.itemRepo.update(itemId, dto);
     const updated = await this.itemRepo.findOne({ where: { id: itemId } });
+    this.auditLogsService.log({
+      entityType: 'MenuItem',
+      entityId: String(itemId),
+      entityLabel: updated!.label,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật mục menu "${updated!.label}" trong menu #${menuId}`,
+      before: JSON.stringify(before),
+      after: JSON.stringify({ label: updated!.label, url: updated!.url, type: updated!.type, isVisible: updated!.isVisible, openInNewTab: updated!.openInNewTab }),
+    });
     return this.mapItem({ ...updated!, children: [] });
   }
 
@@ -101,6 +129,14 @@ export class MenuService {
     const item = await this.itemRepo.findOne({ where: { id: itemId, menuId } });
     if (!item) throw new NotFoundException('Menu item không tồn tại');
     await this.itemRepo.delete(itemId);
+    this.auditLogsService.log({
+      entityType: 'MenuItem',
+      entityId: String(itemId),
+      entityLabel: item.label,
+      actionType: 'Xoa',
+      actionDetail: `Xóa mục menu "${item.label}" khỏi menu #${menuId} (url: ${item.url})`,
+      before: JSON.stringify({ id: item.id, menuId, label: item.label, url: item.url, type: item.type }),
+    });
   }
 
   private buildTree(items: MenuItem[]): MenuItemNode[] {

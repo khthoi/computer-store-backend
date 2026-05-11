@@ -3,18 +3,22 @@ import {
   Get,
   Post,
   Put,
+  Patch,
   Delete,
   Body,
   Param,
+  Query,
   ParseIntPipe,
   HttpCode,
   HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { BuildPcService } from './build-pc.service';
-import { BuildSlot } from './entities/build-slot.entity';
-import { CompatibilityRule } from './entities/compatibility-rule.entity';
 import { Roles } from '../../common/decorators/roles.decorator';
+import { CreateBuildSlotDto } from './dto/create-build-slot.dto';
+import { UpdateBuildSlotDto } from './dto/update-build-slot.dto';
+import { CreateCompatibilityRuleDto } from './dto/create-compatibility-rule.dto';
+import { UpdateCompatibilityRuleDto } from './dto/update-compatibility-rule.dto';
 
 @ApiTags('Admin — BuildPC')
 @ApiBearerAuth('access-token')
@@ -27,14 +31,6 @@ export class AdminBuildPcController {
 
   @Get('slots')
   @ApiOperation({ summary: 'List all Build-PC slot definitions' })
-  @ApiOkResponse({
-    schema: {
-      example: [
-        { id: 1, tenSlot: 'CPU', danhMucId: 3, batBuoc: true, soLuongMin: 1, soLuongMax: 1, thuTu: 1, iconKey: 'cpu' },
-        { id: 2, tenSlot: 'RAM', danhMucId: 5, batBuoc: true, soLuongMin: 1, soLuongMax: 4, thuTu: 2, iconKey: 'ram' },
-      ],
-    },
-  })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findAllSlots() {
@@ -43,14 +39,21 @@ export class AdminBuildPcController {
 
   @Post('slots')
   @ApiOperation({ summary: 'Tạo slot' })
-  createSlot(@Body() data: Partial<BuildSlot>) {
-    return this.buildPcService.createSlot(data);
+  createSlot(@Body() dto: CreateBuildSlotDto) {
+    return this.buildPcService.createSlot(dto);
+  }
+
+  @Patch('slots/reorder')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Cập nhật thứ tự hiển thị các slot' })
+  reorderSlots(@Body() dto: { ids: number[] }) {
+    return this.buildPcService.reorderSlots(dto.ids);
   }
 
   @Put('slots/:id')
   @ApiOperation({ summary: 'Cập nhật slot' })
-  updateSlot(@Param('id', ParseIntPipe) id: number, @Body() data: Partial<BuildSlot>) {
-    return this.buildPcService.updateSlot(id, data);
+  updateSlot(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBuildSlotDto) {
+    return this.buildPcService.updateSlot(id, dto);
   }
 
   @Delete('slots/:id')
@@ -58,6 +61,17 @@ export class AdminBuildPcController {
   @ApiOperation({ summary: 'Xoá slot' })
   removeSlot(@Param('id', ParseIntPipe) id: number) {
     return this.buildPcService.removeSlot(id);
+  }
+
+  // ── Tech keys ─────────────────────────────────────────────────────────────
+
+  @Get('tech-keys')
+  @ApiOperation({ summary: 'Danh sách thông số kỹ thuật dùng được trong quy tắc tương thích' })
+  findTechKeys(@Query('categoryIds') categoryIds?: string) {
+    const ids = categoryIds
+      ? categoryIds.split(',').map(Number).filter((n) => !isNaN(n))
+      : undefined;
+    return this.buildPcService.findTechKeys(ids);
   }
 
   // ── Rules ─────────────────────────────────────────────────────────────────
@@ -79,14 +93,14 @@ export class AdminBuildPcController {
 
   @Post('rules')
   @ApiOperation({ summary: 'Tạo quy tắc tương thích' })
-  createRule(@Body() data: Partial<CompatibilityRule>) {
-    return this.buildPcService.createRule(data);
+  createRule(@Body() dto: CreateCompatibilityRuleDto) {
+    return this.buildPcService.createRule(dto);
   }
 
   @Put('rules/:id')
   @ApiOperation({ summary: 'Cập nhật quy tắc' })
-  updateRule(@Param('id', ParseIntPipe) id: number, @Body() data: Partial<CompatibilityRule>) {
-    return this.buildPcService.updateRule(id, data);
+  updateRule(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCompatibilityRuleDto) {
+    return this.buildPcService.updateRule(id, dto);
   }
 
   @Delete('rules/:id')
@@ -94,5 +108,31 @@ export class AdminBuildPcController {
   @ApiOperation({ summary: 'Vô hiệu hóa quy tắc' })
   removeRule(@Param('id', ParseIntPipe) id: number) {
     return this.buildPcService.removeRule(id);
+  }
+
+  // ── Saved Builds (admin read-only) ─────────────────────────────────────────
+
+  @Get('builds')
+  @ApiOperation({ summary: 'Danh sách build đã lưu (admin)' })
+  findAllBuilds(
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+    @Query('status') status?: string,
+    @Query('search') search?: string,
+    @Query('customerId') customerId?: string,
+  ) {
+    return this.buildPcService.findAllBuildsAdmin({
+      page: page ? parseInt(page, 10) : undefined,
+      limit: limit ? parseInt(limit, 10) : undefined,
+      status: status || undefined,
+      search: search || undefined,
+      customerId: customerId ? parseInt(customerId, 10) : undefined,
+    });
+  }
+
+  @Get('builds/:id')
+  @ApiOperation({ summary: 'Chi tiết một build (admin)' })
+  findBuildDetail(@Param('id', ParseIntPipe) id: number) {
+    return this.buildPcService.findBuildDetailAdmin(id);
   }
 }

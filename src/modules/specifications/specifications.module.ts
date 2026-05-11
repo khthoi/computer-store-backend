@@ -8,9 +8,10 @@ import { Category } from '../categories/entities/category.entity';
 import { SpecificationsService } from './specifications.service';
 import { SpecificationsController } from './specifications.controller';
 import { AdminSpecificationsController } from './admin-specifications.controller';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([SpecGroup, SpecType, CategorySpecGroup, SpecValue, Category])],
+  imports: [TypeOrmModule.forFeature([SpecGroup, SpecType, CategorySpecGroup, SpecValue, Category]), AuditLogsModule],
   controllers: [SpecificationsController, AdminSpecificationsController],
   providers: [SpecificationsService],
   exports: [SpecificationsService, TypeOrmModule],

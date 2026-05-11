@@ -11,6 +11,8 @@ export interface JwtPayload {
   roles: string[];
   jti: string;
   sessionJti?: string; // chỉ có trong refresh token của customer (trỏ đến access JTI tương ứng)
+  name?: string;       // display name — chỉ có trong employee tokens (dùng bởi AuditContextMiddleware)
+  code?: string;       // maNhanVien — chỉ có trong employee tokens (dùng bởi AuditContextMiddleware)
 }
 
 @Injectable()

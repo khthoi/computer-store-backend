@@ -10,6 +10,7 @@ import { CreateSpecGroupDto } from './dto/create-spec-group.dto';
 import { CreateSpecTypeDto } from './dto/create-spec-type.dto';
 import { LinkCategoryGroupDto } from './dto/link-category-group.dto';
 import { SaveSpecValuesDto } from './dto/save-spec-values.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class SpecificationsService {
@@ -19,6 +20,7 @@ export class SpecificationsService {
     @InjectRepository(CategorySpecGroup) private readonly catGroupRepo: Repository<CategorySpecGroup>,
     @InjectRepository(SpecValue) private readonly valueRepo: Repository<SpecValue>,
     @InjectRepository(Category) private readonly categoryRepo: Repository<Category>,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   // ── Groups ────────────────────────────────────────────────────────────────
@@ -34,20 +36,48 @@ export class SpecificationsService {
   }
 
   async createGroup(dto: CreateSpecGroupDto): Promise<SpecGroup> {
-    return this.groupRepo.save(this.groupRepo.create(dto));
+    const group = await this.groupRepo.save(this.groupRepo.create(dto));
+    this.auditLogsService.log({
+      entityType: 'SpecGroup',
+      entityId: String(group.id),
+      entityLabel: group.tenNhom,
+      actionType: 'TaoMoi',
+      actionDetail: `Tạo nhóm thông số kỹ thuật "${group.tenNhom}"`,
+      after: JSON.stringify({ id: group.id, tenNhom: group.tenNhom }),
+    });
+    return group;
   }
 
   async updateGroup(id: number, dto: CreateSpecGroupDto): Promise<SpecGroup> {
     const group = await this.groupRepo.findOne({ where: { id } });
     if (!group) throw new NotFoundException('Nhóm thông số không tồn tại');
+    const before = { tenNhom: group.tenNhom };
     Object.assign(group, dto);
-    return this.groupRepo.save(group);
+    const updated = await this.groupRepo.save(group);
+    this.auditLogsService.log({
+      entityType: 'SpecGroup',
+      entityId: String(id),
+      entityLabel: updated.tenNhom,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật nhóm thông số kỹ thuật "${updated.tenNhom}"`,
+      before: JSON.stringify(before),
+      after: JSON.stringify({ tenNhom: updated.tenNhom }),
+    });
+    return updated;
   }
 
   async removeGroup(id: number): Promise<void> {
     const group = await this.groupRepo.findOne({ where: { id } });
     if (!group) throw new NotFoundException('Nhóm thông số không tồn tại');
     await this.groupRepo.remove(group);
+    this.auditLogsService.log({
+      entityType: 'SpecGroup',
+      entityId: String(id),
+      entityLabel: group.tenNhom,
+      actionType: 'Xoa',
+      actionDetail: `Xóa nhóm thông số kỹ thuật "${group.tenNhom}"`,
+      before: JSON.stringify({ id, tenNhom: group.tenNhom }),
+    });
   }
 
   // ── Types ─────────────────────────────────────────────────────────────────
@@ -64,6 +94,14 @@ export class SpecificationsService {
     await Promise.all(
       orderedIds.map((id, idx) => this.typeRepo.update({ id, nhomThongSoId }, { thuTuHienThi: idx })),
     );
+    this.auditLogsService.log({
+      entityType: 'SpecType',
+      entityId: 'batch',
+      entityLabel: `Sắp xếp lại loại thông số trong nhóm #${nhomThongSoId}`,
+      actionType: 'CapNhat',
+      actionDetail: `Sắp xếp lại thứ tự ${orderedIds.length} loại thông số trong nhóm #${nhomThongSoId}`,
+      after: JSON.stringify({ nhomThongSoId, newOrder: orderedIds }),
+    });
   }
 
   async createType(dto: CreateSpecTypeDto): Promise<SpecType> {
@@ -71,20 +109,48 @@ export class SpecificationsService {
       const exists = await this.typeRepo.findOne({ where: { maKyThuat: dto.maKyThuat } });
       if (exists) throw new ConflictException(`Mã kỹ thuật "${dto.maKyThuat}" đã tồn tại`);
     }
-    return this.typeRepo.save(this.typeRepo.create(dto));
+    const specType = await this.typeRepo.save(this.typeRepo.create(dto));
+    this.auditLogsService.log({
+      entityType: 'SpecType',
+      entityId: String(specType.id),
+      entityLabel: specType.tenLoai,
+      actionType: 'TaoMoi',
+      actionDetail: `Tạo loại thông số "${specType.tenLoai}" trong nhóm #${specType.nhomThongSoId} (kiểu dữ liệu: ${specType.kieuDuLieu})`,
+      after: JSON.stringify({ id: specType.id, tenLoai: specType.tenLoai, nhomThongSoId: specType.nhomThongSoId, kieuDuLieu: specType.kieuDuLieu, batBuoc: specType.batBuoc, thuTuHienThi: specType.thuTuHienThi }),
+    });
+    return specType;
   }
 
   async updateType(id: number, dto: Partial<CreateSpecTypeDto>): Promise<SpecType> {
     const type = await this.typeRepo.findOne({ where: { id } });
     if (!type) throw new NotFoundException('Loại thông số không tồn tại');
+    const before = { tenLoai: type.tenLoai, kieuDuLieu: type.kieuDuLieu, batBuoc: type.batBuoc, donVi: type.donVi };
     Object.assign(type, dto);
-    return this.typeRepo.save(type);
+    const updated = await this.typeRepo.save(type);
+    this.auditLogsService.log({
+      entityType: 'SpecType',
+      entityId: String(id),
+      entityLabel: updated.tenLoai,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật loại thông số "${updated.tenLoai}"`,
+      before: JSON.stringify(before),
+      after: JSON.stringify({ tenLoai: updated.tenLoai, kieuDuLieu: updated.kieuDuLieu, batBuoc: updated.batBuoc, donVi: updated.donVi }),
+    });
+    return updated;
   }
 
   async removeType(id: number): Promise<void> {
     const type = await this.typeRepo.findOne({ where: { id } });
     if (!type) throw new NotFoundException('Loại thông số không tồn tại');
     await this.typeRepo.remove(type);
+    this.auditLogsService.log({
+      entityType: 'SpecType',
+      entityId: String(id),
+      entityLabel: type.tenLoai,
+      actionType: 'Xoa',
+      actionDetail: `Xóa loại thông số "${type.tenLoai}" khỏi nhóm #${type.nhomThongSoId}`,
+      before: JSON.stringify({ id, tenLoai: type.tenLoai, nhomThongSoId: type.nhomThongSoId, kieuDuLieu: type.kieuDuLieu }),
+    });
   }
 
   // ── Category ↔ Group links ────────────────────────────────────────────────
@@ -99,10 +165,30 @@ export class SpecificationsService {
       where: { danhMucId: dto.danhMucId, nhomThongSoId: dto.nhomThongSoId },
     });
     if (existing) {
+      const before = { thuTuHienThi: existing.thuTuHienThi, hienThiBoLoc: existing.hienThiBoLoc, thuTuBoLoc: existing.thuTuBoLoc };
       Object.assign(existing, dto);
-      return this.catGroupRepo.save(existing);
+      const link = await this.catGroupRepo.save(existing);
+      this.auditLogsService.log({
+        entityType: 'CategorySpecGroup',
+        entityId: String(link.id),
+        entityLabel: `Danh mục #${link.danhMucId} ↔ Nhóm spec #${link.nhomThongSoId}`,
+        actionType: 'CapNhat',
+        actionDetail: `Cập nhật liên kết nhóm thông số #${link.nhomThongSoId} với danh mục #${link.danhMucId}`,
+        before: JSON.stringify(before),
+        after: JSON.stringify({ thuTuHienThi: link.thuTuHienThi, hienThiBoLoc: link.hienThiBoLoc, thuTuBoLoc: link.thuTuBoLoc }),
+      });
+      return link;
     }
-    return this.catGroupRepo.save(this.catGroupRepo.create(dto));
+    const link = await this.catGroupRepo.save(this.catGroupRepo.create(dto));
+    this.auditLogsService.log({
+      entityType: 'CategorySpecGroup',
+      entityId: String(link.id),
+      entityLabel: `Danh mục #${link.danhMucId} ↔ Nhóm spec #${link.nhomThongSoId}`,
+      actionType: 'TaoMoi',
+      actionDetail: `Liên kết nhóm thông số #${link.nhomThongSoId} với danh mục #${link.danhMucId} (thứ tự: ${link.thuTuHienThi})`,
+      after: JSON.stringify({ danhMucId: link.danhMucId, nhomThongSoId: link.nhomThongSoId, thuTuHienThi: link.thuTuHienThi, hienThiBoLoc: link.hienThiBoLoc }),
+    });
+    return link;
   }
 
   /** Kept for backward compat — throws ConflictException if already linked. */
@@ -120,20 +206,47 @@ export class SpecificationsService {
   ): Promise<CategorySpecGroup> {
     const link = await this.catGroupRepo.findOne({ where: { id } });
     if (!link) throw new NotFoundException('Liên kết không tồn tại');
+    const before = { thuTuHienThi: link.thuTuHienThi, hienThiBoLoc: link.hienThiBoLoc, thuTuBoLoc: link.thuTuBoLoc };
     Object.assign(link, patch);
-    return this.catGroupRepo.save(link);
+    const updated = await this.catGroupRepo.save(link);
+    this.auditLogsService.log({
+      entityType: 'CategorySpecGroup',
+      entityId: String(id),
+      entityLabel: `Liên kết CategorySpecGroup #${id}`,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật cấu hình nhóm thông số #${id} trong danh mục`,
+      before: JSON.stringify(before),
+      after: JSON.stringify({ thuTuHienThi: updated.thuTuHienThi, hienThiBoLoc: updated.hienThiBoLoc, thuTuBoLoc: updated.thuTuBoLoc }),
+    });
+    return updated;
   }
 
   async unlinkCategoryGroup(id: number): Promise<void> {
     const link = await this.catGroupRepo.findOne({ where: { id } });
     if (!link) throw new NotFoundException('Liên kết không tồn tại');
     await this.catGroupRepo.remove(link);
+    this.auditLogsService.log({
+      entityType: 'CategorySpecGroup',
+      entityId: String(id),
+      entityLabel: `CategorySpecGroup #${id}`,
+      actionType: 'Xoa',
+      actionDetail: `Gỡ liên kết CategorySpecGroup #${id} (danh mục #${link.danhMucId} ↔ nhóm #${link.nhomThongSoId})`,
+      before: JSON.stringify({ id, danhMucId: link.danhMucId, nhomThongSoId: link.nhomThongSoId, thuTuHienThi: link.thuTuHienThi }),
+    });
   }
 
   async unlinkCategoryGroupByPair(danhMucId: number, nhomThongSoId: number): Promise<void> {
     const link = await this.catGroupRepo.findOne({ where: { danhMucId, nhomThongSoId } });
     if (!link) throw new NotFoundException('Liên kết không tồn tại');
     await this.catGroupRepo.remove(link);
+    this.auditLogsService.log({
+      entityType: 'CategorySpecGroup',
+      entityId: String(link.id),
+      entityLabel: `Danh mục #${danhMucId} ↔ Nhóm spec #${nhomThongSoId}`,
+      actionType: 'Xoa',
+      actionDetail: `Gỡ liên kết nhóm thông số #${nhomThongSoId} khỏi danh mục #${danhMucId}`,
+      before: JSON.stringify({ danhMucId, nhomThongSoId, thuTuHienThi: link.thuTuHienThi }),
+    });
   }
 
   async reorderCategoryGroups(danhMucId: number, orderedGroupIds: number[]): Promise<void> {
@@ -142,6 +255,14 @@ export class SpecificationsService {
         this.catGroupRepo.update({ danhMucId, nhomThongSoId }, { thuTuHienThi: idx }),
       ),
     );
+    this.auditLogsService.log({
+      entityType: 'CategorySpecGroup',
+      entityId: 'batch',
+      entityLabel: `Sắp xếp lại nhóm spec của danh mục #${danhMucId}`,
+      actionType: 'CapNhat',
+      actionDetail: `Sắp xếp lại thứ tự ${orderedGroupIds.length} nhóm thông số trong danh mục #${danhMucId}`,
+      after: JSON.stringify({ danhMucId, newOrder: orderedGroupIds }),
+    });
   }
 
   // ── Resolved inheritance view ─────────────────────────────────────────────

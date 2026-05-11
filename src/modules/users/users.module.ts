@@ -5,9 +5,10 @@ import { ShippingAddress } from './entities/shipping-address.entity';
 import { UsersService } from './users.service';
 import { UsersController } from './users.controller';
 import { AdminUsersController } from './admin-users.controller';
+import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Customer, ShippingAddress])],
+  imports: [TypeOrmModule.forFeature([Customer, ShippingAddress]), AuditLogsModule],
   controllers: [UsersController, AdminUsersController],
   providers: [UsersService],
   exports: [UsersService],

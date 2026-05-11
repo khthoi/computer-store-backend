@@ -8,6 +8,7 @@ import { AdjustStockDto } from './dto/adjust-stock.dto';
 import { QueryHistoryDto } from './dto/query-history.dto';
 import { UpdateThresholdsDto } from './dto/inventory-item-response.dto';
 import { BatchService } from './batch.service';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
 export class InventoryService {
@@ -18,6 +19,7 @@ export class InventoryService {
     private readonly historyRepo: Repository<StockHistory>,
     private readonly dataSource: DataSource,
     private readonly batchService: BatchService,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   // ─── Stock Level List (enriched) ─────────────────────────────────────────────
@@ -209,9 +211,20 @@ export class InventoryService {
   async updateThresholds(phienBanId: number, dto: UpdateThresholdsDto) {
     const sl = await this.stockRepo.findOne({ where: { phienBanId } });
     if (!sl) throw new NotFoundException(`Stock level not found for variant ${phienBanId}`);
+    const beforeNguong = sl.nguongCanhBao;
+    const beforeReorder = sl.reorderPoint;
     sl.nguongCanhBao = dto.lowStockThreshold;
     sl.reorderPoint = dto.reorderPoint;
     await this.stockRepo.save(sl);
+    this.auditLogsService.log({
+      entityType: 'TonKho',
+      entityId: String(phienBanId),
+      entityLabel: `Phiên bản #${phienBanId}`,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật ngưỡng cảnh báo tồn kho phiên bản #${phienBanId}`,
+      before: JSON.stringify({ nguongCanhBao: beforeNguong, reorderPoint: beforeReorder }),
+      after: JSON.stringify({ nguongCanhBao: dto.lowStockThreshold, reorderPoint: dto.reorderPoint }),
+    });
     return { success: true };
   }
 
@@ -250,6 +263,9 @@ export class InventoryService {
   }
 
   async adjustStock(dto: AdjustStockDto, nguoiThucHienId: number): Promise<{ success: true }> {
+    const stockBefore = await this.stockRepo.findOne({ where: { phienBanId: dto.phienBanId } });
+    const qtyBefore = stockBefore?.soLuongTon ?? 0;
+
     await this.dataSource.transaction(async (manager) => {
       const { before, after } = await this.upsertStockLevel(manager, dto.phienBanId, dto.soLuong);
 
@@ -299,6 +315,19 @@ export class InventoryService {
 
       await this.batchService.recalcWeightedAvgCost(manager, dto.phienBanId);
     });
+
+    const stockAfter = await this.stockRepo.findOne({ where: { phienBanId: dto.phienBanId } });
+    const qtyAfter = stockAfter?.soLuongTon ?? 0;
+    this.auditLogsService.log({
+      entityType: 'TonKho',
+      entityId: String(dto.phienBanId),
+      entityLabel: `Biến thể #${dto.phienBanId}`,
+      actionType: 'CapNhat',
+      actionDetail: `Điều chỉnh tồn kho: ${qtyBefore} → ${qtyAfter}`,
+      before: JSON.stringify({ soLuongTon: qtyBefore }),
+      after: JSON.stringify({ soLuongTon: qtyAfter }),
+    });
+
     return { success: true };
   }
 

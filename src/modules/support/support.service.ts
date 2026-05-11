@@ -15,6 +15,7 @@ import { QueryTicketsDto } from './dto/query-tickets.dto';
 import { UpdateTicketMetaDto } from './dto/update-ticket-meta.dto';
 import { TicketMessageResponseDto } from './dto/ticket-message-response.dto';
 import { TicketPriority, TicketStatus } from './support.enums';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const SLA_HOURS: Record<string, number> = { KhanCap: 1, Cao: 4, TrungBinh: 24, Thap: 48 };
 
@@ -30,6 +31,7 @@ export class SupportService {
     @InjectRepository(TicketAttachment)
     private readonly attachmentRepo: Repository<TicketAttachment>,
     private readonly dataSource: DataSource,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   // ─── Customer ─────────────────────────────────────────────────────────────
@@ -163,6 +165,7 @@ export class SupportService {
     const ticket = await this.ticketRepo.findOne({ where: { id: ticketId } });
     if (!ticket) throw new NotFoundException(`Ticket #${ticketId} không tồn tại`);
     if (ticket.status === TicketStatus.DaDong) throw new BadRequestException('Ticket đã đóng');
+    const oldStatus = ticket.status;
     ticket.status = TicketStatus.DaDong;
     ticket.closedAt = new Date();
     const saved = await this.ticketRepo.save(ticket);
@@ -170,6 +173,15 @@ export class SupportService {
       this.messageRepo.create({ ticketId, senderType: 'HeThong', senderId: null, content: `Ticket đã được đóng bởi nhân viên #${employeeId}`, messageType: 'SystemLog', newStatus: TicketStatus.DaDong }),
     );
     this.emitToStream(ticketId, { type: 'closed', data: { ticketId } });
+    this.auditLogsService.log({
+      entityType: 'Ticket',
+      entityId: String(ticketId),
+      entityLabel: `Ticket ${ticket.ticketCode}`,
+      actionType: 'DoiTrangThai',
+      actionDetail: `Đổi trạng thái ${oldStatus} → ${TicketStatus.DaDong}`,
+      before: JSON.stringify({ status: oldStatus }),
+      after: JSON.stringify({ status: TicketStatus.DaDong }),
+    });
     return saved;
   }
 
@@ -178,6 +190,7 @@ export class SupportService {
     if (!ticket) throw new NotFoundException(`Ticket #${ticketId} không tồn tại`);
     if (ticket.status === TicketStatus.DaDong) throw new BadRequestException('Ticket đã đóng hoàn toàn');
     if (ticket.status === TicketStatus.DaGiaiQuyet) throw new BadRequestException('Ticket đã được giải quyết');
+    const oldStatus = ticket.status;
     ticket.status = TicketStatus.DaGiaiQuyet;
     ticket.resolvedAt = new Date();
     const saved = await this.ticketRepo.save(ticket);
@@ -185,6 +198,15 @@ export class SupportService {
       this.messageRepo.create({ ticketId, senderType: 'HeThong', senderId: null, content: `Ticket đã được đánh dấu giải quyết bởi nhân viên #${employeeId}`, messageType: 'SystemLog', newStatus: TicketStatus.DaGiaiQuyet }),
     );
     this.emitToStream(ticketId, { type: 'resolved', data: { ticketId } });
+    this.auditLogsService.log({
+      entityType: 'Ticket',
+      entityId: String(ticketId),
+      entityLabel: `Ticket ${ticket.ticketCode}`,
+      actionType: 'DoiTrangThai',
+      actionDetail: `Đổi trạng thái ${oldStatus} → ${TicketStatus.DaGiaiQuyet}`,
+      before: JSON.stringify({ status: oldStatus }),
+      after: JSON.stringify({ status: TicketStatus.DaGiaiQuyet }),
+    });
     return saved;
   }
 

@@ -7,6 +7,7 @@ import {
   Body,
   Param,
   ParseIntPipe,
+  DefaultValuePipe,
   Query,
   HttpCode,
   HttpStatus,
@@ -37,8 +38,8 @@ export class EmployeesController {
 
   @Get()
   @ApiOperation({ summary: 'Danh sách nhân viên' })
-  @ApiQuery({ name: 'q', required: false, description: 'Tìm theo tên hoặc email', example: 'Trần Thị B' })
-  @ApiQuery({ name: 'status', required: false, description: 'Lọc theo trạng thái', example: 'DangLam' })
+  @ApiQuery({ name: 'search', required: false, description: 'Tìm theo tên hoặc email', example: 'Trần Thị B' })
+  @ApiQuery({ name: 'status', required: false, description: 'Lọc theo trạng thái', enum: ['active', 'inactive'] })
   @ApiQuery({ name: 'page', required: false, description: 'Trang hiện tại', example: 1 })
   @ApiQuery({ name: 'limit', required: false, description: 'Số bản ghi mỗi trang', example: 20 })
   @ApiOkResponse({ type: EmployeeListResponseDto })
@@ -46,6 +47,15 @@ export class EmployeesController {
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   findAll(@Query() query: QueryEmployeesDto) {
     return this.employeesService.findAll(query);
+  }
+
+  @Get('code/:code')
+  @ApiOperation({ summary: 'Chi tiết nhân viên theo mã NV' })
+  @ApiParam({ name: 'code', example: 'NV-001' })
+  @ApiOkResponse({ type: EmployeeResponseDto })
+  @ApiResponse({ status: 404, description: 'Nhân viên không tồn tại' })
+  findByCode(@Param('code') code: string) {
+    return this.employeesService.findByCode(code);
   }
 
   @Get(':id')
@@ -57,6 +67,23 @@ export class EmployeesController {
   @ApiResponse({ status: 404, description: 'Nhân viên không tồn tại' })
   findOne(@Param('id', ParseIntPipe) id: number) {
     return this.employeesService.findOne(id);
+  }
+
+  @Get(':id/audit-logs')
+  @ApiOperation({ summary: 'Lịch sử hoạt động của nhân viên' })
+  @ApiParam({ name: 'id', example: 2 })
+  @ApiQuery({ name: 'page', required: false })
+  @ApiQuery({ name: 'limit', required: false })
+  @ApiQuery({ name: 'q', required: false, description: 'Tìm theo nội dung chi tiết' })
+  @ApiQuery({ name: 'action', required: false, description: 'Lọc loại hành động, nhiều giá trị cách nhau bởi dấu phẩy' })
+  getAuditLogs(
+    @Param('id', ParseIntPipe) id: number,
+    @Query('page', new DefaultValuePipe(1), ParseIntPipe) page: number,
+    @Query('limit', new DefaultValuePipe(20), ParseIntPipe) limit: number,
+    @Query('q') q?: string,
+    @Query('action') action?: string,
+  ) {
+    return this.employeesService.getEmployeeAuditLogs(id, page, limit, q, action);
   }
 
   @Post()

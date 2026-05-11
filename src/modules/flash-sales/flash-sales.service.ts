@@ -1,6 +1,6 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, Repository } from 'typeorm';
+import { DataSource, In, LessThanOrEqual, Repository } from 'typeorm';
 import { FlashSale, FlashSaleStatus } from './entities/flash-sale.entity';
 import { FlashSaleItem } from './entities/flash-sale-item.entity';
 import { ProductVariant } from '../products/entities/product-variant.entity';
@@ -15,6 +15,7 @@ import {
   FlashSaleStatsResponseDto,
   VariantSearchResultResponseDto,
 } from './dto/flash-sale-response.dto';
+import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const VARIANT_RELATIONS = ['items', 'items.phienBan', 'items.phienBan.product', 'items.phienBan.images', 'createdByEmployee'];
 
@@ -28,6 +29,7 @@ export class FlashSalesService {
     @InjectRepository(ProductVariant)
     private readonly variantRepo: Repository<ProductVariant>,
     private readonly dataSource: DataSource,
+    private readonly auditLogsService: AuditLogsService,
   ) {}
 
   async create(dto: CreateFlashSaleDto, createdBy: number): Promise<FlashSaleResponseDto> {
@@ -61,6 +63,14 @@ export class FlashSalesService {
       }),
     );
     await this.itemRepo.save(items);
+    this.auditLogsService.log({
+      entityType: 'FlashSale',
+      entityId: String(saved.id),
+      entityLabel: saved.ten,
+      actionType: 'TaoMoi',
+      actionDetail: `Tạo flash sale ${saved.ten}`,
+      after: JSON.stringify({ ten: saved.ten, trangThai: saved.trangThai, batDau: saved.batDau, ketThuc: saved.ketThuc, soLuongSanPham: items.length }),
+    });
     return this.findOne(saved.id);
   }
 
@@ -120,6 +130,8 @@ export class FlashSalesService {
     if (fs.trangThai === FlashSaleStatus.DANG_DIEN_RA) {
       throw new BadRequestException('Không thể sửa flash sale đang diễn ra');
     }
+    const label = fs.ten;
+    const beforeSnapshot = { ten: fs.ten, trangThai: fs.trangThai, batDau: fs.batDau, ketThuc: fs.ketThuc };
     const { items, ...fsFields } = dto;
     Object.assign(fs, fsFields);
     await this.flashSaleRepo.save(fs);
@@ -142,12 +154,33 @@ export class FlashSalesService {
       await this.itemRepo.save(newItems);
     }
 
+    this.auditLogsService.log({
+      entityType: 'FlashSale',
+      entityId: String(id),
+      entityLabel: label,
+      actionType: 'CapNhat',
+      actionDetail: `Cập nhật thông tin ${label}`,
+      before: JSON.stringify(beforeSnapshot),
+      after: JSON.stringify({ ten: fs.ten, trangThai: fs.trangThai, batDau: fs.batDau, ketThuc: fs.ketThuc, soLuongSanPham: items?.length }),
+    });
+
     return this.findOne(id);
   }
 
   async cancel(id: number): Promise<void> {
-    await this.findOne(id);
+    const fs = await this.flashSaleRepo.findOne({ where: { id } });
+    if (!fs) throw new NotFoundException(`Flash sale #${id} không tồn tại`);
+    const oldStatus = fs.trangThai;
     await this.flashSaleRepo.update(id, { trangThai: FlashSaleStatus.HUY });
+    this.auditLogsService.log({
+      entityType: 'FlashSale',
+      entityId: String(id),
+      entityLabel: fs.ten,
+      actionType: 'DoiTrangThai',
+      actionDetail: `Đổi trạng thái ${oldStatus} → ${FlashSaleStatus.HUY}`,
+      before: JSON.stringify({ trangThai: oldStatus }),
+      after: JSON.stringify({ trangThai: FlashSaleStatus.HUY }),
+    });
   }
 
   async endEarly(id: number): Promise<FlashSaleResponseDto> {
@@ -156,7 +189,17 @@ export class FlashSalesService {
     if (fs.trangThai === FlashSaleStatus.DA_KET_THUC || fs.trangThai === FlashSaleStatus.HUY) {
       throw new BadRequestException('Flash sale đã kết thúc hoặc bị hủy');
     }
+    const oldStatus = fs.trangThai;
     await this.flashSaleRepo.update(id, { trangThai: FlashSaleStatus.DA_KET_THUC });
+    this.auditLogsService.log({
+      entityType: 'FlashSale',
+      entityId: String(id),
+      entityLabel: fs.ten,
+      actionType: 'DoiTrangThai',
+      actionDetail: `Đổi trạng thái ${oldStatus} → ${FlashSaleStatus.DA_KET_THUC}`,
+      before: JSON.stringify({ trangThai: oldStatus }),
+      after: JSON.stringify({ trangThai: FlashSaleStatus.DA_KET_THUC }),
+    });
     return this.findOne(id);
   }
 
@@ -206,18 +249,44 @@ export class FlashSalesService {
 
   async activateScheduled(): Promise<void> {
     const now = new Date();
+    const toActivate = await this.flashSaleRepo.find({
+      where: { trangThai: FlashSaleStatus.SAP_DIEN_RA, batDau: LessThanOrEqual(now) },
+      select: ['id', 'ten'],
+    });
+    if (toActivate.length === 0) return;
     await this.flashSaleRepo.createQueryBuilder().update()
       .set({ trangThai: FlashSaleStatus.DANG_DIEN_RA })
       .where('trang_thai = :s AND bat_dau <= :now', { s: FlashSaleStatus.SAP_DIEN_RA, now })
       .execute();
+    this.auditLogsService.log({
+      entityType: 'FlashSale',
+      entityId: 'batch',
+      entityLabel: `${toActivate.length} flash sale(s)`,
+      actionType: 'DoiTrangThai',
+      actionDetail: `Scheduler kích hoạt ${toActivate.length} flash sale: ${toActivate.map((f) => f.ten).join(', ')}`,
+      after: JSON.stringify({ trangThai: FlashSaleStatus.DANG_DIEN_RA, ids: toActivate.map((f) => f.id) }),
+    });
   }
 
   async endExpired(): Promise<void> {
     const now = new Date();
+    const toEnd = await this.flashSaleRepo.find({
+      where: { trangThai: FlashSaleStatus.DANG_DIEN_RA, ketThuc: LessThanOrEqual(now) },
+      select: ['id', 'ten'],
+    });
+    if (toEnd.length === 0) return;
     await this.flashSaleRepo.createQueryBuilder().update()
       .set({ trangThai: FlashSaleStatus.DA_KET_THUC })
       .where('trang_thai = :s AND ket_thuc < :now', { s: FlashSaleStatus.DANG_DIEN_RA, now })
       .execute();
+    this.auditLogsService.log({
+      entityType: 'FlashSale',
+      entityId: 'batch',
+      entityLabel: `${toEnd.length} flash sale(s)`,
+      actionType: 'DoiTrangThai',
+      actionDetail: `Scheduler kết thúc ${toEnd.length} flash sale hết hạn: ${toEnd.map((f) => f.ten).join(', ')}`,
+      after: JSON.stringify({ trangThai: FlashSaleStatus.DA_KET_THUC, ids: toEnd.map((f) => f.id) }),
+    });
   }
 
   async incrementSold(itemId: number, quantity: number): Promise<boolean> {
