@@ -29,6 +29,7 @@ import { ShippingAddressResponseDto } from './dto/shipping-address-response.dto'
 import { AdminUpdateCustomerDto } from './dto/admin-update-customer.dto';
 import { AdminCreateCustomerDto } from './dto/admin-create-customer.dto';
 import { AdminCreateAddressDto, AdminUpdateAddressDto } from './dto/admin-address.dto';
+import { AdminResetPasswordDto } from '../employees/dto/admin-reset-password.dto';
 import { RequirePermission } from '../../common/decorators/permission.decorator';
 
 @ApiTags('Admin — Customers')
@@ -101,6 +102,18 @@ export class AdminUsersController {
     @Body('trangThai') trangThai: string,
   ) {
     return this.usersService.adminUpdate(id, { trangThai } as never);
+  }
+
+  @Post(':id/reset-password')
+  @RequirePermission('users.update')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Admin đặt lại mật khẩu khách hàng' })
+  @ApiParam({ name: 'id', example: 5 })
+  @ApiResponse({ status: 204, description: 'Đặt lại mật khẩu thành công' })
+  @ApiResponse({ status: 400, description: 'Mật khẩu xác nhận không khớp' })
+  @ApiResponse({ status: 404, description: 'Khách hàng không tồn tại' })
+  resetPassword(@Param('id', ParseIntPipe) id: number, @Body() dto: AdminResetPasswordDto) {
+    return this.usersService.adminResetCustomerPassword(id, dto);
   }
 
   @Delete(':id')

@@ -25,6 +25,7 @@ import { EmployeesService } from './employees.service';
 import { CreateEmployeeDto } from './dto/create-employee.dto';
 import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { AssignRolesDto } from './dto/assign-roles.dto';
+import { AdminResetPasswordDto } from './dto/admin-reset-password.dto';
 import { QueryEmployeesDto } from './dto/query-employees.dto';
 import { EmployeeResponseDto, EmployeeListResponseDto } from './dto/employee-response.dto';
 import { RequirePermission } from '../../common/decorators/permission.decorator';
@@ -114,6 +115,19 @@ export class EmployeesController {
   @ApiResponse({ status: 404, description: 'Nhân viên không tồn tại' })
   remove(@Param('id', ParseIntPipe) id: number) {
     return this.employeesService.remove(id);
+  }
+
+  @Post(':id/reset-password')
+  @RequirePermission('employees.update')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  @ApiOperation({ summary: 'Admin đặt lại mật khẩu nhân viên' })
+  @ApiParam({ name: 'id', example: 2 })
+  @ApiResponse({ status: 204, description: 'Đặt lại mật khẩu thành công' })
+  @ApiResponse({ status: 400, description: 'Mật khẩu xác nhận không khớp' })
+  @ApiResponse({ status: 403, description: 'Không thể đặt lại mật khẩu của chính mình' })
+  @ApiResponse({ status: 404, description: 'Nhân viên không tồn tại' })
+  resetPassword(@Param('id', ParseIntPipe) id: number, @Body() dto: AdminResetPasswordDto) {
+    return this.employeesService.adminResetPassword(id, dto);
   }
 
   @Put(':id/roles')

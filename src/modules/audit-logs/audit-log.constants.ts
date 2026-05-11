@@ -14,6 +14,7 @@ export const AuditAction = {
   // Employee-specific
   ASSIGN_ROLES:             'PhanCongVaiTro',
   REQUEST_PASSWORD_CHANGE:  'YeuCauDoiMatKhau',
+  RESET_PASSWORD:           'DatLaiMatKhau',
 
   // Order flow
   PLACE_ORDER:     'TaoDonHang',

@@ -2,6 +2,99 @@ import { Injectable, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import * as nodemailer from 'nodemailer';
 
+// ---------------------------------------------------------------------------
+// Layout helpers
+// ---------------------------------------------------------------------------
+
+function emailLayout(title: string, bodyRows: string): string {
+  return `<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>${title}</title>
+</head>
+<body style="margin:0;padding:0;background:#f0f0f0;font-family:Arial,sans-serif;">
+  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f0f0f0;padding:32px 0;">
+    <tr><td align="center">
+      <table width="600" cellpadding="0" cellspacing="0"
+             style="background:#ffffff;border:1px solid #cccccc;">
+        <!-- Header -->
+        <tr>
+          <td style="background:#1a1a2e;padding:20px 36px;border-bottom:3px solid #333366;">
+            <p style="margin:0;color:#ffffff;font-size:17px;font-weight:bold;letter-spacing:0.5px;">
+              PC STORE — HỆ THỐNG QUẢN TRỊ
+            </p>
+            <p style="margin:4px 0 0;color:#aaaacc;font-size:12px;">
+              Thông báo hệ thống — Email tự động
+            </p>
+          </td>
+        </tr>
+        ${bodyRows}
+        <!-- Footer -->
+        <tr>
+          <td style="border-top:1px solid #dddddd;padding:16px 36px;background:#f8f8f8;">
+            <p style="margin:0;color:#888888;font-size:11px;line-height:1.6;">
+              Đây là email được gửi tự động từ hệ thống PC Store. Vui lòng <strong>không trả lời</strong> email này.<br/>
+              Nếu bạn cần hỗ trợ, hãy liên hệ quản trị viên hệ thống qua kênh nội bộ.
+            </p>
+          </td>
+        </tr>
+      </table>
+    </td></tr>
+  </table>
+</body>
+</html>`;
+}
+
+function ctaRow(href: string, label: string): string {
+  return `<tr>
+  <td style="padding:0 0 20px;">
+    <table cellpadding="0" cellspacing="0">
+      <tr>
+        <td style="background:#1a1a2e;border:1px solid #333366;">
+          <a href="${href}"
+             style="display:inline-block;padding:11px 28px;color:#ffffff;font-size:14px;
+                    font-weight:bold;text-decoration:none;letter-spacing:0.3px;">
+            ${label}
+          </a>
+        </td>
+      </tr>
+    </table>
+  </td>
+</tr>`;
+}
+
+function noticeRow(text: string): string {
+  return `<tr>
+  <td style="padding:0 0 16px;">
+    <table width="100%" cellpadding="0" cellspacing="0"
+           style="border-left:3px solid #333366;background:#f5f5fa;">
+      <tr>
+        <td style="padding:10px 14px;color:#333333;font-size:13px;line-height:1.6;">
+          ${text}
+        </td>
+      </tr>
+    </table>
+  </td>
+</tr>`;
+}
+
+function fallbackLinkRow(href: string): string {
+  return `<tr>
+  <td style="padding:0 0 8px;">
+    <p style="margin:0;color:#666666;font-size:12px;line-height:1.7;">
+      Nếu nút trên không hoạt động, sao chép đường liên kết sau và dán vào trình duyệt:<br/>
+      <a href="${href}" style="color:#333366;word-break:break-all;">${href}</a>
+    </p>
+  </td>
+</tr>`;
+}
+
+// ---------------------------------------------------------------------------
+// Service
+// ---------------------------------------------------------------------------
+
 @Injectable()
 export class MailService {
   private readonly logger = new Logger(MailService.name);
@@ -19,6 +112,22 @@ export class MailService {
     });
   }
 
+  private get from(): string {
+    return this.config.get<string>('MAIL_FROM', '"PC Store" <noreply@pcstore.vn>');
+  }
+
+  private async send(to: string, subject: string, html: string): Promise<void> {
+    try {
+      await this.transporter.sendMail({ from: this.from, to, subject, html });
+      this.logger.log(`Email sent → ${to} | ${subject}`);
+    } catch (err) {
+      this.logger.error(`Failed to send email → ${to}`, err);
+      throw new Error('Không thể gửi email. Vui lòng thử lại sau.');
+    }
+  }
+
+  // -------------------------------------------------------------------------
+
   async sendPasswordChangeConfirmation(opts: {
     to: string;
     fullName: string;
@@ -26,96 +135,35 @@ export class MailService {
     expiresMinutes: number;
   }): Promise<void> {
     const { to, fullName, confirmLink, expiresMinutes } = opts;
-    const from = this.config.get<string>('MAIL_FROM', '"PC Store Admin" <noreply@pcstore.vn>');
 
-    const html = `
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Xác nhận thay đổi mật khẩu</title>
-</head>
-<body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:40px 0;">
-    <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-        <!-- Header -->
-        <tr>
-          <td style="background:#1e1b4b;padding:32px 40px;">
-            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">
-              🔐 PC Store Admin
-            </h1>
-            <p style="margin:6px 0 0;color:#a5b4fc;font-size:13px;">Hệ thống quản trị bán lẻ máy tính</p>
-          </td>
-        </tr>
-        <!-- Body -->
-        <tr>
-          <td style="padding:36px 40px 24px;">
-            <h2 style="margin:0 0 16px;color:#1e1b4b;font-size:20px;font-weight:700;">
-              Xác nhận thay đổi mật khẩu
-            </h2>
-            <p style="margin:0 0 12px;color:#374151;font-size:15px;line-height:1.6;">
-              Xin chào <strong>${fullName}</strong>,
-            </p>
-            <p style="margin:0 0 24px;color:#374151;font-size:15px;line-height:1.6;">
-              Chúng tôi nhận được yêu cầu thay đổi mật khẩu cho tài khoản <strong>${to}</strong> trên hệ thống PC Store Admin.
-              Nhấn vào nút bên dưới để xác nhận thay đổi mật khẩu của bạn.
-            </p>
-            <!-- CTA Button -->
-            <table cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
-              <tr>
-                <td style="background:#4f46e5;border-radius:8px;">
-                  <a href="${confirmLink}"
-                     style="display:inline-block;padding:14px 32px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;">
-                    ✅ Xác nhận thay đổi mật khẩu
-                  </a>
-                </td>
-              </tr>
-            </table>
-            <!-- Expiry notice -->
-            <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:14px 18px;margin-bottom:24px;">
-              <p style="margin:0;color:#92400e;font-size:13px;line-height:1.5;">
-                ⏰ <strong>Lưu ý:</strong> Đường link xác nhận này sẽ <strong>hết hiệu lực sau ${expiresMinutes} phút</strong> kể từ khi email được gửi.
-                Nếu hết hạn, bạn cần thực hiện lại yêu cầu đổi mật khẩu.
-              </p>
-            </div>
-            <!-- Security warning -->
-            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px 18px;margin-bottom:24px;">
-              <p style="margin:0;color:#991b1b;font-size:13px;line-height:1.5;">
-                🚨 <strong>Không phải bạn?</strong> Nếu bạn không thực hiện yêu cầu này, hãy bỏ qua email này.
-                Mật khẩu của bạn sẽ không thay đổi. Tuy nhiên, hãy xem xét liên hệ quản trị viên hệ thống ngay lập tức.
-              </p>
-            </div>
-            <!-- Fallback link -->
-            <p style="margin:0;color:#6b7280;font-size:12px;line-height:1.6;">
-              Nếu nút trên không hoạt động, sao chép và dán đường link sau vào trình duyệt:<br/>
-              <a href="${confirmLink}" style="color:#4f46e5;word-break:break-all;">${confirmLink}</a>
-            </p>
-          </td>
-        </tr>
-        <!-- Footer -->
-        <tr>
-          <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;">
-            <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center;">
-              Email này được gửi tự động từ hệ thống PC Store Admin. Vui lòng không trả lời email này.
-            </p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+    const body = `
+<tr>
+  <td style="padding:28px 36px 8px;">
+    <p style="margin:0 0 6px;font-size:18px;font-weight:bold;color:#1a1a2e;">
+      Xác nhận thay đổi mật khẩu
+    </p>
+    <p style="margin:0 0 20px;color:#888888;font-size:12px;">
+      Yêu cầu thay đổi mật khẩu — ${new Date().toLocaleString('vi-VN')}
+    </p>
+    <p style="margin:0 0 10px;color:#222222;font-size:14px;line-height:1.7;">
+      Kính gửi <strong>${fullName}</strong>,
+    </p>
+    <p style="margin:0 0 20px;color:#222222;font-size:14px;line-height:1.7;">
+      Hệ thống PC Store đã nhận được yêu cầu thay đổi mật khẩu cho tài khoản
+      <strong>${to}</strong>. Để xác nhận thao tác này, vui lòng nhấn vào nút bên dưới.
+    </p>
+    ${ctaRow(confirmLink, 'XÁC NHẬN THAY ĐỔI MẬT KHẨU')}
+    ${noticeRow(`<strong>Thời hạn hiệu lực:</strong> Đường liên kết trên sẽ <strong>hết hiệu lực sau ${expiresMinutes} phút</strong> kể từ thời điểm email được gửi. Sau khi hết hạn, bạn cần thực hiện lại yêu cầu đổi mật khẩu từ đầu.`)}
+    ${noticeRow(`<strong>Lưu ý bảo mật:</strong> Nếu bạn <em>không</em> thực hiện yêu cầu này, hãy bỏ qua email. Mật khẩu của bạn sẽ <strong>không thay đổi</strong>. Tuy nhiên, nếu nghi ngờ tài khoản bị xâm phạm, hãy liên hệ quản trị viên hệ thống ngay lập tức.`)}
+    ${fallbackLinkRow(confirmLink)}
+  </td>
+</tr>`;
 
-    try {
-      await this.transporter.sendMail({ from, to, subject: '[PC Store] Xác nhận thay đổi mật khẩu', html });
-      this.logger.log(`Password change confirmation email sent to ${to}`);
-    } catch (err) {
-      this.logger.error(`Failed to send email to ${to}`, err);
-      throw new Error('Không thể gửi email xác nhận. Vui lòng thử lại sau.');
-    }
+    const html = emailLayout('Xác nhận thay đổi mật khẩu', body);
+    await this.send(to, '[PC Store] Xác nhận thay đổi mật khẩu', html);
   }
+
+  // -------------------------------------------------------------------------
 
   async sendWelcomeWithResetLink(opts: {
     to: string;
@@ -124,86 +172,32 @@ export class MailService {
     expiresHours: number;
   }): Promise<void> {
     const { to, fullName, resetLink, expiresHours } = opts;
-    const from = this.config.get<string>('MAIL_FROM', '"PC Store" <noreply@pcstore.vn>');
 
-    const html = `
-<!DOCTYPE html>
-<html lang="vi">
-<head>
-  <meta charset="UTF-8"/>
-  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
-  <title>Tài khoản của bạn đã được tạo</title>
-</head>
-<body style="margin:0;padding:0;background:#f4f4f7;font-family:'Segoe UI',Arial,sans-serif;">
-  <table width="100%" cellpadding="0" cellspacing="0" style="background:#f4f4f7;padding:40px 0;">
-    <tr><td align="center">
-      <table width="600" cellpadding="0" cellspacing="0" style="background:#ffffff;border-radius:12px;overflow:hidden;box-shadow:0 2px 8px rgba(0,0,0,0.08);">
-        <tr>
-          <td style="background:#1e1b4b;padding:32px 40px;">
-            <h1 style="margin:0;color:#ffffff;font-size:22px;font-weight:700;letter-spacing:-0.5px;">
-              🖥️ PC Store
-            </h1>
-            <p style="margin:6px 0 0;color:#a5b4fc;font-size:13px;">Hệ thống bán lẻ máy tính & linh kiện</p>
-          </td>
-        </tr>
-        <tr>
-          <td style="padding:36px 40px 24px;">
-            <h2 style="margin:0 0 16px;color:#1e1b4b;font-size:20px;font-weight:700;">
-              Chào mừng bạn đến với PC Store!
-            </h2>
-            <p style="margin:0 0 12px;color:#374151;font-size:15px;line-height:1.6;">
-              Xin chào <strong>${fullName}</strong>,
-            </p>
-            <p style="margin:0 0 24px;color:#374151;font-size:15px;line-height:1.6;">
-              Tài khoản khách hàng của bạn tại <strong>PC Store</strong> đã được tạo bởi quản trị viên với địa chỉ email <strong>${to}</strong>.
-              Nhấn vào nút bên dưới để thiết lập mật khẩu và bắt đầu mua sắm.
-            </p>
-            <table cellpadding="0" cellspacing="0" style="margin:0 0 28px;">
-              <tr>
-                <td style="background:#4f46e5;border-radius:8px;">
-                  <a href="${resetLink}"
-                     style="display:inline-block;padding:14px 32px;color:#ffffff;font-size:15px;font-weight:600;text-decoration:none;border-radius:8px;">
-                    🔑 Thiết lập mật khẩu ngay
-                  </a>
-                </td>
-              </tr>
-            </table>
-            <div style="background:#fef9c3;border:1px solid #fde68a;border-radius:8px;padding:14px 18px;margin-bottom:24px;">
-              <p style="margin:0;color:#92400e;font-size:13px;line-height:1.5;">
-                ⏰ <strong>Lưu ý:</strong> Đường link này sẽ <strong>hết hiệu lực sau ${expiresHours} giờ</strong>.
-                Sau khi hết hạn, bạn có thể yêu cầu gửi lại link qua trang đăng nhập.
-              </p>
-            </div>
-            <div style="background:#fef2f2;border:1px solid #fecaca;border-radius:8px;padding:14px 18px;margin-bottom:24px;">
-              <p style="margin:0;color:#991b1b;font-size:13px;line-height:1.5;">
-                🚨 <strong>Không phải bạn?</strong> Nếu bạn không biết về tài khoản này, hãy bỏ qua email và liên hệ chúng tôi ngay.
-              </p>
-            </div>
-            <p style="margin:0;color:#6b7280;font-size:12px;line-height:1.6;">
-              Nếu nút trên không hoạt động, sao chép và dán đường link sau vào trình duyệt:<br/>
-              <a href="${resetLink}" style="color:#4f46e5;word-break:break-all;">${resetLink}</a>
-            </p>
-          </td>
-        </tr>
-        <tr>
-          <td style="background:#f9fafb;border-top:1px solid #e5e7eb;padding:20px 40px;">
-            <p style="margin:0;color:#9ca3af;font-size:12px;text-align:center;">
-              Email này được gửi tự động từ hệ thống PC Store. Vui lòng không trả lời email này.
-            </p>
-          </td>
-        </tr>
-      </table>
-    </td></tr>
-  </table>
-</body>
-</html>`;
+    const body = `
+<tr>
+  <td style="padding:28px 36px 8px;">
+    <p style="margin:0 0 6px;font-size:18px;font-weight:bold;color:#1a1a2e;">
+      Thông báo tạo tài khoản
+    </p>
+    <p style="margin:0 0 20px;color:#888888;font-size:12px;">
+      Tài khoản khách hàng — ${new Date().toLocaleString('vi-VN')}
+    </p>
+    <p style="margin:0 0 10px;color:#222222;font-size:14px;line-height:1.7;">
+      Kính gửi <strong>${fullName}</strong>,
+    </p>
+    <p style="margin:0 0 20px;color:#222222;font-size:14px;line-height:1.7;">
+      Quản trị viên hệ thống vừa tạo tài khoản khách hàng tại <strong>PC Store</strong>
+      với địa chỉ email <strong>${to}</strong>.
+      Vui lòng nhấn vào nút bên dưới để thiết lập mật khẩu và kích hoạt tài khoản.
+    </p>
+    ${ctaRow(resetLink, 'THIẾT LẬP MẬT KHẨU')}
+    ${noticeRow(`<strong>Thời hạn hiệu lực:</strong> Đường liên kết trên sẽ <strong>hết hiệu lực sau ${expiresHours} giờ</strong>. Sau khi hết hạn, bạn có thể yêu cầu gửi lại liên kết thông qua trang đăng nhập.`)}
+    ${noticeRow(`<strong>Lưu ý:</strong> Nếu bạn <em>không</em> biết về tài khoản này hoặc không yêu cầu tạo tài khoản, hãy bỏ qua email này và liên hệ quản trị viên hệ thống để được hỗ trợ.`)}
+    ${fallbackLinkRow(resetLink)}
+  </td>
+</tr>`;
 
-    try {
-      await this.transporter.sendMail({ from, to, subject: '[PC Store] Thiết lập mật khẩu tài khoản của bạn', html });
-      this.logger.log(`Welcome reset-link email sent to ${to}`);
-    } catch (err) {
-      this.logger.error(`Failed to send welcome email to ${to}`, err);
-      throw new Error('Không thể gửi email chào mừng. Vui lòng thử lại sau.');
-    }
+    const html = emailLayout('Thông báo tạo tài khoản', body);
+    await this.send(to, '[PC Store] Thiết lập mật khẩu tài khoản', html);
   }
 }

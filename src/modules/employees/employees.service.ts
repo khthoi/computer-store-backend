@@ -3,6 +3,7 @@ import {
   NotFoundException,
   ConflictException,
   BadRequestException,
+  ForbiddenException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, In } from 'typeorm';
@@ -20,6 +21,7 @@ import { AuditLogsService } from '../audit-logs/audit-logs.service';
 import { AuditAction, EntityType } from '../audit-logs/audit-log.constants';
 import { detailCreate, detailUpdate, detailStatusChange, truncate500 } from '../../common/helpers/log.helper';
 import { ProfileService } from './profile.service';
+import { AdminResetPasswordDto } from './dto/admin-reset-password.dto';
 
 // MySQL date columns may come back as strings ("YYYY-MM-DD") or Date objects
 function toDateString(val: Date | string): string {
@@ -350,6 +352,42 @@ export class EmployeesService {
       total, page, limit,
       totalPages: Math.ceil(total / limit),
     };
+  }
+
+  async adminResetPassword(id: number, dto: AdminResetPasswordDto): Promise<void> {
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new BadRequestException('Mật khẩu xác nhận không khớp');
+    }
+
+    const actorId = this.cls.get<number | null>('actorId');
+    if (actorId !== null && actorId === id) {
+      throw new ForbiddenException('Admin không thể tự đặt lại mật khẩu của chính mình');
+    }
+
+    const employee = await this.employeeRepo.findOne({ where: { id } });
+    if (!employee) throw new NotFoundException(`Nhân viên #${id} không tồn tại`);
+
+    const newHash = await bcrypt.hash(dto.newPassword, 12);
+    await this.employeeRepo.update(id, { matKhauHash: newHash });
+
+    const ipAddress = this.cls.get<string | null>('ipAddress') ?? null;
+
+    this.auditLogsService.log({
+      entityType: EntityType.EMPLOYEE,
+      entityId: employee.maNhanVien,
+      entityLabel: employee.hoTen,
+      actionType: AuditAction.RESET_PASSWORD,
+      actionDetail: `Đặt lại mật khẩu cho ${employee.hoTen} bởi ${this.buildActorSuffix()}`,
+    });
+
+    void this.auditLogRepo.save(
+      this.auditLogRepo.create({
+        employeeId: id,
+        action: 'password_reset_by_admin',
+        details: truncate500(`Mật khẩu được đặt lại bởi ${this.buildActorSuffix()}`),
+        ipAddress,
+      }),
+    );
   }
 
   async validatePassword(employee: Employee, matKhau: string): Promise<boolean> {

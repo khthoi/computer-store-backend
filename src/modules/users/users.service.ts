@@ -4,6 +4,7 @@ import {
   NotFoundException,
   ForbiddenException,
   ConflictException,
+  BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike, QueryFailedError } from 'typeorm';
@@ -18,6 +19,9 @@ import { QueryCustomersDto } from './dto/query-customers.dto';
 import { CustomerProfileResponseDto, CustomerListItemResponseDto, CustomerDetailResponseDto, CustomerListResponseDto } from './dto/customer-response.dto';
 import { ShippingAddressResponseDto } from './dto/shipping-address-response.dto';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AuditAction, EntityType } from '../audit-logs/audit-log.constants';
+import { ClsService } from 'nestjs-cls';
+import { AdminResetPasswordDto } from '../employees/dto/admin-reset-password.dto';
 import { AdminCreateAddressDto, AdminUpdateAddressDto } from './dto/admin-address.dto';
 import { AdminUpdateCustomerDto } from './dto/admin-update-customer.dto';
 import { AdminCreateCustomerDto } from './dto/admin-create-customer.dto';
@@ -40,6 +44,7 @@ export class UsersService {
     private readonly redisService: RedisService,
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
+    private readonly cls: ClsService,
   ) {}
 
   // ─── Profile ───────────────────────────────────────────────────────────────
@@ -243,6 +248,31 @@ export class UsersService {
       actionDetail: `Đổi trạng thái ${oldStatus} → BiKhoa`,
       before: JSON.stringify({ trangThai: oldStatus }),
       after: JSON.stringify({ trangThai: 'BiKhoa' }),
+    });
+  }
+
+  async adminResetCustomerPassword(id: number, dto: AdminResetPasswordDto): Promise<void> {
+    if (dto.newPassword !== dto.confirmPassword) {
+      throw new BadRequestException('Mật khẩu xác nhận không khớp');
+    }
+
+    const customer = await this.customerRepo.findOne({ where: { id } });
+    if (!customer) throw new NotFoundException('Khách hàng không tồn tại');
+
+    const newHash = await bcrypt.hash(dto.newPassword, 12);
+    customer.matKhauHash = newHash;
+    await this.customerRepo.save(customer);
+
+    const actorName = this.cls.get<string>('actorName') ?? 'Admin';
+    const actorCode = this.cls.get<string | null>('actorCode');
+    const actorLabel = actorCode ? `${actorName} [${actorCode}]` : actorName;
+
+    this.auditLogsService.log({
+      entityType: EntityType.CUSTOMER,
+      entityId: String(id),
+      entityLabel: customer.hoTen,
+      actionType: AuditAction.RESET_PASSWORD,
+      actionDetail: `Đặt lại mật khẩu cho khách hàng ${customer.hoTen} bởi ${actorLabel}`,
     });
   }
 
