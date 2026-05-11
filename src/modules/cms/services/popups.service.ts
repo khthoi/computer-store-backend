@@ -1,11 +1,11 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Popup, PopupStatus } from './entities/popup.entity';
-import { CreatePopupDto } from './dto/create-popup.dto';
-import { UpdatePopupDto } from './dto/update-popup.dto';
-import { PopupResponseDto } from './dto/popup-response.dto';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { Popup, PopupStatus } from '../entities/popup.entity';
+import { CreatePopupDto } from '../dto/create-popup.dto';
+import { UpdatePopupDto } from '../dto/update-popup.dto';
+import { PopupResponseDto } from '../dto/popup-response.dto';
+import { AuditLogsService } from '../../audit-logs/audit-logs.service';
 
 @Injectable()
 export class PopupsService {

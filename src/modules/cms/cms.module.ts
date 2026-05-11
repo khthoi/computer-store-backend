@@ -13,20 +13,20 @@ import { AnnouncementBar } from './entities/announcement-bar.entity';
 import { SiteConfig } from './entities/site-config.entity';
 import { RedisModule } from '../../common/redis/redis.module';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
-import { BannersService } from './banners.service';
-import { HomepageService } from './homepage.service';
-import { HomepagePreviewService } from './homepage-preview.service';
-import { PagesService } from './pages.service';
-import { FaqService } from './faq.service';
-import { MenuService } from './menu.service';
-import { PopupsService } from './popups.service';
-import { AnnouncementBarsService } from './announcement-bars.service';
-import { SiteConfigService } from './site-config.service';
-import { CmsController } from './cms.controller';
-import { AdminCmsController } from './admin-cms.controller';
-import { AdminCmsHomepageController } from './admin-cms-homepage.controller';
-import { AdminCmsContentController } from './admin-cms-content.controller';
-import { AdminCmsAnnouncementsController } from './admin-cms-announcements.controller';
+import { BannersService } from './services/banners.service';
+import { HomepageService } from './services/homepage.service';
+import { HomepagePreviewService } from './services/homepage-preview.service';
+import { PagesService } from './services/pages.service';
+import { FaqService } from './services/faq.service';
+import { MenuService } from './services/menu.service';
+import { PopupsService } from './services/popups.service';
+import { AnnouncementBarsService } from './services/announcement-bars.service';
+import { SiteConfigService } from './services/site-config.service';
+import { CmsController } from './controllers/cms.controller';
+import { AdminCmsController } from './controllers/admin-cms.controller';
+import { AdminCmsHomepageController } from './controllers/admin-cms-homepage.controller';
+import { AdminCmsContentController } from './controllers/admin-cms-content.controller';
+import { AdminCmsAnnouncementsController } from './controllers/admin-cms-announcements.controller';
 
 @Module({
   imports: [

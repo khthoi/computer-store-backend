@@ -1,13 +1,13 @@
 import { Controller, Get, Param, Post, HttpCode, HttpStatus } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiParam } from '@nestjs/swagger';
-import { Public } from '../../common/decorators/public.decorator';
-import { BannersService } from './banners.service';
-import { HomepageService } from './homepage.service';
-import { PagesService } from './pages.service';
-import { FaqService } from './faq.service';
-import { MenuService } from './menu.service';
-import { PopupsService } from './popups.service';
-import { SiteConfigService } from './site-config.service';
+import { Public } from '../../../common/decorators/public.decorator';
+import { BannersService } from '../services/banners.service';
+import { HomepageService } from '../services/homepage.service';
+import { PagesService } from '../services/pages.service';
+import { FaqService } from '../services/faq.service';
+import { MenuService } from '../services/menu.service';
+import { PopupsService } from '../services/popups.service';
+import { SiteConfigService } from '../services/site-config.service';
 
 @ApiTags('CMS')
 @Public()

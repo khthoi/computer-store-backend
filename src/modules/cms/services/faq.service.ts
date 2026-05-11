@@ -1,15 +1,15 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { FaqGroup } from './entities/faq-group.entity';
-import { FaqItem } from './entities/faq-item.entity';
-import { CreateFaqGroupDto } from './dto/create-faq-group.dto';
-import { UpdateFaqGroupDto } from './dto/update-faq-group.dto';
-import { CreateFaqItemDto } from './dto/create-faq-item.dto';
-import { UpdateFaqItemDto } from './dto/update-faq-item.dto';
-import { FaqGroupResponseDto } from './dto/faq-group-response.dto';
-import { FaqItemResponseDto } from './dto/faq-item-response.dto';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { FaqGroup } from '../entities/faq-group.entity';
+import { FaqItem } from '../entities/faq-item.entity';
+import { CreateFaqGroupDto } from '../dto/create-faq-group.dto';
+import { UpdateFaqGroupDto } from '../dto/update-faq-group.dto';
+import { CreateFaqItemDto } from '../dto/create-faq-item.dto';
+import { UpdateFaqItemDto } from '../dto/update-faq-item.dto';
+import { FaqGroupResponseDto } from '../dto/faq-group-response.dto';
+import { FaqItemResponseDto } from '../dto/faq-item-response.dto';
+import { AuditLogsService } from '../../audit-logs/audit-logs.service';
 
 @Injectable()
 export class FaqService {

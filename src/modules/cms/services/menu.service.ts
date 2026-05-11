@@ -1,11 +1,11 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Menu } from './entities/menu.entity';
-import { MenuItem } from './entities/menu-item.entity';
-import { CreateMenuItemDto } from './dto/create-menu-item.dto';
-import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { Menu } from '../entities/menu.entity';
+import { MenuItem } from '../entities/menu-item.entity';
+import { CreateMenuItemDto } from '../dto/create-menu-item.dto';
+import { UpdateMenuItemDto } from '../dto/update-menu-item.dto';
+import { AuditLogsService } from '../../audit-logs/audit-logs.service';
 
 export interface MenuItemNode extends MenuItem {
   children: MenuItemNode[];

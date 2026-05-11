@@ -12,16 +12,16 @@ import { InventorySettings } from './entities/inventory-settings.entity';
 import { Employee } from '../employees/entities/employee.entity';
 import { Supplier } from '../suppliers/entities/supplier.entity';
 import { InventoryHealthReport } from '../reports/entities/inventory-health-report.entity';
-import { InventoryService } from './inventory.service';
-import { InventoryImportsService } from './inventory-imports.service';
-import { InventoryExportsService } from './inventory-exports.service';
-import { InventoryHistoryService } from './inventory-history.service';
-import { InventoryKpiService } from './inventory-kpi.service';
-import { BatchService } from './batch.service';
-import { InventoryController } from './inventory.controller';
-import { AdminInventoryController } from './admin-inventory.controller';
+import { InventoryService } from './services/inventory.service';
+import { InventoryImportsService } from './services/inventory-imports.service';
+import { InventoryExportsService } from './services/inventory-exports.service';
+import { InventoryHistoryService } from './services/inventory-history.service';
+import { InventoryKpiService } from './services/inventory-kpi.service';
+import { BatchService } from './services/batch.service';
+import { InventoryController } from './controllers/inventory.controller';
+import { AdminInventoryController } from './controllers/admin-inventory.controller';
 import { LowStockProcessor, LOW_STOCK_QUEUE } from './processors/low-stock.processor';
-import { LowStockScheduler } from './low-stock.scheduler';
+import { LowStockScheduler } from './schedulers/low-stock.scheduler';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 
 @Module({

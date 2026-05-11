@@ -3,10 +3,10 @@ import {
   ParseIntPipe, Request, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
-import { RequirePermission } from '../../common/decorators/permission.decorator';
-import { AnnouncementBarsService } from './announcement-bars.service';
-import { CreateAnnouncementBarDto } from './dto/create-announcement-bar.dto';
-import { UpdateAnnouncementBarDto } from './dto/update-announcement-bar.dto';
+import { RequirePermission } from '../../../common/decorators/permission.decorator';
+import { AnnouncementBarsService } from '../services/announcement-bars.service';
+import { CreateAnnouncementBarDto } from '../dto/create-announcement-bar.dto';
+import { UpdateAnnouncementBarDto } from '../dto/update-announcement-bar.dto';
 
 @ApiTags('Admin — CMS')
 @ApiBearerAuth('access-token')

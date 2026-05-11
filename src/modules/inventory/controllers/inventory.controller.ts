@@ -6,8 +6,8 @@ import {
   ApiResponse,
   ApiParam,
 } from '@nestjs/swagger';
-import { Public } from '../../common/decorators/public.decorator';
-import { InventoryService } from './inventory.service';
+import { Public } from '../../../common/decorators/public.decorator';
+import { InventoryService } from '../services/inventory.service';
 
 @ApiTags('Inventory')
 @Controller('inventory')

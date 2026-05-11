@@ -80,8 +80,9 @@ export class AuthController {
   async loginEmployee(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const ip = (req.headers['x-forwarded-for'] as string)?.split(',')[0] ?? req.ip;
     const userAgent = req.headers['user-agent'] as string | undefined;
-    const { refreshToken, ...data } = await this.authService.loginEmployee(req.user as Employee, ip, userAgent);
-    res.cookie(RT_COOKIE, refreshToken, RT_COOKIE_OPTIONS);
+    const rememberMe = Boolean((req.body as { rememberMe?: boolean })?.rememberMe);
+    const { refreshToken, ...data } = await this.authService.loginEmployee(req.user as Employee, ip, userAgent, rememberMe);
+    res.cookie(RT_COOKIE, refreshToken, rememberMe ? RT_COOKIE_OPTIONS : RT_COOKIE_SESSION);
     return data;
   }
 

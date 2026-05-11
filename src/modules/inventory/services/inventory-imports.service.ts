@@ -1,15 +1,15 @@
 import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { ImportReceipt } from './entities/import-receipt.entity';
-import { ImportReceiptItem } from './entities/import-receipt-item.entity';
-import { CreateImportReceiptDto } from './dto/create-import-receipt.dto';
-import { ApproveImportDto } from './dto/approve-import.dto';
-import { ImportReceiptSummaryDto, ImportReceiptDetailDto } from './dto/import-receipt-response.dto';
-import { QueryImportReceiptDto } from './dto/query-import-receipt.dto';
+import { ImportReceipt } from '../entities/import-receipt.entity';
+import { ImportReceiptItem } from '../entities/import-receipt-item.entity';
+import { CreateImportReceiptDto } from '../dto/create-import-receipt.dto';
+import { ApproveImportDto } from '../dto/approve-import.dto';
+import { ImportReceiptSummaryDto, ImportReceiptDetailDto } from '../dto/import-receipt-response.dto';
+import { QueryImportReceiptDto } from '../dto/query-import-receipt.dto';
 import { InventoryService } from './inventory.service';
 import { BatchService } from './batch.service';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AuditLogsService } from '../../audit-logs/audit-logs.service';
 
 @Injectable()
 export class InventoryImportsService {

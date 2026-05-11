@@ -1,14 +1,14 @@
 import { BadRequestException, Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Banner } from './entities/banner.entity';
-import { BannerResponseDto, mapBanner } from './dto/banner-response.dto';
-import { CreateBannerDto } from './dto/create-banner.dto';
-import { UpdateBannerDto } from './dto/update-banner.dto';
-import { QueryBannersDto } from './dto/query-banners.dto';
-import { UpdateBannersLayoutDto } from './dto/update-banners-layout.dto';
-import { ReorderBannersDto } from './dto/reorder-banners.dto';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { Banner } from '../entities/banner.entity';
+import { BannerResponseDto, mapBanner } from '../dto/banner-response.dto';
+import { CreateBannerDto } from '../dto/create-banner.dto';
+import { UpdateBannerDto } from '../dto/update-banner.dto';
+import { QueryBannersDto } from '../dto/query-banners.dto';
+import { UpdateBannersLayoutDto } from '../dto/update-banners-layout.dto';
+import { ReorderBannersDto } from '../dto/reorder-banners.dto';
+import { AuditLogsService } from '../../audit-logs/audit-logs.service';
 
 @Injectable()
 export class BannersService {

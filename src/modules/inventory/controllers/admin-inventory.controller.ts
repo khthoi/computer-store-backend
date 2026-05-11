@@ -1,27 +1,27 @@
 import {
   Controller, Get, Post, Put, Patch, Param, Body, ParseIntPipe, Query, Request,
 } from '@nestjs/common';
-import { CreateExportReceiptDto } from './dto/create-export-receipt.dto';
-import { QueryExportReceiptDto } from './dto/query-export-receipt.dto';
-import { InventoryExportsService } from './inventory-exports.service';
-import { UpdateThresholdsDto, StockBatchResponseDto } from './dto/inventory-item-response.dto';
+import { CreateExportReceiptDto } from '../dto/create-export-receipt.dto';
+import { QueryExportReceiptDto } from '../dto/query-export-receipt.dto';
+import { InventoryExportsService } from '../services/inventory-exports.service';
+import { UpdateThresholdsDto, StockBatchResponseDto } from '../dto/inventory-item-response.dto';
 import {
   ApiTags, ApiOperation, ApiBearerAuth, ApiParam, ApiQuery, ApiResponse,
 } from '@nestjs/swagger';
-import { RequirePermission } from '../../common/decorators/permission.decorator';
-import { InventoryService } from './inventory.service';
-import { InventoryImportsService } from './inventory-imports.service';
-import { InventoryHistoryService } from './inventory-history.service';
-import { InventoryKpiService } from './inventory-kpi.service';
-import { BatchService } from './batch.service';
-import { QueryStockDto } from './dto/query-stock.dto';
-import { QueryHistoryDto } from './dto/query-history.dto';
-import { AdjustStockDto } from './dto/adjust-stock.dto';
-import { CreateImportReceiptDto } from './dto/create-import-receipt.dto';
-import { ApproveImportDto } from './dto/approve-import.dto';
-import { ImportReceiptSummaryDto, ImportReceiptDetailDto } from './dto/import-receipt-response.dto';
-import { QueryImportReceiptDto } from './dto/query-import-receipt.dto';
-import { QueryMovementsDto } from './dto/query-movements.dto';
+import { RequirePermission } from '../../../common/decorators/permission.decorator';
+import { InventoryService } from '../services/inventory.service';
+import { InventoryImportsService } from '../services/inventory-imports.service';
+import { InventoryHistoryService } from '../services/inventory-history.service';
+import { InventoryKpiService } from '../services/inventory-kpi.service';
+import { BatchService } from '../services/batch.service';
+import { QueryStockDto } from '../dto/query-stock.dto';
+import { QueryHistoryDto } from '../dto/query-history.dto';
+import { AdjustStockDto } from '../dto/adjust-stock.dto';
+import { CreateImportReceiptDto } from '../dto/create-import-receipt.dto';
+import { ApproveImportDto } from '../dto/approve-import.dto';
+import { ImportReceiptSummaryDto, ImportReceiptDetailDto } from '../dto/import-receipt-response.dto';
+import { QueryImportReceiptDto } from '../dto/query-import-receipt.dto';
+import { QueryMovementsDto } from '../dto/query-movements.dto';
 
 @ApiTags('Admin — Inventory')
 @ApiBearerAuth()

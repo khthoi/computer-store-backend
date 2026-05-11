@@ -1,12 +1,12 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { StockBatch } from './entities/stock-batch.entity';
-import { StockHistory } from './entities/stock-history.entity';
-import { StockLevel } from './entities/stock-level.entity';
-import { ImportReceiptItem } from './entities/import-receipt-item.entity';
-import { ImportReceipt } from './entities/import-receipt.entity';
-import { InventoryHealthReport } from '../reports/entities/inventory-health-report.entity';
+import { StockBatch } from '../entities/stock-batch.entity';
+import { StockHistory } from '../entities/stock-history.entity';
+import { StockLevel } from '../entities/stock-level.entity';
+import { ImportReceiptItem } from '../entities/import-receipt-item.entity';
+import { ImportReceipt } from '../entities/import-receipt.entity';
+import { InventoryHealthReport } from '../../reports/entities/inventory-health-report.entity';
 
 @Injectable()
 export class InventoryKpiService {

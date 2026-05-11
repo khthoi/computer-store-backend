@@ -103,10 +103,11 @@ export class AuthService {
     employee: Employee,
     ipAddress?: string,
     userAgent?: string,
+    rememberMe = false,
   ): Promise<{ user: AuthEmployeeDto; accessToken: string; refreshToken: string }> {
     const fullEmployee = await this.employeesService.findByIdWithRoles(employee.id);
     if (!fullEmployee) throw new UnauthorizedException();
-    const tokens = await this.issueEmployeeTokens(fullEmployee);
+    const tokens = await this.issueEmployeeTokens(fullEmployee, rememberMe);
     const allRoles = fullEmployee.roles?.map((r) => r.tenVaiTro) ?? [];
 
     void this.profileService.recordLogin(employee.id, ipAddress, userAgent);
@@ -271,7 +272,9 @@ export class AuthService {
     return { accessToken, refreshToken };
   }
 
-  private async issueEmployeeTokens(employee: Employee) {
+  private async issueEmployeeTokens(employee: Employee, rememberMe = false) {
+    const refreshTtl = rememberMe ? REFRESH_TOKEN_TTL : REFRESH_SHORT_TOKEN_TTL;
+
     const oldJti = await this.redisService.getActiveJti(employee.id, 'employee');
     if (oldJti) await this.redisService.blacklistToken(oldJti, ACCESS_TOKEN_TTL);
 
@@ -284,8 +287,8 @@ export class AuthService {
     const refreshSecret = this.configService.get<string>('JWT_REFRESH_SECRET', 'refresh_fallback');
     const refreshJti = randomUUID();
     const refreshPayload = { sub: employee.id, email: employee.email, type: 'employee', roles, jti: refreshJti };
-    const refreshToken = this.jwtService.sign(refreshPayload, { secret: refreshSecret, expiresIn: REFRESH_TOKEN_TTL });
-    await this.redisService.saveRefreshToken(employee.id, 'employee', refreshToken, REFRESH_TOKEN_TTL);
+    const refreshToken = this.jwtService.sign(refreshPayload, { secret: refreshSecret, expiresIn: refreshTtl });
+    await this.redisService.saveRefreshToken(employee.id, 'employee', refreshToken, refreshTtl);
 
     return { accessToken, refreshToken };
   }

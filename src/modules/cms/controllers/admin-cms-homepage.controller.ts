@@ -3,12 +3,12 @@ import {
   ParseIntPipe, Query, Request, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiBearerAuth, ApiQuery, ApiResponse } from '@nestjs/swagger';
-import { RequirePermission } from '../../common/decorators/permission.decorator';
-import { HomepageService } from './homepage.service';
-import { HomepagePreviewService } from './homepage-preview.service';
-import { CreateHomepageSectionDto } from './dto/create-homepage-section.dto';
-import { UpdateHomepageSectionDto } from './dto/update-homepage-section.dto';
-import { ReorderHomepageSectionsDto } from './dto/reorder-homepage-sections.dto';
+import { RequirePermission } from '../../../common/decorators/permission.decorator';
+import { HomepageService } from '../services/homepage.service';
+import { HomepagePreviewService } from '../services/homepage-preview.service';
+import { CreateHomepageSectionDto } from '../dto/create-homepage-section.dto';
+import { UpdateHomepageSectionDto } from '../dto/update-homepage-section.dto';
+import { ReorderHomepageSectionsDto } from '../dto/reorder-homepage-sections.dto';
 
 @ApiTags('Admin — CMS')
 @ApiBearerAuth('access-token')

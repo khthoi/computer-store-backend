@@ -1,15 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { HomepageSection } from './entities/homepage-section.entity';
-import { HomepageSectionItem } from './entities/homepage-section-item.entity';
-import { CreateHomepageSectionDto } from './dto/create-homepage-section.dto';
-import { UpdateHomepageSectionDto } from './dto/update-homepage-section.dto';
+import { HomepageSection } from '../entities/homepage-section.entity';
+import { HomepageSectionItem } from '../entities/homepage-section-item.entity';
+import { CreateHomepageSectionDto } from '../dto/create-homepage-section.dto';
+import { UpdateHomepageSectionDto } from '../dto/update-homepage-section.dto';
 import {
   HomepageSectionResponseDto,
   toHomepageSectionResponse,
-} from './dto/homepage-section-response.dto';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+} from '../dto/homepage-section-response.dto';
+import { AuditLogsService } from '../../audit-logs/audit-logs.service';
 
 @Injectable()
 export class HomepageService {

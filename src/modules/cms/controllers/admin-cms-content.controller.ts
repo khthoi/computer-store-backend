@@ -3,24 +3,24 @@ import {
   ParseIntPipe, Query, Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
-import { RequirePermission } from '../../common/decorators/permission.decorator';
-import { PagesService } from './pages.service';
-import { FaqService } from './faq.service';
-import { MenuService } from './menu.service';
-import { SiteConfigService } from './site-config.service';
-import { CreatePageDto } from './dto/create-page.dto';
-import { UpdatePageDto } from './dto/update-page.dto';
-import { ReorderPagesDto } from './dto/reorder-pages.dto';
-import { CreateFaqGroupDto } from './dto/create-faq-group.dto';
-import { UpdateFaqGroupDto } from './dto/update-faq-group.dto';
-import { CreateFaqItemDto } from './dto/create-faq-item.dto';
-import { UpdateFaqItemDto } from './dto/update-faq-item.dto';
-import { ReorderFaqGroupsDto } from './dto/reorder-faq-groups.dto';
-import { ReorderFaqItemsDto } from './dto/reorder-faq-items.dto';
-import { CreateMenuItemDto } from './dto/create-menu-item.dto';
-import { UpdateMenuItemDto } from './dto/update-menu-item.dto';
-import { ReorderMenuItemsDto } from './dto/reorder-menu-items.dto';
-import { UpsertSiteConfigDto } from './dto/upsert-site-config.dto';
+import { RequirePermission } from '../../../common/decorators/permission.decorator';
+import { PagesService } from '../services/pages.service';
+import { FaqService } from '../services/faq.service';
+import { MenuService } from '../services/menu.service';
+import { SiteConfigService } from '../services/site-config.service';
+import { CreatePageDto } from '../dto/create-page.dto';
+import { UpdatePageDto } from '../dto/update-page.dto';
+import { ReorderPagesDto } from '../dto/reorder-pages.dto';
+import { CreateFaqGroupDto } from '../dto/create-faq-group.dto';
+import { UpdateFaqGroupDto } from '../dto/update-faq-group.dto';
+import { CreateFaqItemDto } from '../dto/create-faq-item.dto';
+import { UpdateFaqItemDto } from '../dto/update-faq-item.dto';
+import { ReorderFaqGroupsDto } from '../dto/reorder-faq-groups.dto';
+import { ReorderFaqItemsDto } from '../dto/reorder-faq-items.dto';
+import { CreateMenuItemDto } from '../dto/create-menu-item.dto';
+import { UpdateMenuItemDto } from '../dto/update-menu-item.dto';
+import { ReorderMenuItemsDto } from '../dto/reorder-menu-items.dto';
+import { UpsertSiteConfigDto } from '../dto/upsert-site-config.dto';
 
 @ApiTags('Admin — CMS')
 @ApiBearerAuth('access-token')

@@ -1,7 +1,7 @@
 import { Injectable, OnModuleInit } from '@nestjs/common';
 import { InjectQueue } from '@nestjs/bull';
 import { Queue } from 'bull';
-import { LOW_STOCK_QUEUE, LOW_STOCK_JOB } from './processors/low-stock.processor';
+import { LOW_STOCK_QUEUE, LOW_STOCK_JOB } from '../processors/low-stock.processor';
 
 @Injectable()
 export class LowStockScheduler implements OnModuleInit {

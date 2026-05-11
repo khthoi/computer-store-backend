@@ -1,10 +1,10 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { EntityManager, Repository } from 'typeorm';
-import { StockBatch } from './entities/stock-batch.entity';
-import { StockLevel } from './entities/stock-level.entity';
-import { InventorySettings } from './entities/inventory-settings.entity';
-import { StockBatchResponseDto } from './dto/inventory-item-response.dto';
+import { StockBatch } from '../entities/stock-batch.entity';
+import { StockLevel } from '../entities/stock-level.entity';
+import { InventorySettings } from '../entities/inventory-settings.entity';
+import { StockBatchResponseDto } from '../dto/inventory-item-response.dto';
 
 export type DeductionResult = { loId: number; soLuong: number; donGiaNhap: number }[];
 

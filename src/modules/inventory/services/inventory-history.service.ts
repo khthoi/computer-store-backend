@@ -1,8 +1,8 @@
 import { Injectable } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { StockHistory } from './entities/stock-history.entity';
-import { QueryMovementsDto } from './dto/query-movements.dto';
+import { StockHistory } from '../entities/stock-history.entity';
+import { QueryMovementsDto } from '../dto/query-movements.dto';
 
 const TYPE_TO_BACKEND: Record<string, string> = {
   stock_in:   'Nhap',

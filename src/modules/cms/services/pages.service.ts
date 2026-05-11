@@ -1,11 +1,11 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { Page } from './entities/page.entity';
-import { CreatePageDto } from './dto/create-page.dto';
-import { UpdatePageDto } from './dto/update-page.dto';
-import { PageResponseDto, toPageResponse } from './dto/page-response.dto';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { Page } from '../entities/page.entity';
+import { CreatePageDto } from '../dto/create-page.dto';
+import { UpdatePageDto } from '../dto/update-page.dto';
+import { PageResponseDto, toPageResponse } from '../dto/page-response.dto';
+import { AuditLogsService } from '../../audit-logs/audit-logs.service';
 
 const STATUS_TO_DB: Record<string, string> = {
   draft: 'nhap',

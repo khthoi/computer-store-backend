@@ -3,16 +3,16 @@ import {
   ParseIntPipe, Query, Request, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
-import { RequirePermission } from '../../common/decorators/permission.decorator';
-import { BannersService } from './banners.service';
-import { PopupsService } from './popups.service';
-import { CreateBannerDto } from './dto/create-banner.dto';
-import { UpdateBannerDto } from './dto/update-banner.dto';
-import { QueryBannersDto } from './dto/query-banners.dto';
-import { UpdateBannersLayoutDto } from './dto/update-banners-layout.dto';
-import { ReorderBannersDto } from './dto/reorder-banners.dto';
-import { CreatePopupDto } from './dto/create-popup.dto';
-import { UpdatePopupDto } from './dto/update-popup.dto';
+import { RequirePermission } from '../../../common/decorators/permission.decorator';
+import { BannersService } from '../services/banners.service';
+import { PopupsService } from '../services/popups.service';
+import { CreateBannerDto } from '../dto/create-banner.dto';
+import { UpdateBannerDto } from '../dto/update-banner.dto';
+import { QueryBannersDto } from '../dto/query-banners.dto';
+import { UpdateBannersLayoutDto } from '../dto/update-banners-layout.dto';
+import { ReorderBannersDto } from '../dto/reorder-banners.dto';
+import { CreatePopupDto } from '../dto/create-popup.dto';
+import { UpdatePopupDto } from '../dto/update-popup.dto';
 
 @ApiTags('Admin — CMS')
 @ApiBearerAuth('access-token')

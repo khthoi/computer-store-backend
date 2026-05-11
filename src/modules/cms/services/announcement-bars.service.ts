@@ -1,11 +1,11 @@
 import { Injectable, NotFoundException, ConflictException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { AnnouncementBar, BarStatus, BarPosition } from './entities/announcement-bar.entity';
-import { CreateAnnouncementBarDto } from './dto/create-announcement-bar.dto';
-import { UpdateAnnouncementBarDto } from './dto/update-announcement-bar.dto';
-import { AnnouncementBarResponseDto } from './dto/announcement-bar-response.dto';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AnnouncementBar, BarStatus, BarPosition } from '../entities/announcement-bar.entity';
+import { CreateAnnouncementBarDto } from '../dto/create-announcement-bar.dto';
+import { UpdateAnnouncementBarDto } from '../dto/update-announcement-bar.dto';
+import { AnnouncementBarResponseDto } from '../dto/announcement-bar-response.dto';
+import { AuditLogsService } from '../../audit-logs/audit-logs.service';
 
 @Injectable()
 export class AnnouncementBarsService {

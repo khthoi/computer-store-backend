@@ -1,14 +1,14 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, EntityManager, Repository, SelectQueryBuilder } from 'typeorm';
-import { StockLevel } from './entities/stock-level.entity';
-import { StockHistory, LoaiGiaoDich } from './entities/stock-history.entity';
-import { QueryStockDto } from './dto/query-stock.dto';
-import { AdjustStockDto } from './dto/adjust-stock.dto';
-import { QueryHistoryDto } from './dto/query-history.dto';
-import { UpdateThresholdsDto } from './dto/inventory-item-response.dto';
+import { StockLevel } from '../entities/stock-level.entity';
+import { StockHistory, LoaiGiaoDich } from '../entities/stock-history.entity';
+import { QueryStockDto } from '../dto/query-stock.dto';
+import { AdjustStockDto } from '../dto/adjust-stock.dto';
+import { QueryHistoryDto } from '../dto/query-history.dto';
+import { UpdateThresholdsDto } from '../dto/inventory-item-response.dto';
 import { BatchService } from './batch.service';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AuditLogsService } from '../../audit-logs/audit-logs.service';
 
 @Injectable()
 export class InventoryService {

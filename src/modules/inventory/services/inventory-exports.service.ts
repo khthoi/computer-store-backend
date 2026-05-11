@@ -1,16 +1,16 @@
 import { Injectable, BadRequestException, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
-import { ExportReceipt, LoaiPhieuXuat } from './entities/export-receipt.entity';
-import { ExportReceiptItem } from './entities/export-receipt-item.entity';
-import { StockLevel } from './entities/stock-level.entity';
-import { StockHistory, LoaiGiaoDich } from './entities/stock-history.entity';
-import { CreateExportReceiptDto } from './dto/create-export-receipt.dto';
-import { QueryExportReceiptDto } from './dto/query-export-receipt.dto';
-import { ExportReceiptDetailDto, ExportReceiptSummaryDto } from './dto/export-receipt-response.dto';
+import { ExportReceipt, LoaiPhieuXuat } from '../entities/export-receipt.entity';
+import { ExportReceiptItem } from '../entities/export-receipt-item.entity';
+import { StockLevel } from '../entities/stock-level.entity';
+import { StockHistory, LoaiGiaoDich } from '../entities/stock-history.entity';
+import { CreateExportReceiptDto } from '../dto/create-export-receipt.dto';
+import { QueryExportReceiptDto } from '../dto/query-export-receipt.dto';
+import { ExportReceiptDetailDto, ExportReceiptSummaryDto } from '../dto/export-receipt-response.dto';
 import { InventoryService } from './inventory.service';
 import { BatchService } from './batch.service';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { AuditLogsService } from '../../audit-logs/audit-logs.service';
 
 @Injectable()
 export class InventoryExportsService {

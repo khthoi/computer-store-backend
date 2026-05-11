@@ -1,7 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource, In, SelectQueryBuilder } from 'typeorm';
-import { PromotionScope, ScopeType } from '../promotions/entities/promotion-scope.entity';
-import { PromotionCondition, ConditionType } from '../promotions/entities/promotion-condition.entity';
+import { PromotionScope, ScopeType } from '../../promotions/entities/promotion-scope.entity';
+import { PromotionCondition, ConditionType } from '../../promotions/entities/promotion-condition.entity';
 
 export interface PreviewProductDto {
   sanPhamId: number;

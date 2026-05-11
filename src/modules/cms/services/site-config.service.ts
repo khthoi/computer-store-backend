@@ -1,10 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
-import { SiteConfig } from './entities/site-config.entity';
-import { UpsertSiteConfigDto } from './dto/upsert-site-config.dto';
-import { RedisService } from '../../common/redis/redis.service';
-import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { SiteConfig } from '../entities/site-config.entity';
+import { UpsertSiteConfigDto } from '../dto/upsert-site-config.dto';
+import { RedisService } from '../../../common/redis/redis.service';
+import { AuditLogsService } from '../../audit-logs/audit-logs.service';
 
 const CACHE_KEY = 'site_config:all';
 const CACHE_TTL = 600; // 10 minutes
