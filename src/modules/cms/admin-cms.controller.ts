@@ -3,7 +3,7 @@ import {
   ParseIntPipe, Query, Request, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { BannersService } from './banners.service';
 import { PopupsService } from './popups.service';
 import { CreateBannerDto } from './dto/create-banner.dto';
@@ -17,7 +17,6 @@ import { UpdatePopupDto } from './dto/update-popup.dto';
 @ApiTags('Admin — CMS')
 @ApiBearerAuth('access-token')
 @Controller('admin')
-@Roles('admin', 'staff')
 export class AdminCmsController {
   constructor(
     private readonly bannersService: BannersService,
@@ -26,6 +25,7 @@ export class AdminCmsController {
 
   // ── Banners ──────────────────────────────────────────────
   @Get('banners')
+  @RequirePermission('cms.read')
   @ApiOperation({ summary: 'Danh sách banner (admin, hỗ trợ lọc theo vị trí và trạng thái)' })
   @ApiQuery({ name: 'position', required: false, description: 'Lọc theo vị trí banner', example: 'TrangChu' })
   @ApiQuery({ name: 'status', required: false, description: 'Lọc theo trạng thái', example: 'DangHienThi' })
@@ -60,6 +60,7 @@ export class AdminCmsController {
   }
 
   @Get('banners/:id')
+  @RequirePermission('cms.read')
   @ApiOperation({ summary: 'Chi tiết banner (admin)' })
   @ApiParam({ name: 'id', example: 1, description: 'ID banner' })
   @ApiOkResponse({
@@ -86,6 +87,7 @@ export class AdminCmsController {
   }
 
   @Post('banners')
+  @RequirePermission('cms.create')
   @ApiOperation({ summary: 'Tạo banner mới' })
   @ApiResponse({ status: 201, description: 'Banner đã được tạo' })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
@@ -96,6 +98,7 @@ export class AdminCmsController {
   }
 
   @Put('banners/:id')
+  @RequirePermission('cms.update')
   @ApiOperation({ summary: 'Cập nhật banner' })
   @ApiParam({ name: 'id', example: 1, description: 'ID banner' })
   @ApiResponse({ status: 200, description: 'Banner đã được cập nhật' })
@@ -111,6 +114,7 @@ export class AdminCmsController {
   }
 
   @Delete('banners/:id')
+  @RequirePermission('cms.delete')
   @ApiOperation({ summary: 'Xoá banner' })
   @ApiParam({ name: 'id', example: 1, description: 'ID banner' })
   @ApiResponse({ status: 200, description: 'Banner đã được xoá' })
@@ -122,6 +126,7 @@ export class AdminCmsController {
   }
 
   @Patch('banners/reorder')
+  @RequirePermission('cms.update')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Cập nhật sortOrder của banners theo vị trí (bulk reorder)' })
   @ApiResponse({ status: 204, description: 'Thứ tự đã được lưu' })
@@ -133,6 +138,7 @@ export class AdminCmsController {
   }
 
   @Patch('banners/layout')
+  @RequirePermission('cms.update')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Cập nhật vị trí grid của promotions_banner (bulk)' })
   @ApiResponse({ status: 204, description: 'Layout đã được lưu' })
@@ -145,6 +151,7 @@ export class AdminCmsController {
 
   // ── Popups ────────────────────────────────────────────────
   @Get('popups')
+  @RequirePermission('cms.read')
   @ApiOperation({ summary: 'Danh sách popup (admin)' })
   @ApiOkResponse({
     schema: {
@@ -169,6 +176,7 @@ export class AdminCmsController {
   }
 
   @Get('popups/:id')
+  @RequirePermission('cms.read')
   @ApiOperation({ summary: 'Chi tiết popup (admin)' })
   @ApiParam({ name: 'id', example: 1, description: 'ID popup' })
   @ApiOkResponse({
@@ -194,6 +202,7 @@ export class AdminCmsController {
   }
 
   @Post('popups')
+  @RequirePermission('cms.create')
   @ApiOperation({ summary: 'Tạo popup mới' })
   @ApiResponse({ status: 201, description: 'Popup đã được tạo' })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
@@ -204,6 +213,7 @@ export class AdminCmsController {
   }
 
   @Put('popups/:id')
+  @RequirePermission('cms.update')
   @ApiOperation({ summary: 'Cập nhật popup' })
   @ApiParam({ name: 'id', example: 1, description: 'ID popup' })
   @ApiResponse({ status: 200, description: 'Popup đã được cập nhật' })
@@ -215,6 +225,7 @@ export class AdminCmsController {
   }
 
   @Delete('popups/:id')
+  @RequirePermission('cms.delete')
   @ApiOperation({ summary: 'Xoá popup' })
   @ApiParam({ name: 'id', example: 1, description: 'ID popup' })
   @ApiResponse({ status: 200, description: 'Popup đã được xoá' })

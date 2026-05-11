@@ -27,16 +27,16 @@ import { UpdateEmployeeDto } from './dto/update-employee.dto';
 import { AssignRolesDto } from './dto/assign-roles.dto';
 import { QueryEmployeesDto } from './dto/query-employees.dto';
 import { EmployeeResponseDto, EmployeeListResponseDto } from './dto/employee-response.dto';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 
 @ApiTags('Admin — Employees')
 @ApiBearerAuth('access-token')
-@Roles('admin')
 @Controller('admin/employees')
 export class EmployeesController {
   constructor(private readonly employeesService: EmployeesService) {}
 
   @Get()
+  @RequirePermission('employees.read')
   @ApiOperation({ summary: 'Danh sách nhân viên' })
   @ApiQuery({ name: 'search', required: false, description: 'Tìm theo tên hoặc email', example: 'Trần Thị B' })
   @ApiQuery({ name: 'status', required: false, description: 'Lọc theo trạng thái', enum: ['active', 'inactive'] })
@@ -50,6 +50,7 @@ export class EmployeesController {
   }
 
   @Get('code/:code')
+  @RequirePermission('employees.read')
   @ApiOperation({ summary: 'Chi tiết nhân viên theo mã NV' })
   @ApiParam({ name: 'code', example: 'NV-001' })
   @ApiOkResponse({ type: EmployeeResponseDto })
@@ -59,6 +60,7 @@ export class EmployeesController {
   }
 
   @Get(':id')
+  @RequirePermission('employees.read')
   @ApiOperation({ summary: 'Chi tiết nhân viên' })
   @ApiParam({ name: 'id', example: 2 })
   @ApiOkResponse({ type: EmployeeResponseDto })
@@ -70,6 +72,7 @@ export class EmployeesController {
   }
 
   @Get(':id/audit-logs')
+  @RequirePermission('employees.read')
   @ApiOperation({ summary: 'Lịch sử hoạt động của nhân viên' })
   @ApiParam({ name: 'id', example: 2 })
   @ApiQuery({ name: 'page', required: false })
@@ -87,6 +90,7 @@ export class EmployeesController {
   }
 
   @Post()
+  @RequirePermission('employees.create')
   @ApiOperation({ summary: 'Tạo tài khoản nhân viên mới' })
   @ApiOkResponse({ type: EmployeeResponseDto })
   @ApiResponse({ status: 409, description: 'Email hoặc mã nhân viên đã tồn tại' })
@@ -95,6 +99,7 @@ export class EmployeesController {
   }
 
   @Put(':id')
+  @RequirePermission('employees.update')
   @ApiOperation({ summary: 'Cập nhật thông tin nhân viên' })
   @ApiOkResponse({ type: EmployeeResponseDto })
   @ApiResponse({ status: 404, description: 'Nhân viên không tồn tại' })
@@ -103,6 +108,7 @@ export class EmployeesController {
   }
 
   @Delete(':id')
+  @RequirePermission('employees.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Vô hiệu hoá nhân viên (soft delete)' })
   @ApiResponse({ status: 404, description: 'Nhân viên không tồn tại' })
@@ -111,6 +117,7 @@ export class EmployeesController {
   }
 
   @Put(':id/roles')
+  @RequirePermission('employees.update')
   @ApiOperation({ summary: 'Gán vai trò cho nhân viên' })
   @ApiOkResponse({ type: EmployeeResponseDto })
   @ApiResponse({ status: 404, description: 'Nhân viên không tồn tại' })

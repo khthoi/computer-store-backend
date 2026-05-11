@@ -1,14 +1,12 @@
 import {
-  Controller, Get, Query, Res, UseGuards,
+  Controller, Get, Query, Res,
 } from '@nestjs/common';
 import { Response } from 'express';
 import {
   ApiTags, ApiOperation, ApiOkResponse, ApiResponse,
   ApiBearerAuth, ApiQuery,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { ReportsQueryService } from './reports-query.service';
 import { ReportsExportService } from './reports-export.service';
 import { QueryRevenueDto } from './dto/query-revenue.dto';
@@ -19,7 +17,6 @@ import { ExportReportDto } from './dto/export-report.dto';
 
 @ApiTags('Admin — Reports')
 @ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('admin/reports')
 export class AdminReportsController {
   constructor(
@@ -28,7 +25,7 @@ export class AdminReportsController {
   ) {}
 
   @Get('revenue')
-  @Roles('admin', 'staff')
+  @RequirePermission('reports.read')
   @ApiOperation({ summary: 'Dữ liệu biểu đồ doanh thu theo ngày' })
   @ApiQuery({ name: 'startDate', required: false, example: '2026-01-01', description: 'Ngày bắt đầu' })
   @ApiQuery({ name: 'endDate', required: false, example: '2026-04-24', description: 'Ngày kết thúc' })
@@ -47,7 +44,7 @@ export class AdminReportsController {
   }
 
   @Get('top-products')
-  @Roles('admin', 'staff')
+  @RequirePermission('reports.read')
   @ApiOperation({ summary: 'Sản phẩm bán chạy nhất theo khoảng thời gian' })
   @ApiQuery({ name: 'period', required: false, enum: ['7d', '30d', '90d', '365d'], example: '30d', description: 'Khoảng thời gian' })
   @ApiQuery({ name: 'limit', required: false, example: 10, description: 'Số lượng sản phẩm (tối đa 50)' })
@@ -63,7 +60,7 @@ export class AdminReportsController {
   }
 
   @Get('customers/summary')
-  @Roles('admin', 'staff')
+  @RequirePermission('reports.read')
   @ApiOperation({ summary: 'Phân phối segment RFM khách hàng (cho pie chart)' })
   @ApiOkResponse({
     schema: {
@@ -80,7 +77,7 @@ export class AdminReportsController {
   }
 
   @Get('customers')
-  @Roles('admin', 'staff')
+  @RequirePermission('reports.read')
   @ApiOperation({ summary: 'Danh sách phân khúc RFM khách hàng (phân trang)' })
   @ApiQuery({ name: 'segment', required: false, example: 'Champions', description: 'Lọc theo segment' })
   @ApiQuery({ name: 'page', required: false, example: 1, description: 'Trang' })
@@ -102,7 +99,7 @@ export class AdminReportsController {
   }
 
   @Get('inventory-health')
-  @Roles('admin', 'staff')
+  @RequirePermission('reports.read')
   @ApiOperation({ summary: 'Tình trạng sức khỏe kho theo biến thể sản phẩm' })
   @ApiQuery({ name: 'bucket', required: false, enum: ['het_hang', 'thap', 'tot', 'ton_kho'], description: 'Lọc theo nhóm tình trạng' })
   @ApiQuery({ name: 'page', required: false, example: 1, description: 'Trang' })
@@ -124,7 +121,7 @@ export class AdminReportsController {
   }
 
   @Get('retention')
-  @Roles('admin', 'staff')
+  @RequirePermission('reports.read')
   @ApiOperation({ summary: 'Ma trận cohort retention khách hàng theo tháng' })
   @ApiOkResponse({
     schema: {
@@ -138,7 +135,7 @@ export class AdminReportsController {
   }
 
   @Get('job-logs')
-  @Roles('admin', 'staff')
+  @RequirePermission('reports.read')
   @ApiOperation({ summary: 'Lịch sử chạy cron job báo cáo' })
   @ApiQuery({ name: 'limit', required: false, example: 20, description: 'Số bản ghi gần nhất' })
   @ApiOkResponse({
@@ -153,7 +150,7 @@ export class AdminReportsController {
   }
 
   @Get('export')
-  @Roles('admin', 'staff')
+  @RequirePermission('reports.read')
   @ApiOperation({ summary: 'Xuất báo cáo dạng Excel (.xlsx)' })
   @ApiQuery({ name: 'type', required: true, enum: ['revenue', 'rfm', 'inventory'], description: 'Loại báo cáo' })
   @ApiQuery({ name: 'startDate', required: false, example: '2026-01-01', description: 'Ngày bắt đầu (cho báo cáo doanh thu)' })

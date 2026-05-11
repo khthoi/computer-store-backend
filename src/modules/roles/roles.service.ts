@@ -11,6 +11,7 @@ import { Permission } from './entities/permission.entity';
 import { RedisService } from '../../common/redis/redis.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
+import { QueryRoleDto } from './dto/query-role.dto';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const PERMISSIONS_CACHE_KEY = 'cache:permissions:all';
@@ -25,8 +26,67 @@ export class RolesService {
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
-  async findAllRoles(): Promise<Role[]> {
-    return this.roleRepo.find({ relations: ['permissions'], order: { id: 'ASC' } });
+  async findAllRoles(dto: QueryRoleDto = {}): Promise<{
+    data: (Role & { employeeCount: number })[];
+    total: number;
+    page: number;
+    limit: number;
+    totalPages: number;
+  }> {
+    const { q, page = 1, limit = 10, sortBy = 'id', sortOrder = 'ASC' } = dto;
+
+    const allowedSortBy: Record<string, string> = {
+      id:            'r.id',
+      name:          'r.tenVaiTro',
+      createdAt:     'r.createdAt',
+    };
+
+    const qb = this.roleRepo
+      .createQueryBuilder('r')
+      .leftJoinAndSelect('r.permissions', 'p')
+      .addSelect(
+        `(SELECT COUNT(*) FROM nhan_vien_vai_tro nvvt WHERE nvvt.vai_tro_id = r.vai_tro_id)`,
+        'r_employeeCount',
+      );
+
+    if (q) {
+      qb.where('(r.tenVaiTro LIKE :q OR r.moTa LIKE :q)', { q: `%${q}%` });
+    }
+
+    if (sortBy === 'employeeCount') {
+      qb.orderBy('r_employeeCount', sortOrder);
+    } else {
+      qb.orderBy(allowedSortBy[sortBy] ?? 'r.id', sortOrder);
+    }
+
+    // Separate count query (avoids join row multiplication issues with getCount)
+    const countQb = this.roleRepo.createQueryBuilder('r');
+    if (q) countQb.where('(r.tenVaiTro LIKE :q OR r.moTa LIKE :q)', { q: `%${q}%` });
+    const total = await countQb.getCount();
+
+    qb.skip((page - 1) * limit).take(limit);
+
+    const { entities, raw } = await qb.getRawAndEntities();
+
+    // leftJoinAndSelect produces one raw row per permission — map by role ID, not index
+    const countByRoleId = new Map<number, number>();
+    for (const row of raw) {
+      const roleId = Number(row.r_vai_tro_id);
+      if (!countByRoleId.has(roleId)) {
+        countByRoleId.set(roleId, Number(row.r_employeeCount ?? 0));
+      }
+    }
+
+    return {
+      data: entities.map((role) => ({
+        ...role,
+        employeeCount: countByRoleId.get(role.id) ?? 0,
+      })),
+      total,
+      page,
+      limit,
+      totalPages: Math.ceil(total / limit),
+    };
   }
 
   async findOne(id: number): Promise<Role> {
@@ -105,6 +165,7 @@ export class RolesService {
     }
     role.permissions = permissions;
     const saved = await this.roleRepo.save(role);
+    await this.redisService.invalidate(`role:permissions:${role.tenVaiTro}`);
     await this.redisService.invalidate(PERMISSIONS_CACHE_KEY);
     this.auditLogsService.log({
       entityType: 'VaiTro',

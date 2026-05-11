@@ -5,7 +5,7 @@ import {
   ApiTags, ApiOperation, ApiOkResponse, ApiResponse,
   ApiBearerAuth, ApiParam, ApiQuery,
 } from '@nestjs/swagger';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { ReturnsService } from './returns.service';
 import { QueryReturnsDto } from './dto/query-returns.dto';
@@ -24,11 +24,11 @@ import { ConfirmGoodsReceivedDto } from './dto/confirm-received.dto';
 @ApiTags('Admin — Returns')
 @ApiBearerAuth()
 @Controller('admin/returns')
-@Roles('admin', 'staff')
 export class AdminReturnsController {
   constructor(private readonly returnsService: ReturnsService) {}
 
   @Get()
+  @RequirePermission('returns.read')
   @ApiOperation({ summary: 'Danh sách tất cả yêu cầu đổi/trả (có lọc theo trạng thái)' })
   @ApiQuery({ name: 'status', required: false, enum: ['ChoDuyet', 'DaDuyet', 'TuChoi', 'DaNhanHang', 'DaKiemTra', 'DangXuLy', 'HoanThanh'] })
   @ApiQuery({ name: 'page', required: false, example: 1 })
@@ -55,6 +55,7 @@ export class AdminReturnsController {
   }
 
   @Get(':id')
+  @RequirePermission('returns.read')
   @ApiOperation({ summary: 'Chi tiết yêu cầu đổi/trả (kèm items, resolution record, ảnh bằng chứng)' })
   @ApiParam({ name: 'id', example: 1, description: 'ID yêu cầu đổi/trả' })
   @ApiOkResponse({ description: 'Chi tiết yêu cầu đổi/trả' })
@@ -64,6 +65,7 @@ export class AdminReturnsController {
   }
 
   @Put(':id/status')
+  @RequirePermission('returns.update')
   @ApiOperation({ summary: 'Duyệt / từ chối / cập nhật trạng thái yêu cầu đổi/trả' })
   @ApiParam({ name: 'id', example: 1, description: 'ID yêu cầu đổi/trả' })
   @ApiResponse({ status: 200, description: 'Trạng thái đã được cập nhật' })
@@ -78,6 +80,7 @@ export class AdminReturnsController {
   }
 
   @Get(':id/assets')
+  @RequirePermission('returns.read')
   @ApiOperation({ summary: 'Danh sách ảnh bằng chứng của yêu cầu đổi/trả' })
   @ApiParam({ name: 'id', example: 1, description: 'ID yêu cầu đổi/trả' })
   @ApiOkResponse({
@@ -92,6 +95,7 @@ export class AdminReturnsController {
   // ─── Xác nhận nhận hàng về từ khách ──────────────────────────────────────
 
   @Patch(':id/confirm-received')
+  @RequirePermission('returns.update')
   @ApiOperation({
     summary: 'Xác nhận kho đã nhận hàng khách gửi về — chuyển sang DaNhanHang',
     description: 'Ghi nhận tracking khách gửi, ngày nhận hàng, nhân viên xác nhận. Chỉ dùng cho DoiHang/TraHang/BaoHanh khi hàng thực sự về đến kho.',
@@ -111,6 +115,7 @@ export class AdminReturnsController {
   // ─── Cập nhật kết quả kiểm tra ───────────────────────────────────────────
 
   @Patch(':id/inspection')
+  @RequirePermission('returns.update')
   @ApiOperation({
     summary: 'Ghi / cập nhật kết quả kiểm tra hàng',
     description: 'Chỉ áp dụng khi yêu cầu ở trạng thái DaNhanHang hoặc DangXuLy.',
@@ -129,6 +134,7 @@ export class AdminReturnsController {
   // ─── Xác nhận hoàn tất kiểm tra ─────────────────────────────────────────
 
   @Post(':id/complete-inspection')
+  @RequirePermission('returns.update')
   @ApiOperation({
     summary: 'Xác nhận hoàn tất kiểm tra — chuyển sang DaKiemTra',
     description: 'Yêu cầu phải có kết quả kiểm tra + ít nhất 1 ảnh bằng chứng inspection_evidence.',
@@ -146,6 +152,7 @@ export class AdminReturnsController {
   // ─── Từ chối nhận hàng sau kiểm tra ──────────────────────────────────────
 
   @Patch(':id/reject-after-inspection')
+  @RequirePermission('returns.update')
   @ApiOperation({
     summary: 'Từ chối nhận hàng sau kiểm tra — chuyển sang TuChoiNhanHang',
     description: 'Áp dụng khi hàng kiểm tra không đúng mô tả. Ghi nhận thông tin vận chuyển trả lại cho khách.',
@@ -164,6 +171,7 @@ export class AdminReturnsController {
   // ─── Thêm ảnh bằng chứng ─────────────────────────────────────────────────
 
   @Post(':id/assets')
+  @RequirePermission('returns.update')
   @ApiOperation({ summary: 'Thêm ảnh bằng chứng (customer_evidence hoặc inspection_evidence) vào yêu cầu đổi/trả' })
   @ApiParam({ name: 'id', example: 1, description: 'ID yêu cầu đổi/trả' })
   @ApiResponse({ status: 201, description: 'Đã thêm ảnh, trả về danh sách ảnh cập nhật' })
@@ -178,6 +186,7 @@ export class AdminReturnsController {
   // ─── Xử lý hoàn tiền ──────────────────────────────────────────────────────
 
   @Post(':id/process-refund')
+  @RequirePermission('returns.update')
   @ApiOperation({ summary: 'Thực hiện hoàn tiền — chạy trong DB transaction đầy đủ' })
   @ApiParam({ name: 'id', example: 1, description: 'ID yêu cầu đổi/trả' })
   @ApiResponse({ status: 201, description: 'Hoàn tiền thành công' })
@@ -194,6 +203,7 @@ export class AdminReturnsController {
   // ─── Đổi hướng xử lý (trước khi process) ────────────────────────────────
 
   @Patch(':id/change-resolution')
+  @RequirePermission('returns.update')
   @ApiOperation({
     summary: 'Đổi hướng xử lý (GiaoHangMoi ↔ HoanTien) khi chưa bắt đầu xử lý',
     description: 'Chỉ áp dụng khi trạng thái là DaDuyet, DaNhanHang hoặc DaKiemTra. Dùng khi hết hàng đổi, chuyển sang hoàn tiền.',
@@ -213,6 +223,7 @@ export class AdminReturnsController {
   // ─── Xử lý đổi hàng ───────────────────────────────────────────────────────
 
   @Post(':id/process-exchange')
+  @RequirePermission('returns.update')
   @ApiOperation({ summary: 'Xuất hàng thay thế — tạo đơn hàng đổi mới và trừ tồn kho' })
   @ApiParam({ name: 'id', example: 1, description: 'ID yêu cầu đổi/trả' })
   @ApiResponse({ status: 201, description: 'Đơn đổi hàng đã được tạo' })
@@ -225,6 +236,7 @@ export class AdminReturnsController {
   }
 
   @Patch('resolutions/:resolutionId/confirm-delivered')
+  @RequirePermission('returns.update')
   @ApiOperation({ summary: 'Xác nhận khách đã nhận được hàng đổi — hoàn tất quy trình đổi hàng' })
   @ApiParam({ name: 'resolutionId', example: 1 })
   confirmExchangeDelivered(
@@ -237,6 +249,7 @@ export class AdminReturnsController {
   // ─── Xử lý bảo hành ───────────────────────────────────────────────────────
 
   @Post(':id/init-warranty')
+  @RequirePermission('returns.update')
   @ApiOperation({ summary: 'Khởi tạo bản ghi bảo hành khi nhận hàng từ khách' })
   @ApiParam({ name: 'id', example: 1, description: 'ID yêu cầu đổi/trả' })
   initWarranty(
@@ -248,6 +261,7 @@ export class AdminReturnsController {
   }
 
   @Patch('resolutions/:resolutionId/warranty-status')
+  @RequirePermission('returns.update')
   @ApiOperation({ summary: 'Cập nhật trạng thái bảo hành (mã hãng, ngày gửi/nhận, kết quả)' })
   @ApiParam({ name: 'resolutionId', example: 1 })
   updateWarrantyStatus(
@@ -258,6 +272,7 @@ export class AdminReturnsController {
   }
 
   @Post(':id/process-warranty')
+  @RequirePermission('returns.update')
   @ApiOperation({ summary: 'Trả hàng bảo hành lại khách — trừ tồn kho và hoàn tất quy trình' })
   @ApiParam({ name: 'id', example: 1, description: 'ID yêu cầu đổi/trả' })
   processWarranty(
@@ -271,6 +286,7 @@ export class AdminReturnsController {
   // ─── Ghi nhận xử lý hàng lỗi/hoàn trả ───────────────────────────────────
 
   @Patch('resolutions/:resolutionId/defective-handling')
+  @RequirePermission('returns.update')
   @ApiOperation({
     summary: 'Ghi nhận hướng xử lý hàng lỗi sau khi resolution hoàn thành',
     description: 'Xác định số phận của hàng lỗi đã nhận về: trả nhà cung cấp, tiêu hủy, hoặc tái sử dụng linh kiện.',
@@ -288,6 +304,7 @@ export class AdminReturnsController {
   }
 
   @Patch('resolutions/:resolutionId/complete-reuse')
+  @RequirePermission('returns.update')
   @ApiOperation({
     summary: 'Hoàn tất tái sử dụng hàng lỗi — gán phiếu nhập kho cho hàng đã sửa xong',
     description: 'Chỉ dùng sau khi đã gọi defective-handling với TaiSuDung và hàng đã được sửa chữa, tạo phiếu nhập kho (NhapHoanTra) và duyệt trong inventory module.',

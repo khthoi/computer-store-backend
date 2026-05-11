@@ -29,16 +29,16 @@ import { ShippingAddressResponseDto } from './dto/shipping-address-response.dto'
 import { AdminUpdateCustomerDto } from './dto/admin-update-customer.dto';
 import { AdminCreateCustomerDto } from './dto/admin-create-customer.dto';
 import { AdminCreateAddressDto, AdminUpdateAddressDto } from './dto/admin-address.dto';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 
 @ApiTags('Admin — Customers')
 @ApiBearerAuth('access-token')
-@Roles('admin', 'staff')
 @Controller('admin/customers')
 export class AdminUsersController {
   constructor(private readonly usersService: UsersService) {}
 
   @Get()
+  @RequirePermission('users.read')
   @ApiOperation({ summary: 'Danh sách khách hàng' })
   @ApiQuery({ name: 'q', required: false, description: 'Tìm theo tên hoặc email', example: 'Nguyễn Văn A' })
   @ApiQuery({ name: 'status', required: false, description: 'Lọc theo trạng thái', example: 'HoatDong' })
@@ -52,6 +52,7 @@ export class AdminUsersController {
   }
 
   @Post()
+  @RequirePermission('users.create')
   @ApiOperation({ summary: 'Tạo khách hàng mới' })
   @ApiCreatedResponse({ type: CustomerDetailResponseDto })
   @ApiResponse({ status: 409, description: 'Email đã được sử dụng' })
@@ -60,6 +61,7 @@ export class AdminUsersController {
   }
 
   @Get('next-code')
+  @RequirePermission('users.read')
   @ApiOperation({ summary: 'Lấy mã khách hàng tiếp theo (ước tính — chỉ dùng để hiển thị preview)' })
   @ApiOkResponse({ schema: { example: { code: 'KH-0010' } } })
   getNextCode() {
@@ -67,6 +69,7 @@ export class AdminUsersController {
   }
 
   @Get(':id')
+  @RequirePermission('users.read')
   @ApiOperation({ summary: 'Chi tiết khách hàng' })
   @ApiParam({ name: 'id', example: 5 })
   @ApiOkResponse({ type: CustomerDetailResponseDto })
@@ -78,6 +81,7 @@ export class AdminUsersController {
   }
 
   @Patch(':id')
+  @RequirePermission('users.update')
   @ApiOperation({ summary: 'Cập nhật thông tin khách hàng (tên, điện thoại, giới tính, ngày sinh, trạng thái)' })
   @ApiParam({ name: 'id', example: 5 })
   @ApiOkResponse({ type: CustomerDetailResponseDto })
@@ -90,6 +94,7 @@ export class AdminUsersController {
   }
 
   @Put(':id/status')
+  @RequirePermission('users.update')
   @ApiOperation({ summary: 'Cập nhật trạng thái khách hàng (legacy — dùng PATCH /:id thay thế)' })
   updateStatus(
     @Param('id', ParseIntPipe) id: number,
@@ -99,6 +104,7 @@ export class AdminUsersController {
   }
 
   @Delete(':id')
+  @RequirePermission('users.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Khoá tài khoản khách hàng (soft delete)' })
   softDelete(@Param('id', ParseIntPipe) id: number) {
@@ -108,6 +114,7 @@ export class AdminUsersController {
   // ─── Address sub-resource ──────────────────────────────────────────────────
 
   @Post(':id/addresses')
+  @RequirePermission('users.update')
   @ApiOperation({ summary: 'Thêm địa chỉ giao hàng cho khách hàng' })
   @ApiParam({ name: 'id', example: 5 })
   @ApiCreatedResponse({ type: ShippingAddressResponseDto })
@@ -120,6 +127,7 @@ export class AdminUsersController {
   }
 
   @Put(':id/addresses/:addressId')
+  @RequirePermission('users.update')
   @ApiOperation({ summary: 'Cập nhật địa chỉ giao hàng' })
   @ApiParam({ name: 'id', example: 5 })
   @ApiParam({ name: 'addressId', example: 1 })
@@ -134,6 +142,7 @@ export class AdminUsersController {
   }
 
   @Delete(':id/addresses/:addressId')
+  @RequirePermission('users.update')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Xoá địa chỉ giao hàng' })
   @ApiParam({ name: 'id', example: 5 })
@@ -147,6 +156,7 @@ export class AdminUsersController {
   }
 
   @Put(':id/addresses/:addressId/default')
+  @RequirePermission('users.update')
   @ApiOperation({ summary: 'Đặt làm địa chỉ mặc định' })
   @ApiParam({ name: 'id', example: 5 })
   @ApiParam({ name: 'addressId', example: 1 })

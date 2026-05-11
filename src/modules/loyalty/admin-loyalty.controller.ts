@@ -3,7 +3,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiCreatedResponse, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { MembershipTierResponseDto } from './dto/loyalty-response.dto';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { LoyaltyService } from './loyalty.service';
 import { MembershipTierService } from './membership-tier.service';
 import { CreateEarnRuleDto } from './dto/create-earn-rule.dto';
@@ -15,7 +15,6 @@ import { UpdateMembershipTierDto } from './dto/update-membership-tier.dto';
 
 @ApiTags('Admin — Loyalty')
 @Controller('admin/loyalty')
-@Roles('admin', 'staff')
 @ApiBearerAuth()
 export class AdminLoyaltyController {
   constructor(
@@ -26,6 +25,7 @@ export class AdminLoyaltyController {
   // ─── Earn Rules ───────────────────────────────────────────────────────────
 
   @Get('rules')
+  @RequirePermission('loyalty.read')
   @ApiOperation({ summary: 'Danh sách tất cả earn rules (sắp xếp theo priority giảm dần)' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -38,6 +38,7 @@ export class AdminLoyaltyController {
   }
 
   @Get('rules/:id')
+  @RequirePermission('loyalty.read')
   @ApiOperation({ summary: 'Chi tiết một earn rule theo ID' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 404, description: 'Earn rule không tồn tại' })
@@ -48,6 +49,7 @@ export class AdminLoyaltyController {
   }
 
   @Post('rules')
+  @RequirePermission('loyalty.create')
   @ApiOperation({ summary: 'Tạo earn rule mới (kèm scopes nếu có)' })
   @ApiResponse({ status: 201, description: 'Earn rule đã được tạo' })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
@@ -58,6 +60,7 @@ export class AdminLoyaltyController {
   }
 
   @Put('rules/:id')
+  @RequirePermission('loyalty.update')
   @ApiOperation({ summary: 'Cập nhật earn rule (thay thế toàn bộ scopes nếu truyền vào)' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 200, description: 'Earn rule đã được cập nhật' })
@@ -69,6 +72,7 @@ export class AdminLoyaltyController {
   }
 
   @Delete('rules/:id')
+  @RequirePermission('loyalty.delete')
   @HttpCode(204)
   @ApiOperation({ summary: 'Xóa earn rule và toàn bộ scopes liên quan' })
   @ApiParam({ name: 'id', example: 1 })
@@ -83,6 +87,7 @@ export class AdminLoyaltyController {
   // ─── Redemption Catalog ───────────────────────────────────────────────────
 
   @Get('catalog')
+  @RequirePermission('loyalty.read')
   @ApiOperation({ summary: 'Danh sách tất cả catalog items kể cả đã tắt (admin view)' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -95,6 +100,7 @@ export class AdminLoyaltyController {
   }
 
   @Post('catalog')
+  @RequirePermission('loyalty.create')
   @ApiOperation({ summary: 'Tạo catalog item đổi điểm (phải có promotion liên kết)' })
   @ApiResponse({ status: 201, description: 'Catalog item đã được tạo' })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
@@ -105,6 +111,7 @@ export class AdminLoyaltyController {
   }
 
   @Put('catalog/:id')
+  @RequirePermission('loyalty.update')
   @ApiOperation({ summary: 'Cập nhật catalog item đổi điểm' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 200, description: 'Catalog item đã được cập nhật' })
@@ -119,6 +126,7 @@ export class AdminLoyaltyController {
   }
 
   @Delete('catalog/:id')
+  @RequirePermission('loyalty.delete')
   @HttpCode(204)
   @ApiOperation({ summary: 'Xóa catalog item đổi điểm' })
   @ApiParam({ name: 'id', example: 1 })
@@ -133,6 +141,7 @@ export class AdminLoyaltyController {
   // ─── Point Adjustment ────────────────────────────────────────────────────
 
   @Post('adjust')
+  @RequirePermission('loyalty.update')
   @ApiOperation({ summary: 'Điều chỉnh điểm thủ công cho khách hàng' })
   @ApiResponse({ status: 201, description: 'Điểm đã được điều chỉnh' })
   @ApiResponse({ status: 400, description: 'Số điểm không đủ (khi trừ)' })
@@ -145,6 +154,7 @@ export class AdminLoyaltyController {
   // ─── Membership Tiers ─────────────────────────────────────────────────────
 
   @Get('tiers')
+  @RequirePermission('loyalty.read')
   @ApiOperation({ summary: 'Danh sách hạng thành viên (phân trang, tìm kiếm)' })
   @ApiQuery({ name: 'page', required: false, type: Number })
   @ApiQuery({ name: 'limit', required: false, type: Number })
@@ -162,6 +172,7 @@ export class AdminLoyaltyController {
   }
 
   @Get('tiers/:id')
+  @RequirePermission('loyalty.read')
   @ApiOperation({ summary: 'Chi tiết một hạng thành viên' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiOkResponse({ type: MembershipTierResponseDto })
@@ -172,6 +183,7 @@ export class AdminLoyaltyController {
   }
 
   @Post('tiers')
+  @RequirePermission('loyalty.create')
   @ApiOperation({ summary: 'Tạo hạng thành viên mới (validate overlap)' })
   @ApiCreatedResponse({ type: MembershipTierResponseDto })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
@@ -182,6 +194,7 @@ export class AdminLoyaltyController {
   }
 
   @Patch('tiers/:id')
+  @RequirePermission('loyalty.update')
   @ApiOperation({ summary: 'Cập nhật hạng thành viên (validate overlap với các hạng khác)' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiOkResponse({ type: MembershipTierResponseDto })
@@ -197,6 +210,7 @@ export class AdminLoyaltyController {
   }
 
   @Delete('tiers/:id')
+  @RequirePermission('loyalty.delete')
   @HttpCode(204)
   @ApiOperation({ summary: 'Xóa hạng thành viên (từ chối nếu có khách hàng đang ở bậc này)' })
   @ApiParam({ name: 'id', example: 1 })

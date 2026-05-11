@@ -7,7 +7,7 @@ import {
   ApiResponse,
   ApiParam,
 } from '@nestjs/swagger';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { AdminTransactionsService } from './admin-transactions.service';
 import { GetTransactionsQueryDto } from './dto/get-transactions-query.dto';
 import { GetTransactionsResponseDto } from './dto/transaction-row-response.dto';
@@ -16,12 +16,12 @@ import { Transaction } from './entities/transaction.entity';
 
 @ApiTags('Admin — Transactions')
 @ApiBearerAuth()
-@Roles('admin', 'staff')
 @Controller('admin')
 export class AdminTransactionsController {
   constructor(private readonly adminTxService: AdminTransactionsService) {}
 
   @Get('transactions')
+  @RequirePermission('payments.read')
   @ApiOperation({ summary: '[Admin] Danh sách giao dịch với filter và phân trang' })
   @ApiOkResponse({ type: GetTransactionsResponseDto })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -32,6 +32,7 @@ export class AdminTransactionsController {
 
   // /stats phải khai báo TRƯỚC /:orderCode/transaction để tránh NestJS match 'stats' như dynamic param
   @Get('transactions/stats')
+  @RequirePermission('payments.read')
   @ApiOperation({ summary: '[Admin] Thống kê tổng hợp giao dịch' })
   @ApiOkResponse({ type: TransactionStatsResponseDto })
   getTransactionStats(): Promise<TransactionStatsResponseDto> {
@@ -39,6 +40,7 @@ export class AdminTransactionsController {
   }
 
   @Get('orders/:orderCode/transaction')
+  @RequirePermission('payments.read')
   @ApiOperation({ summary: '[Admin] Lấy giao dịch theo mã đơn hàng' })
   @ApiParam({ name: 'orderCode', example: 'ORD-2024-0001' })
   @ApiOkResponse({ type: Transaction })

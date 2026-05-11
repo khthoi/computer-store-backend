@@ -14,16 +14,16 @@ import { UpdateOrderStatusDto } from './dto/update-order-status.dto';
 import { UpdateOrderShippingDto } from './dto/update-order-shipping.dto';
 import { AddOrderNoteDto } from './dto/add-order-note.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 
 @ApiTags('Admin — Orders')
 @ApiBearerAuth()
-@Roles('admin', 'staff')
 @Controller('admin/orders')
 export class AdminOrdersController {
   constructor(private readonly ordersService: OrdersService) {}
 
   @Get()
+  @RequirePermission('orders.read')
   @ApiOperation({ summary: '[Admin] Danh sách tất cả đơn hàng' })
   @ApiQuery({ name: 'trangThai', required: false, example: 'ChoTT', description: 'Lọc theo trạng thái đơn hàng' })
   @ApiQuery({ name: 'page', required: false, example: 1, description: 'Trang hiện tại' })
@@ -53,6 +53,7 @@ export class AdminOrdersController {
   }
 
   @Get(':id')
+  @RequirePermission('orders.read')
   @ApiOperation({ summary: '[Admin] Chi tiết đơn hàng' })
   @ApiParam({ name: 'id', example: 'ORD-20240315-0001' })
   @ApiOkResponse({
@@ -62,18 +63,8 @@ export class AdminOrdersController {
         orderCode: 'ORD-20240315-0001',
         status: 'DaGiao',
         totalAmount: 15500000,
-        items: [
-          {
-            variantId: 20,
-            productName: 'Intel Core i9-14900K',
-            quantity: 1,
-            price: 15000000,
-          },
-        ],
-        shippingAddress: {
-          fullName: 'Nguyễn Văn A',
-          address: '123 Lê Lợi, Quận 1',
-        },
+        items: [{ variantId: 20, productName: 'Intel Core i9-14900K', quantity: 1, price: 15000000 }],
+        shippingAddress: { fullName: 'Nguyễn Văn A', address: '123 Lê Lợi, Quận 1' },
       },
     },
   })
@@ -85,6 +76,7 @@ export class AdminOrdersController {
   }
 
   @Get(':id/transaction')
+  @RequirePermission('orders.read')
   @ApiOperation({ summary: '[Admin] Thông tin giao dịch của đơn hàng' })
   @ApiParam({ name: 'id', example: 'ORD-20240315-0001' })
   @ApiResponse({ status: 200, description: 'Thông tin giao dịch' })
@@ -96,6 +88,7 @@ export class AdminOrdersController {
   }
 
   @Put(':id/status')
+  @RequirePermission('orders.update')
   @ApiOperation({ summary: '[Admin] Cập nhật trạng thái đơn hàng' })
   updateStatus(
     @Param('id') id: string,
@@ -106,6 +99,7 @@ export class AdminOrdersController {
   }
 
   @Patch(':id/shipping')
+  @RequirePermission('orders.update')
   @ApiOperation({ summary: '[Admin] Cập nhật thông tin vận chuyển (carrier, tracking, estimated delivery)' })
   @ApiParam({ name: 'id', example: 'ORD-20240315-0001' })
   updateShipping(@Param('id') id: string, @Body() dto: UpdateOrderShippingDto) {
@@ -113,6 +107,7 @@ export class AdminOrdersController {
   }
 
   @Post(':id/notes')
+  @RequirePermission('orders.update')
   @ApiOperation({ summary: '[Admin] Thêm ghi chú nội bộ cho đơn hàng' })
   @ApiParam({ name: 'id', example: 'ORD-20240315-0001' })
   addNote(
@@ -124,6 +119,7 @@ export class AdminOrdersController {
   }
 
   @Get(':id/return-requests')
+  @RequirePermission('orders.read')
   @ApiOperation({ summary: '[Admin] Danh sách yêu cầu đổi trả của đơn hàng' })
   @ApiParam({ name: 'id', example: 'ORD-20240315-0001' })
   getReturnRequests(@Param('id') id: string) {

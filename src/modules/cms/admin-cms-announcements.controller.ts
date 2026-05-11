@@ -3,7 +3,7 @@ import {
   ParseIntPipe, Request, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiResponse, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { AnnouncementBarsService } from './announcement-bars.service';
 import { CreateAnnouncementBarDto } from './dto/create-announcement-bar.dto';
 import { UpdateAnnouncementBarDto } from './dto/update-announcement-bar.dto';
@@ -11,11 +11,11 @@ import { UpdateAnnouncementBarDto } from './dto/update-announcement-bar.dto';
 @ApiTags('Admin — CMS')
 @ApiBearerAuth('access-token')
 @Controller('admin')
-@Roles('admin', 'staff')
 export class AdminCmsAnnouncementsController {
   constructor(private readonly announcementBarsService: AnnouncementBarsService) {}
 
   @Get('announcement-bars')
+  @RequirePermission('cms.read')
   @ApiOperation({ summary: 'Danh sách thanh thông báo (admin)' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
@@ -24,6 +24,7 @@ export class AdminCmsAnnouncementsController {
   }
 
   @Get('announcement-bars/:id')
+  @RequirePermission('cms.read')
   @ApiOperation({ summary: 'Chi tiết thanh thông báo (admin)' })
   @ApiParam({ name: 'id', example: 1, description: 'ID thanh thông báo' })
   @ApiResponse({ status: 404, description: 'Thanh thông báo không tồn tại' })
@@ -34,6 +35,7 @@ export class AdminCmsAnnouncementsController {
   }
 
   @Post('announcement-bars')
+  @RequirePermission('cms.create')
   @ApiOperation({ summary: 'Tạo thanh thông báo mới' })
   @ApiResponse({ status: 201, description: 'Thanh thông báo đã được tạo' })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
@@ -45,6 +47,7 @@ export class AdminCmsAnnouncementsController {
   }
 
   @Put('announcement-bars/:id')
+  @RequirePermission('cms.update')
   @ApiOperation({ summary: 'Cập nhật thanh thông báo' })
   @ApiParam({ name: 'id', example: 1, description: 'ID thanh thông báo' })
   @ApiResponse({ status: 200, description: 'Thanh thông báo đã được cập nhật' })
@@ -57,6 +60,7 @@ export class AdminCmsAnnouncementsController {
   }
 
   @Delete('announcement-bars/:id')
+  @RequirePermission('cms.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Xoá thanh thông báo' })
   @ApiParam({ name: 'id', example: 1, description: 'ID thanh thông báo' })

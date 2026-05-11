@@ -23,13 +23,12 @@ import { QueryMediaDto } from './dto/query-media.dto';
 import { CreateMediaFolderDto } from './dto/create-media-folder.dto';
 import { UpdateMediaFolderDto } from './dto/update-media-folder.dto';
 import { UpdateMediaDto } from './dto/update-media.dto';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { JwtPayload } from '../auth/strategies/jwt.strategy';
 
 @ApiTags('Admin — Media')
 @ApiBearerAuth('access-token')
-@Roles('admin', 'staff')
 @Controller('admin/media')
 export class AdminMediaController {
   constructor(
@@ -40,6 +39,7 @@ export class AdminMediaController {
   // ── Upload ────────────────────────────────────────────────────────────────
 
   @Post('upload')
+  @RequirePermission('media.create')
   @ApiOperation({ summary: 'Upload file lên Cloudinary (folder phải nằm trong danh sách cấu hình)' })
   @ApiConsumes('multipart/form-data')
   @ApiBody({
@@ -78,6 +78,7 @@ export class AdminMediaController {
   // ── Folder Configuration (static routes first to avoid :id conflicts) ─────
 
   @Get('folders')
+  @RequirePermission('media.read')
   @ApiOperation({ summary: 'Danh sách thư mục Cloudinary đã cấu hình' })
   @ApiQuery({ name: 'onlyActive', required: false, type: Boolean, description: 'Chỉ lấy thư mục đang hoạt động' })
   @ApiOkResponse({
@@ -95,13 +96,14 @@ export class AdminMediaController {
   }
 
   @Post('folders')
-  @Roles('admin')
+  @RequirePermission('media.create')
   @ApiOperation({ summary: 'Tạo cấu hình thư mục Cloudinary mới' })
   createFolder(@Body() dto: CreateMediaFolderDto) {
     return this.folderService.create(dto);
   }
 
   @Get('folders/:id')
+  @RequirePermission('media.read')
   @ApiOperation({ summary: 'Chi tiết cấu hình thư mục' })
   @ApiParam({ name: 'id', description: 'ID của thư mục', example: 1 })
   @ApiOkResponse({
@@ -124,14 +126,14 @@ export class AdminMediaController {
   }
 
   @Put('folders/:id')
-  @Roles('admin')
+  @RequirePermission('media.update')
   @ApiOperation({ summary: 'Cập nhật cấu hình thư mục' })
   updateFolder(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateMediaFolderDto) {
     return this.folderService.update(id, dto);
   }
 
   @Delete('folders/:id')
-  @Roles('admin')
+  @RequirePermission('media.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Xoá cấu hình thư mục' })
   removeFolder(@Param('id', ParseIntPipe) id: number) {
@@ -141,6 +143,7 @@ export class AdminMediaController {
   // ── Assets ────────────────────────────────────────────────────────────────
 
   @Get()
+  @RequirePermission('media.read')
   @ApiOperation({ summary: 'Danh sách media assets' })
   @ApiQuery({ name: 'folder', required: false, type: String, description: 'Lọc theo folder path' })
   @ApiQuery({ name: 'resourceType', required: false, type: String, description: 'Lọc theo loại tài nguyên (image, video, raw)' })
@@ -171,6 +174,7 @@ export class AdminMediaController {
   }
 
   @Get(':id')
+  @RequirePermission('media.read')
   @ApiOperation({ summary: 'Chi tiết một asset' })
   @ApiParam({ name: 'id', description: 'ID của media asset', example: 45 })
   @ApiOkResponse({
@@ -194,18 +198,21 @@ export class AdminMediaController {
   }
 
   @Patch(':id')
+  @RequirePermission('media.update')
   @ApiOperation({ summary: 'Cập nhật metadata asset (altText, caption)' })
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateMediaDto) {
     return this.mediaService.update(id, dto);
   }
 
   @Patch(':id/archive')
+  @RequirePermission('media.update')
   @ApiOperation({ summary: 'Archive asset (ẩn khỏi thư viện)' })
   archive(@Param('id', ParseIntPipe) id: number) {
     return this.mediaService.archive(id);
   }
 
   @Delete(':id')
+  @RequirePermission('media.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Xoá asset (Cloudinary + DB)' })
   remove(@Param('id', ParseIntPipe) id: number) {

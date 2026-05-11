@@ -5,7 +5,7 @@ import {
   ApiTags, ApiOperation, ApiOkResponse, ApiResponse,
   ApiBearerAuth, ApiParam, ApiQuery,
 } from '@nestjs/swagger';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { ReviewsService } from './reviews.service';
 import { QueryReviewsDto } from './dto/query-reviews.dto';
 import { ModerateReviewDto } from './dto/moderate-review.dto';
@@ -15,11 +15,11 @@ import { BulkModerateDto } from './dto/bulk-moderate.dto';
 @ApiTags('Admin — Reviews')
 @ApiBearerAuth()
 @Controller('admin/reviews')
-@Roles('admin', 'staff')
 export class AdminReviewsController {
   constructor(private readonly reviewsService: ReviewsService) {}
 
   @Get()
+  @RequirePermission('reviews.read')
   @ApiOperation({ summary: 'Danh sách đánh giá (có thể lọc theo trạng thái, biến thể, tìm kiếm)' })
   @ApiQuery({ name: 'status', required: false, enum: ['Pending', 'Approved', 'Rejected', 'Hidden'] })
   @ApiQuery({ name: 'variantId', required: false, description: 'Lọc theo biến thể sản phẩm', example: 5 })
@@ -39,6 +39,7 @@ export class AdminReviewsController {
 
   // IMPORTANT: @Get('stats') must be declared BEFORE @Get(':id')
   @Get('stats')
+  @RequirePermission('reviews.read')
   @ApiOperation({ summary: 'Thống kê tổng quan đánh giá' })
   @ApiOkResponse({
     schema: {
@@ -52,6 +53,7 @@ export class AdminReviewsController {
   }
 
   @Get(':id')
+  @RequirePermission('reviews.read')
   @ApiOperation({ summary: 'Chi tiết đánh giá kèm lịch sử phản hồi' })
   @ApiParam({ name: 'id', example: 1, description: 'ID đánh giá' })
   @ApiResponse({ status: 200, description: 'Chi tiết review + messages' })
@@ -63,6 +65,7 @@ export class AdminReviewsController {
   }
 
   @Post('bulk-moderate')
+  @RequirePermission('reviews.update')
   @ApiOperation({ summary: 'Duyệt/từ chối nhiều đánh giá cùng lúc' })
   @ApiResponse({ status: 201, description: 'Bulk moderation completed' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -73,6 +76,7 @@ export class AdminReviewsController {
   }
 
   @Put(':id/approve')
+  @RequirePermission('reviews.update')
   @ApiOperation({ summary: 'Duyệt đánh giá — cập nhật điểm trung bình sản phẩm' })
   @ApiParam({ name: 'id', example: 1, description: 'ID đánh giá' })
   @ApiResponse({ status: 200, description: 'Đánh giá đã được duyệt' })
@@ -86,6 +90,7 @@ export class AdminReviewsController {
   }
 
   @Put(':id/reject')
+  @RequirePermission('reviews.update')
   @ApiOperation({ summary: 'Từ chối đánh giá — ghi lý do' })
   @ApiParam({ name: 'id', example: 1, description: 'ID đánh giá' })
   @ApiResponse({ status: 200, description: 'Đánh giá đã bị từ chối' })
@@ -102,6 +107,7 @@ export class AdminReviewsController {
   }
 
   @Put(':id/hide')
+  @RequirePermission('reviews.update')
   @ApiOperation({ summary: 'Ẩn đánh giá — giữ trong DB nhưng không hiển thị' })
   @ApiParam({ name: 'id', example: 1, description: 'ID đánh giá' })
   @ApiResponse({ status: 200, description: 'Đánh giá đã bị ẩn' })
@@ -118,6 +124,7 @@ export class AdminReviewsController {
   }
 
   @Post(':id/reply')
+  @RequirePermission('reviews.update')
   @ApiOperation({ summary: 'Phản hồi đánh giá (Reply hiển thị với khách; InternalNote chỉ nội bộ)' })
   @ApiParam({ name: 'id', example: 1, description: 'ID đánh giá' })
   @ApiResponse({ status: 201, description: 'Phản hồi đã được gửi' })
@@ -134,6 +141,7 @@ export class AdminReviewsController {
   }
 
   @Get(':id/messages')
+  @RequirePermission('reviews.read')
   @ApiOperation({ summary: 'Lịch sử phản hồi của một đánh giá (bao gồm InternalNote)' })
   @ApiParam({ name: 'id', example: 1, description: 'ID đánh giá' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })

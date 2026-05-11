@@ -22,7 +22,7 @@ import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { VNPayReturnDto } from './dto/vnpay-return.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { Public } from '../../common/decorators/public.decorator';
 
 @ApiTags('Payments')
@@ -90,7 +90,7 @@ export class PaymentsController {
   }
 
   @Post('cod/:orderId/confirm')
-  @Roles('admin', 'staff')
+  @RequirePermission('payments.read')
   @ApiOperation({ summary: '[Admin] Xác nhận giao COD thành công' })
   confirmCOD(
     @Param('orderId', ParseIntPipe) orderId: number,

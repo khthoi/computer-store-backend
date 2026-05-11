@@ -5,6 +5,7 @@ import {
   ManyToMany,
   JoinTable,
   Index,
+  CreateDateColumn,
 } from 'typeorm';
 import { Permission } from './permission.entity';
 
@@ -19,6 +20,9 @@ export class Role {
 
   @Column({ name: 'mo_ta', length: 500, nullable: true })
   moTa: string | null;
+
+  @CreateDateColumn({ name: 'ngay_tao' })
+  createdAt: Date;
 
   @ManyToMany(() => Permission, { eager: false })
   @JoinTable({

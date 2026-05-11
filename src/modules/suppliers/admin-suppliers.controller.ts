@@ -1,6 +1,6 @@
 import { Controller, Get, Post, Put, Delete, Param, Body, Query, ParseIntPipe } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiParam, ApiBearerAuth } from '@nestjs/swagger';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { SuppliersService } from './suppliers.service';
 import { CreateSupplierDto } from './dto/create-supplier.dto';
 import { UpdateSupplierDto } from './dto/update-supplier.dto';
@@ -10,11 +10,11 @@ import { SupplierResponseDto, PaginatedSuppliersDto } from './dto/supplier-respo
 @ApiTags('Admin — Suppliers')
 @ApiBearerAuth('access-token')
 @Controller('admin/suppliers')
-@Roles('admin', 'warehouse')
 export class AdminSuppliersController {
   constructor(private readonly service: SuppliersService) {}
 
   @Get()
+  @RequirePermission('suppliers.read')
   @ApiOperation({ summary: 'Danh sách nhà cung cấp (phân trang, tìm kiếm, lọc, sắp xếp)' })
   @ApiOkResponse({ type: PaginatedSuppliersDto })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -24,6 +24,7 @@ export class AdminSuppliersController {
   }
 
   @Get(':id')
+  @RequirePermission('suppliers.read')
   @ApiOperation({ summary: 'Chi tiết nhà cung cấp theo ID' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiOkResponse({ type: SupplierResponseDto })
@@ -35,6 +36,7 @@ export class AdminSuppliersController {
   }
 
   @Post()
+  @RequirePermission('suppliers.create')
   @ApiOperation({ summary: 'Tạo nhà cung cấp mới' })
   @ApiResponse({ status: 201, type: SupplierResponseDto, description: 'Nhà cung cấp đã được tạo thành công' })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
@@ -45,6 +47,7 @@ export class AdminSuppliersController {
   }
 
   @Put(':id')
+  @RequirePermission('suppliers.update')
   @ApiOperation({ summary: 'Cập nhật thông tin nhà cung cấp' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiOkResponse({ type: SupplierResponseDto })
@@ -56,6 +59,7 @@ export class AdminSuppliersController {
   }
 
   @Delete(':id')
+  @RequirePermission('suppliers.delete')
   @ApiOperation({ summary: 'Xoá nhà cung cấp (soft delete — chuyển sang Ngưng hợp tác)' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 200, description: 'Nhà cung cấp đã được xoá' })

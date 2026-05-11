@@ -7,7 +7,7 @@ import {
 } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { SupportService } from './support.service';
 import { SupportAdminQueryService } from './support-admin-query.service';
 import { QueryTicketsDto } from './dto/query-tickets.dto';
@@ -19,7 +19,6 @@ import { UpdateTicketMetaDto } from './dto/update-ticket-meta.dto';
 @ApiTags('Admin — Support')
 @ApiBearerAuth()
 @Controller('admin/tickets')
-@Roles('admin', 'staff')
 export class AdminSupportController {
   constructor(
     private readonly supportService: SupportService,
@@ -27,6 +26,7 @@ export class AdminSupportController {
   ) {}
 
   @Get('stats')
+  @RequirePermission('support.read')
   @ApiOperation({ summary: 'Thống kê tổng quan ticket (counts + SLA + avg resolution)' })
   @ApiOkResponse({ description: 'TicketStatsResponseDto' })
   getStats() {
@@ -34,12 +34,14 @@ export class AdminSupportController {
   }
 
   @Get('assignee-stats')
+  @RequirePermission('support.read')
   @ApiOperation({ summary: 'Số phiếu đang mở theo nhân viên phụ trách (dùng cho dropdown phân công)' })
   getAssigneeStats() {
     return this.queryService.getAssigneeStats();
   }
 
   @Get()
+  @RequirePermission('support.read')
   @ApiOperation({ summary: 'Danh sách tất cả ticket (lọc theo trạng thái, mức độ, tìm kiếm)' })
   @ApiQuery({ name: 'status', required: false, enum: ['Moi', 'DangXuLy', 'DaGiaiQuyet', 'DaDong'] })
   @ApiQuery({ name: 'priority', required: false, enum: ['Cao', 'TrungBinh', 'Thap'] })
@@ -57,6 +59,7 @@ export class AdminSupportController {
   }
 
   @Post()
+  @RequirePermission('support.create')
   @ApiOperation({ summary: 'Admin tạo ticket thay khách hàng' })
   @ApiResponse({ status: 201, description: 'Ticket đã được tạo — trả về TicketDetailResponseDto' })
   createTicket(@Body() dto: AdminCreateTicketDto) {
@@ -64,6 +67,7 @@ export class AdminSupportController {
   }
 
   @Get(':id')
+  @RequirePermission('support.read')
   @ApiOperation({ summary: 'Chi tiết ticket (bao gồm messages)' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 404, description: 'Ticket không tồn tại' })
@@ -72,6 +76,7 @@ export class AdminSupportController {
   }
 
   @Patch(':id')
+  @RequirePermission('support.update')
   @ApiOperation({ summary: 'Cập nhật ưu tiên hoặc nhãn của ticket' })
   @ApiParam({ name: 'id', example: 1 })
   async updateMeta(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateTicketMetaDto) {
@@ -80,6 +85,7 @@ export class AdminSupportController {
   }
 
   @Put(':id/assign')
+  @RequirePermission('support.update')
   @ApiOperation({ summary: 'Phân công nhân viên phụ trách ticket' })
   @ApiParam({ name: 'id', example: 1 })
   async assign(@Param('id', ParseIntPipe) id: number, @Body() dto: AssignTicketDto) {
@@ -88,6 +94,7 @@ export class AdminSupportController {
   }
 
   @Post(':id/messages')
+  @RequirePermission('support.update')
   @ApiOperation({ summary: 'Nhân viên gửi phản hồi (Reply hoặc InternalNote)' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 201, description: 'TicketMessageResponseDto' })
@@ -102,6 +109,7 @@ export class AdminSupportController {
   }
 
   @Get(':id/messages')
+  @RequirePermission('support.read')
   @ApiOperation({ summary: 'Lịch sử tin nhắn ticket (bao gồm InternalNote)' })
   @ApiParam({ name: 'id', example: 1 })
   getMessages(@Param('id', ParseIntPipe) id: number) {
@@ -109,6 +117,7 @@ export class AdminSupportController {
   }
 
   @Put(':id/close')
+  @RequirePermission('support.update')
   @ApiOperation({ summary: 'Đóng ticket' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 400, description: 'Ticket đã đóng rồi' })
@@ -119,6 +128,7 @@ export class AdminSupportController {
   }
 
   @Put(':id/resolve')
+  @RequirePermission('support.update')
   @ApiOperation({ summary: 'Đánh dấu ticket đã giải quyết (DaGiaiQuyet)' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 400, description: 'Ticket đã đóng hoặc đã giải quyết' })
@@ -129,6 +139,7 @@ export class AdminSupportController {
   }
 
   @Put(':id/reopen')
+  @RequirePermission('support.update')
   @ApiOperation({ summary: 'Mở lại ticket đã đóng hoặc đã giải quyết' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 400, description: 'Ticket chưa đóng/giải quyết' })
@@ -138,6 +149,7 @@ export class AdminSupportController {
   }
 
   @Sse(':id/stream')
+  @RequirePermission('support.read')
   @ApiOperation({ summary: 'SSE stream — nhận cập nhật real-time của ticket' })
   @ApiParam({ name: 'id', example: 1 })
   stream(@Param('id', ParseIntPipe) id: number): Observable<MessageEvent> {

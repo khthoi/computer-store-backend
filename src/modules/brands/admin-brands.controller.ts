@@ -16,16 +16,16 @@ import { BrandsService } from './brands.service';
 import { CreateBrandDto } from './dto/create-brand.dto';
 import { UpdateBrandDto } from './dto/update-brand.dto';
 import { QueryBrandDto } from './dto/query-brand.dto';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 
 @ApiTags('Admin — Brands')
 @ApiBearerAuth('access-token')
-@Roles('admin', 'staff')
 @Controller('admin/brands')
 export class AdminBrandsController {
   constructor(private readonly brandsService: BrandsService) {}
 
   @Get()
+  @RequirePermission('brands.read')
   @ApiOperation({ summary: 'Danh sách thương hiệu (có phân trang & tìm kiếm)' })
   @ApiQuery({ name: 'q', required: false, description: 'Tìm theo tên hoặc mô tả' })
   @ApiQuery({ name: 'active', required: false, description: 'Lọc theo trạng thái (true/false)' })
@@ -38,6 +38,7 @@ export class AdminBrandsController {
   }
 
   @Get(':id')
+  @RequirePermission('brands.read')
   @ApiOperation({ summary: 'Chi tiết thương hiệu' })
   @ApiParam({ name: 'id', description: 'ID của thương hiệu', example: 2 })
   @ApiOkResponse({
@@ -63,18 +64,21 @@ export class AdminBrandsController {
   }
 
   @Post()
+  @RequirePermission('brands.create')
   @ApiOperation({ summary: 'Tạo thương hiệu' })
   create(@Body() dto: CreateBrandDto) {
     return this.brandsService.create(dto);
   }
 
   @Put(':id')
+  @RequirePermission('brands.update')
   @ApiOperation({ summary: 'Cập nhật thương hiệu' })
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBrandDto) {
     return this.brandsService.update(id, dto);
   }
 
   @Delete(':id')
+  @RequirePermission('brands.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Ẩn / xoá thương hiệu' })
   remove(@Param('id', ParseIntPipe) id: number) {

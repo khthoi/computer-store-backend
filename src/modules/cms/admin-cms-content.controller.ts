@@ -3,7 +3,7 @@ import {
   ParseIntPipe, Query, Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { PagesService } from './pages.service';
 import { FaqService } from './faq.service';
 import { MenuService } from './menu.service';
@@ -25,7 +25,6 @@ import { UpsertSiteConfigDto } from './dto/upsert-site-config.dto';
 @ApiTags('Admin — CMS')
 @ApiBearerAuth('access-token')
 @Controller('admin')
-@Roles('admin', 'staff')
 export class AdminCmsContentController {
   constructor(
     private readonly pagesService: PagesService,
@@ -36,6 +35,7 @@ export class AdminCmsContentController {
 
   // ── Pages ──────────────────────────────────────────────────
   @Get('pages')
+  @RequirePermission('cms.read')
   @ApiOperation({ summary: 'Danh sách trang nội dung (admin, bao gồm bản nháp)' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
@@ -54,6 +54,7 @@ export class AdminCmsContentController {
   }
 
   @Get('pages/:id')
+  @RequirePermission('cms.read')
   @ApiOperation({ summary: 'Chi tiết trang nội dung (admin)' })
   @ApiParam({ name: 'id', example: 1, description: 'ID trang nội dung' })
   @ApiResponse({ status: 404, description: 'Trang nội dung không tồn tại' })
@@ -64,6 +65,7 @@ export class AdminCmsContentController {
   }
 
   @Post('pages')
+  @RequirePermission('cms.create')
   @ApiOperation({ summary: 'Tạo trang nội dung mới' })
   @ApiResponse({ status: 201, description: 'Trang nội dung đã được tạo' })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
@@ -74,6 +76,7 @@ export class AdminCmsContentController {
   }
 
   @Put('pages/:id')
+  @RequirePermission('cms.update')
   @ApiOperation({ summary: 'Cập nhật trang nội dung' })
   @ApiParam({ name: 'id', example: 1, description: 'ID trang nội dung' })
   @ApiResponse({ status: 200, description: 'Trang nội dung đã được cập nhật' })
@@ -85,6 +88,7 @@ export class AdminCmsContentController {
   }
 
   @Patch('pages/reorder')
+  @RequirePermission('cms.update')
   @ApiOperation({ summary: 'Cập nhật thứ tự trang nội dung' })
   @ApiResponse({ status: 200, description: 'Thứ tự đã được cập nhật' })
   reorderPages(@Body() dto: ReorderPagesDto) {
@@ -92,6 +96,7 @@ export class AdminCmsContentController {
   }
 
   @Delete('pages/:id')
+  @RequirePermission('cms.delete')
   @ApiOperation({ summary: 'Xoá trang nội dung' })
   @ApiParam({ name: 'id', example: 1, description: 'ID trang nội dung' })
   @ApiResponse({ status: 200, description: 'Trang nội dung đã được xoá' })
@@ -104,6 +109,7 @@ export class AdminCmsContentController {
 
   // ── FAQ Groups ─────────────────────────────────────────────
   @Get('faq/groups')
+  @RequirePermission('cms.read')
   @ApiOperation({ summary: 'Danh sách nhóm FAQ (admin)' })
   @ApiOkResponse({
     schema: {
@@ -120,6 +126,7 @@ export class AdminCmsContentController {
   }
 
   @Patch('faq/groups/reorder')
+  @RequirePermission('cms.update')
   @ApiOperation({ summary: 'Cập nhật thứ tự nhóm FAQ' })
   @ApiResponse({ status: 200, description: 'Thứ tự đã được cập nhật' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -129,6 +136,7 @@ export class AdminCmsContentController {
   }
 
   @Post('faq/groups')
+  @RequirePermission('cms.create')
   @ApiOperation({ summary: 'Tạo nhóm FAQ mới' })
   @ApiResponse({ status: 201, description: 'Nhóm FAQ đã được tạo' })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
@@ -139,6 +147,7 @@ export class AdminCmsContentController {
   }
 
   @Put('faq/groups/:id')
+  @RequirePermission('cms.update')
   @ApiOperation({ summary: 'Cập nhật nhóm FAQ' })
   @ApiParam({ name: 'id', example: 1, description: 'ID nhóm FAQ' })
   @ApiResponse({ status: 200, description: 'Nhóm FAQ đã được cập nhật' })
@@ -150,6 +159,7 @@ export class AdminCmsContentController {
   }
 
   @Delete('faq/groups/:id')
+  @RequirePermission('cms.delete')
   @ApiOperation({ summary: 'Xoá nhóm FAQ' })
   @ApiParam({ name: 'id', example: 1, description: 'ID nhóm FAQ' })
   @ApiResponse({ status: 200, description: 'Nhóm FAQ đã được xoá' })
@@ -162,6 +172,7 @@ export class AdminCmsContentController {
 
   // ── FAQ Items ──────────────────────────────────────────────
   @Get('faq/items')
+  @RequirePermission('cms.read')
   @ApiOperation({ summary: 'Danh sách FAQ item (admin, lọc theo nhóm)' })
   @ApiQuery({ name: 'groupId', required: false, description: 'Lọc theo ID nhóm FAQ', example: 1 })
   @ApiQuery({ name: 'q', required: false, description: 'Tìm kiếm theo câu hỏi' })
@@ -187,6 +198,7 @@ export class AdminCmsContentController {
   }
 
   @Patch('faq/items/reorder')
+  @RequirePermission('cms.update')
   @ApiOperation({ summary: 'Cập nhật thứ tự FAQ item' })
   @ApiResponse({ status: 200, description: 'Thứ tự đã được cập nhật' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -196,6 +208,7 @@ export class AdminCmsContentController {
   }
 
   @Post('faq/items')
+  @RequirePermission('cms.create')
   @ApiOperation({ summary: 'Tạo FAQ item mới' })
   @ApiResponse({ status: 201, description: 'FAQ item đã được tạo' })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
@@ -206,6 +219,7 @@ export class AdminCmsContentController {
   }
 
   @Put('faq/items/:id')
+  @RequirePermission('cms.update')
   @ApiOperation({ summary: 'Cập nhật FAQ item' })
   @ApiParam({ name: 'id', example: 1, description: 'ID FAQ item' })
   @ApiResponse({ status: 200, description: 'FAQ item đã được cập nhật' })
@@ -217,6 +231,7 @@ export class AdminCmsContentController {
   }
 
   @Delete('faq/items/:id')
+  @RequirePermission('cms.delete')
   @ApiOperation({ summary: 'Xoá FAQ item' })
   @ApiParam({ name: 'id', example: 1, description: 'ID FAQ item' })
   @ApiResponse({ status: 200, description: 'FAQ item đã được xoá' })
@@ -229,6 +244,7 @@ export class AdminCmsContentController {
 
   // ── Menus ──────────────────────────────────────────────────
   @Get('menus')
+  @RequirePermission('cms.read')
   @ApiOperation({ summary: 'Danh sách menu (admin)' })
   @ApiOkResponse({
     schema: {
@@ -245,6 +261,7 @@ export class AdminCmsContentController {
   }
 
   @Get('menus/:id')
+  @RequirePermission('cms.read')
   @ApiOperation({ summary: 'Chi tiết menu với cây item (admin)' })
   @ApiParam({ name: 'id', example: 1, description: 'ID menu' })
   @ApiOkResponse({
@@ -268,6 +285,7 @@ export class AdminCmsContentController {
   }
 
   @Post('menus/:id/items')
+  @RequirePermission('cms.create')
   @ApiOperation({ summary: 'Thêm item vào menu' })
   @ApiParam({ name: 'id', example: 1, description: 'ID menu' })
   @ApiResponse({ status: 201, description: 'Menu item đã được thêm' })
@@ -279,6 +297,7 @@ export class AdminCmsContentController {
   }
 
   @Put('menus/:menuId/items/:itemId')
+  @RequirePermission('cms.update')
   @ApiOperation({ summary: 'Cập nhật menu item' })
   @ApiParam({ name: 'menuId', example: 1, description: 'ID menu' })
   @ApiParam({ name: 'itemId', example: 1, description: 'ID menu item' })
@@ -295,6 +314,7 @@ export class AdminCmsContentController {
   }
 
   @Delete('menus/:menuId/items/:itemId')
+  @RequirePermission('cms.delete')
   @ApiOperation({ summary: 'Xoá menu item' })
   @ApiParam({ name: 'menuId', example: 1, description: 'ID menu' })
   @ApiParam({ name: 'itemId', example: 1, description: 'ID menu item' })
@@ -310,6 +330,7 @@ export class AdminCmsContentController {
   }
 
   @Patch('menus/:id/items/reorder')
+  @RequirePermission('cms.update')
   @ApiOperation({ summary: 'Cập nhật thứ tự item trong menu' })
   @ApiParam({ name: 'id', example: 1, description: 'ID menu' })
   @ApiResponse({ status: 200, description: 'Thứ tự đã được cập nhật' })
@@ -324,6 +345,7 @@ export class AdminCmsContentController {
 
   // ── Site Config ────────────────────────────────────────────
   @Get('site-config')
+  @RequirePermission('cms.read')
   @ApiOperation({ summary: 'Lấy toàn bộ site config (admin)' })
   @ApiOkResponse({
     schema: {
@@ -342,6 +364,7 @@ export class AdminCmsContentController {
   }
 
   @Put('site-config/:key')
+  @RequirePermission('cms.update')
   @ApiOperation({ summary: 'Upsert site config theo key' })
   @ApiParam({ name: 'key', example: 'store_name', description: 'Tên key cấu hình' })
   @ApiResponse({ status: 200, description: 'Cấu hình đã được cập nhật' })
@@ -356,13 +379,13 @@ export class AdminCmsContentController {
   }
 
   @Delete('site-config/:key')
-  @Roles('admin')
-  @ApiOperation({ summary: 'Xoá site config key (chỉ admin)' })
+  @RequirePermission('cms.delete')
+  @ApiOperation({ summary: 'Xoá site config key' })
   @ApiParam({ name: 'key', example: 'store_name', description: 'Tên key cấu hình cần xoá' })
   @ApiResponse({ status: 200, description: 'Cấu hình đã được xoá' })
   @ApiResponse({ status: 404, description: 'Key cấu hình không tồn tại' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  @ApiResponse({ status: 403, description: 'Forbidden — chỉ admin được xoá cấu hình' })
+  @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
   removeSiteConfig(@Param('key') key: string) {
     return this.siteConfigService.remove(key);
   }

@@ -16,16 +16,16 @@ import { CategoriesService } from './categories.service';
 import { CreateCategoryDto } from './dto/create-category.dto';
 import { UpdateCategoryDto } from './dto/update-category.dto';
 import { CategoryResponseDto } from './dto/category-response.dto';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 
 @ApiTags('Admin — Categories')
 @ApiBearerAuth('access-token')
-@Roles('admin', 'staff')
 @Controller('admin/categories')
 export class AdminCategoriesController {
   constructor(private readonly categoriesService: CategoriesService) {}
 
   @Get()
+  @RequirePermission('categories.read')
   @ApiOperation({ summary: 'Danh sách tất cả danh mục (flat list)' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
@@ -38,6 +38,7 @@ export class AdminCategoriesController {
   }
 
   @Get('tree')
+  @RequirePermission('categories.read')
   @ApiOperation({ summary: 'Cây danh mục (nested tree)' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
@@ -50,6 +51,7 @@ export class AdminCategoriesController {
   }
 
   @Get(':id')
+  @RequirePermission('categories.read')
   @ApiOperation({ summary: 'Chi tiết danh mục' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
@@ -63,6 +65,7 @@ export class AdminCategoriesController {
   }
 
   @Post()
+  @RequirePermission('categories.create')
   @ApiOperation({ summary: 'Tạo danh mục mới' })
   async create(@Body() dto: CreateCategoryDto): Promise<CategoryResponseDto> {
     const cat = await this.categoriesService.create(dto);
@@ -70,6 +73,7 @@ export class AdminCategoriesController {
   }
 
   @Put(':id')
+  @RequirePermission('categories.update')
   @ApiOperation({ summary: 'Cập nhật danh mục' })
   async update(
     @Param('id', ParseIntPipe) id: number,
@@ -80,6 +84,7 @@ export class AdminCategoriesController {
   }
 
   @Patch('reorder')
+  @RequirePermission('categories.update')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Sắp xếp lại danh mục cùng cấp' })
   reorder(@Body() dto: { orderedIds: number[] }) {
@@ -87,6 +92,7 @@ export class AdminCategoriesController {
   }
 
   @Delete(':id')
+  @RequirePermission('categories.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Xoá danh mục (không có con, không có sản phẩm)' })
   remove(@Param('id', ParseIntPipe) id: number) {

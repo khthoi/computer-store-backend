@@ -3,7 +3,7 @@ import {
   ParseIntPipe, Query, Request, HttpCode, HttpStatus,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiParam, ApiBearerAuth, ApiQuery, ApiResponse } from '@nestjs/swagger';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { HomepageService } from './homepage.service';
 import { HomepagePreviewService } from './homepage-preview.service';
 import { CreateHomepageSectionDto } from './dto/create-homepage-section.dto';
@@ -13,7 +13,6 @@ import { ReorderHomepageSectionsDto } from './dto/reorder-homepage-sections.dto'
 @ApiTags('Admin — CMS')
 @ApiBearerAuth('access-token')
 @Controller('admin')
-@Roles('admin', 'staff')
 export class AdminCmsHomepageController {
   constructor(
     private readonly homepageService: HomepageService,
@@ -21,6 +20,7 @@ export class AdminCmsHomepageController {
   ) {}
 
   @Get('homepage-sections')
+  @RequirePermission('cms.read')
   @ApiOperation({ summary: 'Danh sách homepage sections (admin)' })
   @ApiResponse({ status: 200, description: 'Danh sách sections theo sortOrder' })
   getSections() {
@@ -29,6 +29,7 @@ export class AdminCmsHomepageController {
 
   // Static routes BEFORE /:id to avoid NestJS routing conflicts
   @Get('homepage-sections/preview')
+  @RequirePermission('cms.read')
   @ApiOperation({ summary: 'Preview sản phẩm cho section config (admin)' })
   @ApiQuery({ name: 'type', required: true, example: 'category' })
   @ApiQuery({ name: 'sourceConfig', required: false, description: 'JSON string of source config' })
@@ -45,6 +46,7 @@ export class AdminCmsHomepageController {
   }
 
   @Patch('homepage-sections/reorder')
+  @RequirePermission('cms.update')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Cập nhật thứ tự hiển thị sections (bulk reorder)' })
   @ApiResponse({ status: 204, description: 'Thứ tự đã được lưu' })
@@ -53,6 +55,7 @@ export class AdminCmsHomepageController {
   }
 
   @Get('homepage-sections/:id')
+  @RequirePermission('cms.read')
   @ApiOperation({ summary: 'Chi tiết homepage section (admin)' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 404, description: 'Section không tồn tại' })
@@ -61,6 +64,7 @@ export class AdminCmsHomepageController {
   }
 
   @Post('homepage-sections')
+  @RequirePermission('cms.create')
   @ApiOperation({ summary: 'Tạo homepage section mới' })
   @ApiResponse({ status: 201, description: 'Section đã được tạo' })
   createSection(@Body() dto: CreateHomepageSectionDto, @Request() req: any) {
@@ -68,6 +72,7 @@ export class AdminCmsHomepageController {
   }
 
   @Put('homepage-sections/:id')
+  @RequirePermission('cms.update')
   @ApiOperation({ summary: 'Cập nhật homepage section' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 404, description: 'Section không tồn tại' })
@@ -76,6 +81,7 @@ export class AdminCmsHomepageController {
   }
 
   @Delete('homepage-sections/:id')
+  @RequirePermission('cms.delete')
   @ApiOperation({ summary: 'Xoá homepage section' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 404, description: 'Section không tồn tại' })
@@ -84,6 +90,7 @@ export class AdminCmsHomepageController {
   }
 
   @Post('homepage-sections/:id/clone')
+  @RequirePermission('cms.create')
   @ApiOperation({ summary: 'Nhân bản homepage section (isVisible=false, title + Bản sao)' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 201, description: 'Bản sao đã được tạo' })

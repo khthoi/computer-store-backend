@@ -1,11 +1,9 @@
-import { Controller, Get, Put, Body, UseGuards } from '@nestjs/common';
+import { Controller, Get, Put, Body } from '@nestjs/common';
 import {
   ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiBearerAuth,
 } from '@nestjs/swagger';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
-import { RolesGuard } from '../../common/guards/roles.guard';
-import { Roles } from '../../common/decorators/roles.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { SettingsService } from './settings.service';
 import { UpdateGeneralSettingsDto } from './dto/update-general-settings.dto';
 import { UpdatePaymentSettingsDto } from './dto/update-payment-settings.dto';
@@ -15,13 +13,12 @@ import { UpdateTaxSettingsDto } from './dto/update-tax-settings.dto';
 
 @ApiTags('Admin — Settings')
 @ApiBearerAuth('access-token')
-@UseGuards(JwtAuthGuard, RolesGuard)
 @Controller('admin/settings')
 export class AdminSettingsController {
   constructor(private readonly settingsService: SettingsService) {}
 
   @Get('general')
-  @Roles('settings.view')
+  @RequirePermission('settings.read')
   @ApiOperation({ summary: 'Xem cài đặt chung (tên site, logo, liên hệ)' })
   @ApiOkResponse({
     schema: {
@@ -41,7 +38,7 @@ export class AdminSettingsController {
   }
 
   @Put('general')
-  @Roles('settings.update')
+  @RequirePermission('settings.update')
   @ApiOperation({ summary: 'Cập nhật cài đặt chung' })
   @ApiOkResponse({ schema: { example: { site_name: 'Computer Store', logo_url: '...' } } })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -51,7 +48,7 @@ export class AdminSettingsController {
   }
 
   @Get('payments')
-  @Roles('settings.view')
+  @RequirePermission('settings.read')
   @ApiOperation({ summary: 'Xem cài đặt cổng thanh toán' })
   @ApiOkResponse({
     schema: {
@@ -71,7 +68,7 @@ export class AdminSettingsController {
   }
 
   @Put('payments')
-  @Roles('settings.update')
+  @RequirePermission('settings.update')
   @ApiOperation({ summary: 'Cập nhật cài đặt cổng thanh toán' })
   @ApiOkResponse({ schema: { example: { cod_enabled: 'true', vnpay_enabled: 'true' } } })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -81,7 +78,7 @@ export class AdminSettingsController {
   }
 
   @Get('shipping')
-  @Roles('settings.view')
+  @RequirePermission('settings.read')
   @ApiOperation({ summary: 'Xem cài đặt vận chuyển' })
   @ApiOkResponse({
     schema: {
@@ -100,7 +97,7 @@ export class AdminSettingsController {
   }
 
   @Put('shipping')
-  @Roles('settings.update')
+  @RequirePermission('settings.update')
   @ApiOperation({ summary: 'Cập nhật cài đặt vận chuyển' })
   @ApiOkResponse({ schema: { example: { free_threshold: '500000', standard_fee: '30000' } } })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -110,7 +107,7 @@ export class AdminSettingsController {
   }
 
   @Get('notifications')
-  @Roles('settings.view')
+  @RequirePermission('settings.read')
   @ApiOperation({ summary: 'Xem cài đặt thông báo & SLA' })
   @ApiOkResponse({
     schema: {
@@ -130,7 +127,7 @@ export class AdminSettingsController {
   }
 
   @Put('notifications')
-  @Roles('settings.update')
+  @RequirePermission('settings.update')
   @ApiOperation({ summary: 'Cập nhật cài đặt thông báo & SLA' })
   @ApiOkResponse({ schema: { example: { email_enabled: 'true', low_stock_threshold: '5' } } })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -140,7 +137,7 @@ export class AdminSettingsController {
   }
 
   @Get('tax')
-  @Roles('settings.view')
+  @RequirePermission('settings.read')
   @ApiOperation({ summary: 'Xem cài đặt thuế' })
   @ApiOkResponse({
     schema: {
@@ -159,7 +156,7 @@ export class AdminSettingsController {
   }
 
   @Put('tax')
-  @Roles('settings.update')
+  @RequirePermission('settings.update')
   @ApiOperation({ summary: 'Cập nhật cài đặt thuế' })
   @ApiOkResponse({ schema: { example: { vat_enabled: 'true', vat_rate: '10' } } })
   @ApiResponse({ status: 401, description: 'Unauthorized' })

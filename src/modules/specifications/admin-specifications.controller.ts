@@ -22,7 +22,7 @@ import { UpdateSpecTypeDto } from './dto/update-spec-type.dto';
 import { LinkCategoryGroupDto } from './dto/link-category-group.dto';
 import { SpecGroupResponseDto, SpecTypeResponseDto } from './dto/spec-group-response.dto';
 import { CategorySpecGroupResponseDto } from './dto/category-spec-group-response.dto';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 
 class UpdateCategoryGroupDto {
   @IsOptional() @IsBoolean() hienThiBoLoc?: boolean;
@@ -37,7 +37,6 @@ class ReorderCategoryGroupsDto {
 
 @ApiTags('Admin — Specifications')
 @ApiBearerAuth('access-token')
-@Roles('admin', 'staff')
 @Controller('admin/specs')
 export class AdminSpecificationsController {
   constructor(private readonly specsService: SpecificationsService) {}
@@ -45,6 +44,7 @@ export class AdminSpecificationsController {
   // ── Groups ────────────────────────────────────────────────────────────────
 
   @Get('groups')
+  @RequirePermission('specifications.read')
   @ApiOperation({ summary: 'Danh sách nhóm thông số' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -54,6 +54,7 @@ export class AdminSpecificationsController {
   }
 
   @Post('groups')
+  @RequirePermission('specifications.create')
   @ApiOperation({ summary: 'Tạo nhóm thông số' })
   async createGroup(@Body() dto: CreateSpecGroupDto): Promise<SpecGroupResponseDto> {
     const group = await this.specsService.createGroup(dto);
@@ -61,6 +62,7 @@ export class AdminSpecificationsController {
   }
 
   @Put('groups/:id')
+  @RequirePermission('specifications.update')
   @ApiOperation({ summary: 'Cập nhật nhóm thông số' })
   async updateGroup(
     @Param('id', ParseIntPipe) id: number,
@@ -71,6 +73,7 @@ export class AdminSpecificationsController {
   }
 
   @Get('groups/:id')
+  @RequirePermission('specifications.read')
   @ApiOperation({ summary: 'Chi tiết nhóm thông số' })
   async findOneGroup(@Param('id', ParseIntPipe) id: number): Promise<SpecGroupResponseDto> {
     const group = await this.specsService.findOneGroup(id);
@@ -78,6 +81,7 @@ export class AdminSpecificationsController {
   }
 
   @Delete('groups/:id')
+  @RequirePermission('specifications.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Xoá nhóm thông số' })
   removeGroup(@Param('id', ParseIntPipe) id: number) {
@@ -87,6 +91,7 @@ export class AdminSpecificationsController {
   // ── Types ─────────────────────────────────────────────────────────────────
 
   @Get('types')
+  @RequirePermission('specifications.read')
   @ApiOperation({ summary: 'Danh sách loại thông số (có thể lọc theo groupId)' })
   @ApiQuery({ name: 'groupId', required: false, type: Number })
   async findAllTypes(@Query('groupId') groupId?: string): Promise<SpecTypeResponseDto[]> {
@@ -96,6 +101,7 @@ export class AdminSpecificationsController {
   }
 
   @Post('types')
+  @RequirePermission('specifications.create')
   @ApiOperation({ summary: 'Tạo loại thông số' })
   async createType(@Body() dto: CreateSpecTypeDto): Promise<SpecTypeResponseDto> {
     const t = await this.specsService.createType(dto);
@@ -103,6 +109,7 @@ export class AdminSpecificationsController {
   }
 
   @Put('types/:id')
+  @RequirePermission('specifications.update')
   @ApiOperation({ summary: 'Cập nhật loại thông số' })
   async updateType(
     @Param('id', ParseIntPipe) id: number,
@@ -113,6 +120,7 @@ export class AdminSpecificationsController {
   }
 
   @Patch('types/reorder')
+  @RequirePermission('specifications.update')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Sắp xếp lại loại thông số trong một nhóm' })
   reorderSpecTypes(@Body() dto: { groupId: number; orderedIds: number[] }) {
@@ -120,6 +128,7 @@ export class AdminSpecificationsController {
   }
 
   @Delete('types/:id')
+  @RequirePermission('specifications.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Xoá loại thông số' })
   removeType(@Param('id', ParseIntPipe) id: number) {
@@ -129,6 +138,7 @@ export class AdminSpecificationsController {
   // ── Spec template ─────────────────────────────────────────────────────────
 
   @Get('template')
+  @RequirePermission('specifications.read')
   @ApiOperation({ summary: 'Template thông số kỹ thuật theo danh mục (kể cả kế thừa từ cha)' })
   getSpecTemplate(@Query('categoryId') categoryId?: string) {
     const id = parseInt(categoryId ?? '', 10);
@@ -140,6 +150,7 @@ export class AdminSpecificationsController {
 
   // NOTE: /resolved and / (GET) must be defined before /:id routes to avoid route conflict
   @Get('category-groups/resolved')
+  @RequirePermission('specifications.read')
   @ApiOperation({ summary: 'Resolved spec group view (3 buckets) cho một danh mục' })
   @ApiQuery({ name: 'categoryId', required: true, type: Number })
   getResolvedView(@Query('categoryId') categoryId?: string) {
@@ -149,6 +160,7 @@ export class AdminSpecificationsController {
   }
 
   @Get('category-groups')
+  @RequirePermission('specifications.read')
   @ApiOperation({ summary: 'Lấy danh sách assignment trực tiếp của một danh mục' })
   @ApiQuery({ name: 'categoryId', required: true, type: Number })
   async findGroupsByCategory(
@@ -161,6 +173,7 @@ export class AdminSpecificationsController {
   }
 
   @Post('category-groups')
+  @RequirePermission('specifications.update')
   @ApiOperation({ summary: 'Gán (upsert) nhóm thông số vào danh mục' })
   async upsertCategoryGroup(
     @Body() dto: LinkCategoryGroupDto,
@@ -170,6 +183,7 @@ export class AdminSpecificationsController {
   }
 
   @Patch('category-groups/reorder')
+  @RequirePermission('specifications.update')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Sắp xếp lại nhóm thông số trong một danh mục' })
   reorderCategoryGroups(@Body() dto: ReorderCategoryGroupsDto) {
@@ -177,6 +191,7 @@ export class AdminSpecificationsController {
   }
 
   @Patch('category-groups/:id')
+  @RequirePermission('specifications.update')
   @ApiOperation({ summary: 'Cập nhật một assignment (hienThiBoLoc, thuTuBoLoc, thuTuHienThi)' })
   async updateCategoryGroup(
     @Param('id', ParseIntPipe) id: number,
@@ -187,6 +202,7 @@ export class AdminSpecificationsController {
   }
 
   @Delete('category-groups')
+  @RequirePermission('specifications.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Gỡ nhóm thông số khỏi danh mục (theo categoryId + groupId)' })
   @ApiQuery({ name: 'categoryId', required: true, type: Number })
@@ -202,6 +218,7 @@ export class AdminSpecificationsController {
   }
 
   @Delete('category-groups/:id')
+  @RequirePermission('specifications.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Gỡ nhóm thông số khỏi danh mục (theo link ID)' })
   unlinkCategoryGroup(@Param('id', ParseIntPipe) id: number) {

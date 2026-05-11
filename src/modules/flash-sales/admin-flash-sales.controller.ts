@@ -2,7 +2,7 @@ import {
   Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, ParseIntPipe, Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { FlashSalesService } from './flash-sales.service';
 import { CreateFlashSaleDto } from './dto/create-flash-sale.dto';
 import { UpdateFlashSaleDto } from './dto/update-flash-sale.dto';
@@ -10,12 +10,12 @@ import { QueryFlashSaleDto } from './dto/query-flash-sale.dto';
 
 @ApiTags('Admin — Flash Sales')
 @Controller('admin/flash-sales')
-@Roles('admin', 'staff')
 @ApiBearerAuth()
 export class AdminFlashSalesController {
   constructor(private readonly flashSalesService: FlashSalesService) {}
 
   @Get('stats')
+  @RequirePermission('flash-sales.read')
   @ApiOperation({ summary: 'Thống kê tổng quan flash sale' })
   @ApiOkResponse({ schema: { example: { totalEvents: 10, activeNow: 1, upcomingCount: 3, todayCount: 2 } } })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -24,6 +24,7 @@ export class AdminFlashSalesController {
   }
 
   @Get('search-variants')
+  @RequirePermission('flash-sales.read')
   @ApiOperation({ summary: 'Tìm kiếm phiên bản sản phẩm để thêm vào flash sale' })
   @ApiQuery({ name: 'q', description: 'Từ khóa tìm kiếm (tên, SKU, tên sản phẩm)', example: 'i9' })
   @ApiQuery({ name: 'exclude', required: false, description: 'Danh sách phienBanId đã chọn (phân cách dấu phẩy)', example: '1,2,3' })
@@ -39,6 +40,7 @@ export class AdminFlashSalesController {
   }
 
   @Get()
+  @RequirePermission('flash-sales.read')
   @ApiOperation({ summary: 'Danh sách flash sales (phân trang, lọc theo status/search)' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -47,6 +49,7 @@ export class AdminFlashSalesController {
   }
 
   @Get(':id')
+  @RequirePermission('flash-sales.read')
   @ApiOperation({ summary: 'Chi tiết flash sale kèm items và thông tin phiên bản sản phẩm' })
   @ApiParam({ name: 'id', example: 5 })
   @ApiResponse({ status: 404, description: 'Flash sale không tồn tại' })
@@ -56,6 +59,7 @@ export class AdminFlashSalesController {
   }
 
   @Post()
+  @RequirePermission('flash-sales.create')
   @ApiOperation({ summary: 'Tạo flash sale mới kèm danh sách items' })
   @ApiResponse({ status: 201, description: 'Flash sale đã được tạo' })
   @ApiResponse({ status: 400, description: 'Dữ liệu không hợp lệ' })
@@ -65,6 +69,7 @@ export class AdminFlashSalesController {
   }
 
   @Put(':id')
+  @RequirePermission('flash-sales.update')
   @ApiOperation({ summary: 'Cập nhật flash sale (không cho sửa khi đang diễn ra)' })
   @ApiParam({ name: 'id', example: 5 })
   @ApiResponse({ status: 200, description: 'Flash sale đã được cập nhật' })
@@ -76,6 +81,7 @@ export class AdminFlashSalesController {
   }
 
   @Patch(':id/end')
+  @RequirePermission('flash-sales.update')
   @ApiOperation({ summary: 'Kết thúc sớm flash sale (đặt trạng thái da_ket_thuc)' })
   @ApiParam({ name: 'id', example: 5 })
   @ApiResponse({ status: 200, description: 'Flash sale đã kết thúc sớm' })
@@ -87,6 +93,7 @@ export class AdminFlashSalesController {
   }
 
   @Delete(':id')
+  @RequirePermission('flash-sales.delete')
   @ApiOperation({ summary: 'Hủy flash sale (chuyển trạng thái sang huy)' })
   @ApiParam({ name: 'id', example: 5 })
   @ApiResponse({ status: 200, description: 'Flash sale đã bị hủy' })

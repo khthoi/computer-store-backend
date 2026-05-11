@@ -14,7 +14,7 @@ import {
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
 import { BuildPcService } from './build-pc.service';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { CreateBuildSlotDto } from './dto/create-build-slot.dto';
 import { UpdateBuildSlotDto } from './dto/update-build-slot.dto';
 import { CreateCompatibilityRuleDto } from './dto/create-compatibility-rule.dto';
@@ -22,7 +22,6 @@ import { UpdateCompatibilityRuleDto } from './dto/update-compatibility-rule.dto'
 
 @ApiTags('Admin — BuildPC')
 @ApiBearerAuth('access-token')
-@Roles('admin', 'staff')
 @Controller('admin/build-pc')
 export class AdminBuildPcController {
   constructor(private readonly buildPcService: BuildPcService) {}
@@ -30,6 +29,7 @@ export class AdminBuildPcController {
   // ── Slots ─────────────────────────────────────────────────────────────────
 
   @Get('slots')
+  @RequirePermission('build-pc.read')
   @ApiOperation({ summary: 'List all Build-PC slot definitions' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
@@ -38,12 +38,14 @@ export class AdminBuildPcController {
   }
 
   @Post('slots')
+  @RequirePermission('build-pc.create')
   @ApiOperation({ summary: 'Tạo slot' })
   createSlot(@Body() dto: CreateBuildSlotDto) {
     return this.buildPcService.createSlot(dto);
   }
 
   @Patch('slots/reorder')
+  @RequirePermission('build-pc.update')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Cập nhật thứ tự hiển thị các slot' })
   reorderSlots(@Body() dto: { ids: number[] }) {
@@ -51,12 +53,14 @@ export class AdminBuildPcController {
   }
 
   @Put('slots/:id')
+  @RequirePermission('build-pc.update')
   @ApiOperation({ summary: 'Cập nhật slot' })
   updateSlot(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateBuildSlotDto) {
     return this.buildPcService.updateSlot(id, dto);
   }
 
   @Delete('slots/:id')
+  @RequirePermission('build-pc.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Xoá slot' })
   removeSlot(@Param('id', ParseIntPipe) id: number) {
@@ -66,6 +70,7 @@ export class AdminBuildPcController {
   // ── Tech keys ─────────────────────────────────────────────────────────────
 
   @Get('tech-keys')
+  @RequirePermission('build-pc.read')
   @ApiOperation({ summary: 'Danh sách thông số kỹ thuật dùng được trong quy tắc tương thích' })
   findTechKeys(@Query('categoryIds') categoryIds?: string) {
     const ids = categoryIds
@@ -77,6 +82,7 @@ export class AdminBuildPcController {
   // ── Rules ─────────────────────────────────────────────────────────────────
 
   @Get('rules')
+  @RequirePermission('build-pc.read')
   @ApiOperation({ summary: 'List all compatibility rules' })
   @ApiOkResponse({
     schema: {
@@ -92,18 +98,21 @@ export class AdminBuildPcController {
   }
 
   @Post('rules')
+  @RequirePermission('build-pc.create')
   @ApiOperation({ summary: 'Tạo quy tắc tương thích' })
   createRule(@Body() dto: CreateCompatibilityRuleDto) {
     return this.buildPcService.createRule(dto);
   }
 
   @Put('rules/:id')
+  @RequirePermission('build-pc.update')
   @ApiOperation({ summary: 'Cập nhật quy tắc' })
   updateRule(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateCompatibilityRuleDto) {
     return this.buildPcService.updateRule(id, dto);
   }
 
   @Delete('rules/:id')
+  @RequirePermission('build-pc.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Vô hiệu hóa quy tắc' })
   removeRule(@Param('id', ParseIntPipe) id: number) {
@@ -113,6 +122,7 @@ export class AdminBuildPcController {
   // ── Saved Builds (admin read-only) ─────────────────────────────────────────
 
   @Get('builds')
+  @RequirePermission('build-pc.read')
   @ApiOperation({ summary: 'Danh sách build đã lưu (admin)' })
   findAllBuilds(
     @Query('page') page?: string,
@@ -131,6 +141,7 @@ export class AdminBuildPcController {
   }
 
   @Get('builds/:id')
+  @RequirePermission('build-pc.read')
   @ApiOperation({ summary: 'Chi tiết một build (admin)' })
   findBuildDetail(@Param('id', ParseIntPipe) id: number) {
     return this.buildPcService.findBuildDetailAdmin(id);

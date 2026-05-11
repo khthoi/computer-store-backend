@@ -2,7 +2,7 @@ import {
   Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, ParseIntPipe, Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiQuery, ApiBearerAuth, ApiParam } from '@nestjs/swagger';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { PromotionsService } from './promotions.service';
 import { CreatePromotionDto } from './dto/create-promotion.dto';
 import { UpdatePromotionDto } from './dto/update-promotion.dto';
@@ -11,12 +11,12 @@ import { SetPromotionStatusDto } from './dto/set-promotion-status.dto';
 
 @ApiTags('Admin — Promotions')
 @Controller('admin/promotions')
-@Roles('admin', 'staff')
 @ApiBearerAuth()
 export class AdminPromotionsController {
   constructor(private readonly promotionsService: PromotionsService) {}
 
   @Get()
+  @RequirePermission('promotions.read')
   @ApiOperation({ summary: 'Danh sách promotions (lọc theo status/type/search/isCoupon, có phân trang)' })
   @ApiQuery({ name: 'status', required: false, enum: ['draft', 'active', 'scheduled', 'paused', 'ended', 'cancelled'] })
   @ApiQuery({ name: 'type', required: false, enum: ['standard', 'bxgy', 'bundle', 'bulk', 'free_shipping'] })
@@ -31,6 +31,7 @@ export class AdminPromotionsController {
   }
 
   @Post('generate-code')
+  @RequirePermission('promotions.update')
   @ApiOperation({ summary: 'Tạo mã giảm giá ngẫu nhiên (duy nhất, 10s cooldown per user)' })
   @ApiResponse({ status: 201, schema: { example: { code: 'ABC12345', cooldownMs: 10000 } } })
   @ApiResponse({ status: 409, description: 'Đang trong thời gian cooldown' })
@@ -40,6 +41,7 @@ export class AdminPromotionsController {
   }
 
   @Get('generate-code/cooldown')
+  @RequirePermission('promotions.read')
   @ApiOperation({ summary: 'Thời gian cooldown còn lại (ms) cho generate-code của user hiện tại' })
   @ApiOkResponse({ schema: { example: { remainingMs: 7234 } } })
   getCodeGenCooldown(@Request() req: any) {
@@ -48,6 +50,7 @@ export class AdminPromotionsController {
   }
 
   @Get(':id')
+  @RequirePermission('promotions.read')
   @ApiOperation({ summary: 'Chi tiết promotion kèm scopes, conditions và actions' })
   @ApiParam({ name: 'id', example: 7 })
   @ApiResponse({ status: 404, description: 'Promotion không tồn tại' })
@@ -57,6 +60,7 @@ export class AdminPromotionsController {
   }
 
   @Get(':id/usages')
+  @RequirePermission('promotions.read')
   @ApiOperation({ summary: 'Lịch sử sử dụng promotion' })
   @ApiParam({ name: 'id', example: 7 })
   @ApiResponse({ status: 404, description: 'Promotion không tồn tại' })
@@ -66,6 +70,7 @@ export class AdminPromotionsController {
   }
 
   @Get(':id/usage-stats')
+  @RequirePermission('promotions.read')
   @ApiOperation({ summary: 'Thống kê sử dụng promotion (tổng lượt, tổng giảm giá, unique customers)' })
   @ApiParam({ name: 'id', example: 7 })
   @ApiResponse({ status: 404, description: 'Promotion không tồn tại' })
@@ -75,6 +80,7 @@ export class AdminPromotionsController {
   }
 
   @Post()
+  @RequirePermission('promotions.create')
   @ApiOperation({ summary: 'Tạo promotion mới (kèm scopes, conditions, actions)' })
   @ApiResponse({ status: 201, description: 'Promotion đã được tạo' })
   @ApiResponse({ status: 409, description: 'Coupon code đã tồn tại' })
@@ -84,6 +90,7 @@ export class AdminPromotionsController {
   }
 
   @Post(':id/duplicate')
+  @RequirePermission('promotions.create')
   @ApiOperation({ summary: 'Nhân bản promotion (tạo bản copy với trạng thái draft, xóa code)' })
   @ApiParam({ name: 'id', example: 7 })
   @ApiResponse({ status: 201, description: 'Promotion đã được nhân bản' })
@@ -94,6 +101,7 @@ export class AdminPromotionsController {
   }
 
   @Put(':id')
+  @RequirePermission('promotions.update')
   @ApiOperation({ summary: 'Cập nhật promotion (cascade replace scopes/conditions/actions)' })
   @ApiParam({ name: 'id', example: 7 })
   @ApiResponse({ status: 200, description: 'Promotion đã được cập nhật' })
@@ -104,6 +112,7 @@ export class AdminPromotionsController {
   }
 
   @Patch(':id/status')
+  @RequirePermission('promotions.update')
   @ApiOperation({ summary: 'Đổi trạng thái promotion (active/paused/draft/scheduled)' })
   @ApiParam({ name: 'id', example: 7 })
   @ApiResponse({ status: 200, description: 'Trạng thái đã được cập nhật' })
@@ -114,6 +123,7 @@ export class AdminPromotionsController {
   }
 
   @Delete(':id')
+  @RequirePermission('promotions.delete')
   @ApiOperation({ summary: 'Xoá vĩnh viễn promotion (hard delete, cascade scopes/conditions/actions/usages)' })
   @ApiParam({ name: 'id', example: 7 })
   @ApiResponse({ status: 200, description: 'Promotion đã bị xoá' })

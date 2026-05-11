@@ -6,6 +6,7 @@ import {
   Delete,
   Body,
   Param,
+  Query,
   ParseIntPipe,
   HttpCode,
   HttpStatus,
@@ -22,36 +23,26 @@ import { RolesService } from './roles.service';
 import { CreateRoleDto } from './dto/create-role.dto';
 import { UpdateRoleDto } from './dto/update-role.dto';
 import { AssignPermissionsDto } from './dto/assign-permissions.dto';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { QueryRoleDto } from './dto/query-role.dto';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 
 @ApiTags('Admin — Roles')
 @ApiBearerAuth('access-token')
-@Roles('admin')
 @Controller('admin/roles')
 export class RolesController {
   constructor(private readonly rolesService: RolesService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Danh sách vai trò' })
-  @ApiOkResponse({
-    schema: {
-      example: [
-        {
-          id: 1,
-          name: 'admin',
-          description: 'Quản trị viên hệ thống',
-          permissions: [{ id: 1, code: 'product.create' }],
-        },
-      ],
-    },
-  })
+  @RequirePermission('roles.read')
+  @ApiOperation({ summary: 'Danh sách vai trò (có phân trang, tìm kiếm, sắp xếp)' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden — insufficient permissions' })
-  findAll() {
-    return this.rolesService.findAllRoles();
+  findAll(@Query() dto: QueryRoleDto) {
+    return this.rolesService.findAllRoles(dto);
   }
 
   @Get(':id')
+  @RequirePermission('roles.read')
   @ApiOperation({ summary: 'Chi tiết vai trò' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiOkResponse({
@@ -75,18 +66,21 @@ export class RolesController {
   }
 
   @Post()
+  @RequirePermission('roles.create')
   @ApiOperation({ summary: 'Tạo vai trò mới' })
   create(@Body() dto: CreateRoleDto) {
     return this.rolesService.create(dto);
   }
 
   @Put(':id')
+  @RequirePermission('roles.update')
   @ApiOperation({ summary: 'Cập nhật vai trò' })
   update(@Param('id', ParseIntPipe) id: number, @Body() dto: UpdateRoleDto) {
     return this.rolesService.update(id, dto);
   }
 
   @Delete(':id')
+  @RequirePermission('roles.delete')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Xoá vai trò' })
   remove(@Param('id', ParseIntPipe) id: number) {
@@ -94,6 +88,7 @@ export class RolesController {
   }
 
   @Put(':id/permissions')
+  @RequirePermission('roles.update')
   @ApiOperation({ summary: 'Gán quyền cho vai trò' })
   assignPermissions(
     @Param('id', ParseIntPipe) id: number,
@@ -105,12 +100,12 @@ export class RolesController {
 
 @ApiTags('Admin — Permissions')
 @ApiBearerAuth('access-token')
-@Roles('admin')
 @Controller('admin/permissions')
 export class PermissionsController {
   constructor(private readonly rolesService: RolesService) {}
 
   @Get()
+  @RequirePermission('roles.read')
   @ApiOperation({ summary: 'Danh sách tất cả quyền hạn (cached 10 phút)' })
   @ApiOkResponse({
     schema: {

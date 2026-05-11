@@ -8,7 +8,7 @@ import {
 } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
-import { Roles } from '../../common/decorators/roles.decorator';
+import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { NotificationsService } from './notifications.service';
 import { NotificationsAdminService } from './notifications-admin.service';
 import { CreateConfigDto } from './dto/create-config.dto';
@@ -19,7 +19,6 @@ import { BroadcastNotificationDto } from './dto/broadcast-notification.dto';
 @ApiTags('Admin — Notifications')
 @ApiBearerAuth('access-token')
 @Controller('admin/notifications')
-@Roles('admin', 'staff')
 export class AdminNotificationsController {
   constructor(
     private readonly notificationsService: NotificationsService,
@@ -27,6 +26,7 @@ export class AdminNotificationsController {
   ) {}
 
   @Sse('stream')
+  @RequirePermission('notifications.read')
   @ApiOperation({ summary: 'SSE stream sự kiện thông báo real-time cho admin' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   @ApiResponse({ status: 403, description: 'Forbidden' })
@@ -39,6 +39,7 @@ export class AdminNotificationsController {
   // ─── Notification list & stats ────────────────────────────────────────────
 
   @Get()
+  @RequirePermission('notifications.read')
   @ApiOperation({ summary: 'Danh sách thông báo admin (có filter + phân trang)' })
   @ApiOkResponse({ description: 'Trả về danh sách ThongBaoRow + metadata phân trang' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -47,6 +48,7 @@ export class AdminNotificationsController {
   }
 
   @Get('stats')
+  @RequirePermission('notifications.read')
   @ApiOperation({ summary: 'KPI thống kê thông báo' })
   @ApiOkResponse({
     schema: {
@@ -62,6 +64,7 @@ export class AdminNotificationsController {
   }
 
   @Post('broadcast')
+  @RequirePermission('notifications.create')
   @ApiOperation({ summary: 'Tạo thông báo hàng loạt (N khách × M kênh)' })
   @ApiCreatedResponse({ schema: { example: { created: 6 } } })
   @ApiResponse({ status: 400, description: 'Validation error' })
@@ -71,6 +74,7 @@ export class AdminNotificationsController {
   }
 
   @Patch(':id/cancel')
+  @RequirePermission('notifications.update')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Hủy thông báo (guard: ChuaGui)' })
   @ApiParam({ name: 'id', example: 1 })
@@ -82,6 +86,7 @@ export class AdminNotificationsController {
   }
 
   @Patch(':id/retry')
+  @RequirePermission('notifications.update')
   @HttpCode(HttpStatus.NO_CONTENT)
   @ApiOperation({ summary: 'Gửi lại thông báo (guard: ThatBai)' })
   @ApiParam({ name: 'id', example: 1 })
@@ -95,6 +100,7 @@ export class AdminNotificationsController {
   // ─── Config CRUD ──────────────────────────────────────────────────────────
 
   @Get('configs')
+  @RequirePermission('notifications.read')
   @ApiOperation({ summary: 'Danh sách cấu hình thông báo tự động' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   findAllConfigs() {
@@ -102,6 +108,7 @@ export class AdminNotificationsController {
   }
 
   @Get('configs/:id')
+  @RequirePermission('notifications.read')
   @ApiOperation({ summary: 'Chi tiết cấu hình thông báo' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 404, description: 'Cấu hình không tồn tại' })
@@ -111,6 +118,7 @@ export class AdminNotificationsController {
   }
 
   @Post('configs')
+  @RequirePermission('notifications.create')
   @ApiOperation({ summary: 'Tạo cấu hình thông báo mới' })
   @ApiResponse({ status: 201, description: 'Tạo thành công' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
@@ -119,6 +127,7 @@ export class AdminNotificationsController {
   }
 
   @Put('configs/:id')
+  @RequirePermission('notifications.update')
   @ApiOperation({ summary: 'Cập nhật cấu hình thông báo' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 404, description: 'Cấu hình không tồn tại' })
@@ -132,6 +141,7 @@ export class AdminNotificationsController {
   }
 
   @Delete('configs/:id')
+  @RequirePermission('notifications.delete')
   @ApiOperation({ summary: 'Xóa cấu hình thông báo' })
   @ApiParam({ name: 'id', example: 1 })
   @ApiResponse({ status: 404, description: 'Cấu hình không tồn tại' })
