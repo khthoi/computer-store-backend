@@ -2,6 +2,7 @@ import { Controller, Get, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
 import { CategoriesService } from './categories.service';
+import { CategoryResponseDto } from './dto/category-response.dto';
 
 @ApiTags('Categories')
 @Public()
@@ -54,8 +55,12 @@ export class CategoriesController {
       ],
     },
   })
-  getTree() {
-    return this.categoriesService.getTree();
+  async getTree() {
+    const [tree, countMap] = await Promise.all([
+      this.categoriesService.getTree(),
+      this.categoriesService.getProductCountMap(),
+    ]);
+    return tree.map((cat) => CategoryResponseDto.fromTree(cat, countMap));
   }
 
   @Get(':slug')
@@ -76,7 +81,11 @@ export class CategoriesController {
     },
   })
   @ApiResponse({ status: 404, description: 'Danh mục không tồn tại' })
-  findBySlug(@Param('slug') slug: string) {
-    return this.categoriesService.findBySlug(slug);
+  async findBySlug(@Param('slug') slug: string) {
+    const [cat, countMap] = await Promise.all([
+      this.categoriesService.findBySlug(slug),
+      this.categoriesService.getProductCountMap(),
+    ]);
+    return CategoryResponseDto.fromTree(cat, countMap);
   }
 }

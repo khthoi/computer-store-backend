@@ -26,11 +26,22 @@ export class Banner {
   @Column({ name: 'alt_text', length: 255, nullable: true })
   altText: string | null;
 
+  @Column({ name: 'caption', type: 'text', nullable: true })
+  caption: string | null;
+
   @Column({ name: 'asset_id_mobile', nullable: true })
   assetIdMobile: number | null;
 
   @Column({ name: 'url_hinh_anh_mobile', type: 'text', nullable: true })
   mobileImageUrl: string | null;
+
+  @Column({
+    name: 'vi_tri_side_banner',
+    type: 'enum',
+    enum: ['left', 'right'],
+    nullable: true,
+  })
+  sidePlacement: 'left' | 'right' | null;
 
   @Column({ name: 'url_dich_den', type: 'text', nullable: true })
   linkUrl: string | null;
@@ -81,6 +92,9 @@ export class Banner {
 
   @Column({ name: 'thu_tu_hien_thi', default: 0 })
   sortOrder: number;
+
+  @Column({ name: 'kich_hoat_hien_thi', type: 'boolean', nullable: true, default: null })
+  isEnabled: boolean | null;
 
   @Column({ name: 'ngay_bat_dau', type: 'datetime', nullable: true })
   startDate: Date | null;

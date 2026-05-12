@@ -1,15 +1,17 @@
 import { Banner } from '../entities/banner.entity';
 
-export class BannerResponseDto {
+export class PublicBannerDto {
   id: string;
   title: string;
   position: string;
   status: string;
   imageUrl: string | null;
   mobileImageUrl: string | null;
+  sidePlacement: 'left' | 'right' | null;
   linkUrl: string | null;
   linkTarget: string;
   altText: string | null;
+  caption: string | null;
   overlayText: string | null;
   overlaySubtext: string | null;
   ctaLabel: string | null;
@@ -22,8 +24,33 @@ export class BannerResponseDto {
   gridW: number | null;
   gridH: number | null;
   sortOrder: number;
-  startDate: string | null;
-  endDate: string | null;
+}
+
+export class BannerResponseDto {
+  id: string;
+  title: string;
+  position: string;
+  status: 'draft' | 'active';
+  isEnabled: boolean;
+  imageUrl: string | null;
+  mobileImageUrl: string | null;
+  sidePlacement: 'left' | 'right' | null;
+  linkUrl: string | null;
+  linkTarget: string;
+  altText: string | null;
+  caption: string | null;
+  overlayText: string | null;
+  overlaySubtext: string | null;
+  ctaLabel: string | null;
+  ctaUrl: string | null;
+  badge: string | null;
+  badgeColor: string | null;
+  badgeTextColor: string | null;
+  gridX: number | null;
+  gridY: number | null;
+  gridW: number | null;
+  gridH: number | null;
+  sortOrder: number;
   clickCount: number;
   impressionCount: number;
   createdBy: string;
@@ -31,17 +58,28 @@ export class BannerResponseDto {
   updatedAt: string;
 }
 
-export function mapBanner(b: Banner): BannerResponseDto {
+function normalizeBannerStatus(status: string | null | undefined): 'draft' | 'active' {
+  return status === 'active' ? 'active' : 'draft';
+}
+
+function resolveBannerEnabled(banner: Pick<Banner, 'isEnabled' | 'status'>): boolean {
+  if (typeof banner.isEnabled === 'boolean') return banner.isEnabled;
+  return normalizeBannerStatus(banner.status) === 'active';
+}
+
+export function mapPublicBanner(b: Banner): PublicBannerDto {
   return {
     id: String(b.id),
     title: b.title,
     position: b.position,
-    status: b.status,
+    status: normalizeBannerStatus(b.status),
     imageUrl: b.imageUrl,
     mobileImageUrl: b.mobileImageUrl,
+    sidePlacement: b.sidePlacement,
     linkUrl: b.linkUrl,
     linkTarget: b.linkTarget,
     altText: b.altText,
+    caption: b.caption,
     overlayText: b.overlayText,
     overlaySubtext: b.overlaySubtext,
     ctaLabel: b.ctaLabel,
@@ -54,8 +92,35 @@ export function mapBanner(b: Banner): BannerResponseDto {
     gridW: b.gridW,
     gridH: b.gridH,
     sortOrder: b.sortOrder,
-    startDate: b.startDate?.toISOString() ?? null,
-    endDate: b.endDate?.toISOString() ?? null,
+  };
+}
+
+export function mapBanner(b: Banner): BannerResponseDto {
+  return {
+    id: String(b.id),
+    title: b.title,
+    position: b.position,
+    status: normalizeBannerStatus(b.status),
+    isEnabled: resolveBannerEnabled(b),
+    imageUrl: b.imageUrl,
+    mobileImageUrl: b.mobileImageUrl,
+    sidePlacement: b.sidePlacement,
+    linkUrl: b.linkUrl,
+    linkTarget: b.linkTarget,
+    altText: b.altText,
+    caption: b.caption,
+    overlayText: b.overlayText,
+    overlaySubtext: b.overlaySubtext,
+    ctaLabel: b.ctaLabel,
+    ctaUrl: b.ctaUrl,
+    badge: b.badge,
+    badgeColor: b.badgeColor,
+    badgeTextColor: b.badgeTextColor,
+    gridX: b.gridX,
+    gridY: b.gridY,
+    gridW: b.gridW,
+    gridH: b.gridH,
+    sortOrder: b.sortOrder,
     clickCount: b.clickCount,
     impressionCount: b.impressionCount,
     createdBy: b.createdBy?.hoTen ?? String(b.createdById ?? ''),

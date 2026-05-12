@@ -12,27 +12,20 @@
 - Port: **4000**
 - API docs: `/api/docs` (Swagger)
 
-## Reading .docx Files
-Both `pandoc` (preferred) and `python-docx` are installed. Use a **single Bash call** — never chain multiple commands.
 
-```bash
-# PREFERRED — pandoc: renders tables as clean markdown tables (best for DB design docs)
-pandoc "path/to/file.docx" -t markdown --wrap=none
+---
 
-# Headings only — use first on large documents to get an outline, then target sections
-pandoc "path/to/file.docx" -t markdown --wrap=none | grep "^#"
+## BẮT BUỘC KHI IMPLEMENT
 
-# Fallback — python-docx: plain text only, tables lose formatting
-python -c "
-import docx, sys
-doc = docx.Document(sys.argv[1])
-for p in doc.paragraphs:
-    if p.text.strip(): print(p.text)
-for t in doc.tables:
-    for row in t.rows:
-        print(' | '.join(c.text.strip() for c in row.cells if c.text.strip()))
-" "path/to/file.docx"
-```
+- Không được phép xóa toàn bộ file rồi viết lại.
+- Không được phép xóa toàn bộ nội dung file rồi viết lại.
+- Không được phép implement lại toàn bộ file nếu chỉ có một phần sai cần sửa.
+- Chỉ sửa đúng phần bị sai hoặc phần cần bổ sung, theo hướng chỉnh sửa tối thiểu và chính xác.
+- Mọi nội dung hiển thị cho người dùng phải dùng tiếng Việt có dấu.
+- Comments, tên biến, tên hàm, tên kiểu dữ liệu, và code phải dùng tiếng Anh.
+- Cấm sử dụng tiếng Việt không dấu trong nội dung hiển thị cho người dùng.
+
+---
 
 ## Using Powershell commands is allowed
 
@@ -242,20 +235,5 @@ D:\Online PC Store System\Documentation\System Design\Docs\
 | Need module API prefix, DB tables list, or business rules for a module | `Trình tự xây dựng Backend NestJS.docx` | Sections 5 & 7 (module list + module details) |
 | Need build phase order or checklist | Same NestJS doc | Sections 4 & 10 |
 
-### How to read efficiently (large files)
-
-```bash
-# Step 1 — get headings outline first
-pandoc "D:/Online PC Store System/Documentation/System Design/Docs/<filename>.docx" \
-  -t markdown --wrap=none | grep "^#"
-
-# Step 2 — jump to Physical ERD section (skip first 5 sections)
-pandoc "D:/Online PC Store System/Documentation/System Design/Docs/Tài liệu đặc tả ERD - Hệ thống bán lẻ máy tính & linh kiện trực tuyến.docx" \
-  -t markdown --wrap=none | sed -n '/^# 6\. Mô tả Physical ERD/,$p'
-
-# Step 3 — target a specific table by name
-pandoc "..." -t markdown --wrap=none \
-  | sed -n '/### Bảng: ten_bang/,/### Bảng:/p' | head -60
 ```
 
-> **Rule:** Always check `.ai/DATABASE.md` first. Only open the ERD docx when you need columns/types not listed there, or when implementing a new entity from scratch.

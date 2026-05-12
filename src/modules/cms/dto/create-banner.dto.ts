@@ -2,16 +2,17 @@ import {
   IsString,
   IsOptional,
   IsInt,
-  IsDateString,
   IsEnum,
   Min,
   MaxLength,
+  IsBoolean,
 } from 'class-validator';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 
 export const BANNER_POSITIONS = ['homepage_hero', 'homepage_hero_slider', 'homepage_small', 'side_banner', 'promotions_banner'] as const;
-export const BANNER_STATUSES = ['draft', 'active', 'scheduled', 'ended'] as const;
+export const BANNER_STATUSES = ['draft', 'active'] as const;
+export const SIDE_BANNER_PLACEMENTS = ['left', 'right'] as const;
 
 export class CreateBannerDto {
   @ApiProperty()
@@ -39,11 +40,22 @@ export class CreateBannerDto {
   @MaxLength(500)
   mobileImageUrl?: string;
 
+  @ApiPropertyOptional({ enum: SIDE_BANNER_PLACEMENTS })
+  @IsOptional()
+  @IsEnum(SIDE_BANNER_PLACEMENTS)
+  sidePlacement?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @IsString()
   @MaxLength(255)
   altText?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  @MaxLength(1000)
+  caption?: string;
 
   @ApiPropertyOptional()
   @IsOptional()
@@ -130,11 +142,7 @@ export class CreateBannerDto {
 
   @ApiPropertyOptional()
   @IsOptional()
-  @IsDateString()
-  startDate?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsDateString()
-  endDate?: string;
+  @IsBoolean()
+  @Type(() => Boolean)
+  isEnabled?: boolean;
 }
