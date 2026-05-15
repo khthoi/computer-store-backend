@@ -17,6 +17,33 @@ export type HomepageHeroMode = 'banner' | 'slider';
 export const HOMEPAGE_HERO_MODE_KEY = 'homepage_hero_mode';
 export const HOMEPAGE_HERO_MODE_DEFAULT: HomepageHeroMode = 'banner';
 
+function sanitizeFooterConfigValue(raw: string): string {
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    if (!parsed || Array.isArray(parsed)) {
+      return raw;
+    }
+
+    const brand =
+      parsed.brand &&
+      typeof parsed.brand === 'object' &&
+      !Array.isArray(parsed.brand)
+        ? (parsed.brand as Record<string, unknown>)
+        : {};
+
+    return JSON.stringify({
+      ...parsed,
+      brand: {
+        logoUrl: typeof brand.logoUrl === 'string' ? brand.logoUrl : '',
+        description:
+          typeof brand.description === 'string' ? brand.description : '',
+      },
+    });
+  } catch {
+    return raw;
+  }
+}
+
 @Injectable()
 export class SiteConfigService {
   constructor(
@@ -29,7 +56,14 @@ export class SiteConfigService {
   async findAll(): Promise<Record<string, string>> {
     return this.redisService.cache(CACHE_KEY, CACHE_TTL, async () => {
       const configs = await this.repo.find();
-      return Object.fromEntries(configs.map((c) => [c.key, c.value]));
+      return Object.fromEntries(
+        configs.map((c) => [
+          c.key,
+          c.key === 'footer_config'
+            ? sanitizeFooterConfigValue(c.value)
+            : c.value,
+        ]),
+      );
     });
   }
 
@@ -86,13 +120,24 @@ export class SiteConfigService {
   async findOne(key: string): Promise<SiteConfig> {
     const config = await this.repo.findOne({ where: { key } });
     if (!config) throw new NotFoundException(`Config '${key}' không tồn tại`);
+    if (config.key === 'footer_config') {
+      config.value = sanitizeFooterConfigValue(config.value);
+    }
     return config;
   }
 
-  async upsert(key: string, dto: UpsertSiteConfigDto, updatedById: number): Promise<SiteConfig> {
+  async upsert(
+    key: string,
+    dto: UpsertSiteConfigDto,
+    updatedById: number,
+  ): Promise<SiteConfig> {
+    const nextValue =
+      key === 'footer_config'
+        ? sanitizeFooterConfigValue(dto.value)
+        : dto.value;
     const existing = await this.repo.findOne({ where: { key } });
     await this.repo.upsert(
-      { key, value: dto.value, updatedById },
+      { key, value: nextValue, updatedById },
       { conflictPaths: ['key'], skipUpdateIfNoValuesChanged: true },
     );
     await this.redisService.invalidate(CACHE_KEY);
@@ -104,7 +149,7 @@ export class SiteConfigService {
         actionType: 'CapNhat',
         actionDetail: `Cập nhật cấu hình hệ thống "${key}"`,
         before: JSON.stringify({ key, value: existing.value }),
-        after: JSON.stringify({ key, value: dto.value }),
+        after: JSON.stringify({ key, value: nextValue }),
       });
     } else {
       this.auditLogsService.log({
@@ -113,7 +158,7 @@ export class SiteConfigService {
         entityLabel: `Cấu hình: ${key}`,
         actionType: 'TaoMoi',
         actionDetail: `Tạo cấu hình hệ thống "${key}"`,
-        after: JSON.stringify({ key, value: dto.value }),
+        after: JSON.stringify({ key, value: nextValue }),
       });
     }
     return this.findOne(key);

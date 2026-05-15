@@ -79,6 +79,21 @@ export class AdminProductsController {
     return this.searchService.findAll(query);
   }
 
+  @Get('check-slug')
+  @RequirePermission('products.read')
+  @ApiOperation({ summary: 'Kiểm tra slug sản phẩm đã tồn tại hay chưa' })
+  @ApiQuery({ name: 'slug', required: true, example: 'asus-rog-strix-rtx-4070' })
+  @ApiQuery({ name: 'excludeId', required: false, example: 12 })
+  checkSlug(
+    @Query('slug') slug: string,
+    @Query('excludeId') excludeId?: string,
+  ) {
+    return this.productsService.checkSlugExists(
+      slug,
+      excludeId ? Number(excludeId) : undefined,
+    );
+  }
+
   @Get(':productId/variants/:variantId')
   @RequirePermission('products.read')
   @ApiOperation({ summary: 'Chi tiết đầy đủ một biến thể (bao gồm thông số kỹ thuật và media)' })

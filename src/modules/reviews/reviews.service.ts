@@ -29,10 +29,18 @@ export class ReviewsService {
 
   async getApprovedReviews(productId: number, page = 1, limit = 10) {
     const offset = (page - 1) * limit;
-    const [rows, [{ total }]] = await Promise.all([
+    const [rows, [{ total }], distRows] = await Promise.all([
       this.dataSource.query(
-        `SELECT r.* FROM danh_gia_san_pham r
+        `SELECT
+          r.review_id, r.phien_ban_id, r.khach_hang_id, r.don_hang_id,
+          r.rating, r.tieu_de, r.noi_dung, r.review_status,
+          r.da_phan_hoi, r.helpful_count, r.duyet_tai, r.nguon_danh_gia,
+          r.created_at, r.updated_at,
+          v.ten_phien_ban, v.sku AS sku_phien_ban,
+          kh.ho_ten AS khach_hang_ten, kh.anh_dai_dien AS khach_hang_avatar
+         FROM danh_gia_san_pham r
          INNER JOIN phien_ban_san_pham v ON v.phien_ban_id = r.phien_ban_id
+         INNER JOIN khach_hang kh ON kh.khach_hang_id = r.khach_hang_id
          WHERE v.san_pham_id = ? AND r.review_status = 'Approved'
          ORDER BY r.created_at DESC
          LIMIT ? OFFSET ?`,
@@ -44,8 +52,29 @@ export class ReviewsService {
          WHERE v.san_pham_id = ? AND r.review_status = 'Approved'`,
         [productId],
       ),
+      this.dataSource.query(
+        `SELECT r.rating AS rating, COUNT(*) AS cnt
+         FROM danh_gia_san_pham r
+         INNER JOIN phien_ban_san_pham v ON v.phien_ban_id = r.phien_ban_id
+         WHERE v.san_pham_id = ? AND r.review_status = 'Approved'
+         GROUP BY r.rating`,
+        [productId],
+      ),
     ]);
-    return { items: rows.map((r: any) => this.rawToDto(r)), total: Number(total), page, limit };
+
+    const distribution: Record<1 | 2 | 3 | 4 | 5, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    for (const row of distRows as { rating: number; cnt: number | string }[]) {
+      const star = Number(row.rating) as 1 | 2 | 3 | 4 | 5;
+      if (star >= 1 && star <= 5) distribution[star] = Number(row.cnt);
+    }
+
+    return {
+      items: (rows as any[]).map((r) => this.rawToDto(r)),
+      total: Number(total),
+      page,
+      limit,
+      distribution,
+    };
   }
 
   // ─── Customer ─────────────────────────────────────────────────────────────
@@ -490,24 +519,28 @@ export class ReviewsService {
 
   private rawToDto(row: any): ReviewResponseDto {
     return {
-      reviewId:     row.review_id,
-      phienBanId:   row.phien_ban_id,
-      khachHangId:  row.khach_hang_id,
-      donHangId:    row.don_hang_id,
-      rating:       row.rating,
-      tieuDe:       row.tieu_de ?? null,
-      noiDung:      row.noi_dung ?? null,
-      trangThai:    row.review_status,
-      daPhanHoi:    !!row.da_phan_hoi,
-      helpfulCount: row.helpful_count ?? 0,
-      nguoiDuyetId: row.nguoi_duyet_id ?? null,
-      lyDoTuChoi:   row.ly_do_tu_choi ?? null,
-      duyetTai:     row.duyet_tai ?? null,
-      nguon:        row.nguon_danh_gia ?? 'Website',
-      sanPhamId:    row.san_pham_id ?? null,
-      skuPhienBan:  row.sku_phien_ban ?? null,
-      createdAt:    row.created_at,
-      updatedAt:    row.updated_at,
+      reviewId:        row.review_id,
+      phienBanId:      row.phien_ban_id,
+      khachHangId:     row.khach_hang_id,
+      donHangId:       row.don_hang_id,
+      rating:          row.rating,
+      tieuDe:          row.tieu_de ?? null,
+      noiDung:         row.noi_dung ?? null,
+      trangThai:       row.review_status,
+      daPhanHoi:       !!row.da_phan_hoi,
+      helpfulCount:    row.helpful_count ?? 0,
+      nguoiDuyetId:    row.nguoi_duyet_id ?? null,
+      lyDoTuChoi:      row.ly_do_tu_choi ?? null,
+      duyetTai:        row.duyet_tai ?? null,
+      nguon:           row.nguon_danh_gia ?? 'Website',
+      sanPhamId:       row.san_pham_id ?? null,
+      tenSanPham:      row.ten_san_pham ?? null,
+      tenPhienBan:     row.ten_phien_ban ?? null,
+      skuPhienBan:     row.sku_phien_ban ?? null,
+      khachHangTen:    row.khach_hang_ten ?? null,
+      khachHangAvatar: row.khach_hang_avatar ?? null,
+      createdAt:       row.created_at,
+      updatedAt:       row.updated_at,
     };
   }
 

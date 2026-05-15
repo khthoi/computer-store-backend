@@ -1,14 +1,18 @@
-import { Controller, Get, Param } from '@nestjs/common';
+import { Controller, Get, NotFoundException, Param } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
 import { CategoriesService } from './categories.service';
 import { CategoryResponseDto } from './dto/category-response.dto';
+import { SpecificationsService } from '../specifications/specifications.service';
 
 @ApiTags('Categories')
 @Public()
 @Controller('categories')
 export class CategoriesController {
-  constructor(private readonly categoriesService: CategoriesService) {}
+  constructor(
+    private readonly categoriesService: CategoriesService,
+    private readonly specsService: SpecificationsService,
+  ) {}
 
   @Get()
   @ApiOperation({ summary: 'Cây danh mục (đệ quy)' })
@@ -87,5 +91,15 @@ export class CategoriesController {
       this.categoriesService.getProductCountMap(),
     ]);
     return CategoryResponseDto.fromTree(cat, countMap);
+  }
+
+  @Get(':slug/facets')
+  @ApiOperation({ summary: 'Facet filter (storefront) theo slug danh mục' })
+  @ApiParam({ name: 'slug', description: 'Slug của danh mục', example: 'card-man-hinh' })
+  @ApiResponse({ status: 404, description: 'Danh mục không tồn tại' })
+  async findFacetsBySlug(@Param('slug') slug: string) {
+    const cat = await this.categoriesService.findBySlug(slug);
+    if (!cat) throw new NotFoundException('Danh mục không tồn tại');
+    return this.specsService.getStorefrontFacetsForCategory(cat.id);
   }
 }

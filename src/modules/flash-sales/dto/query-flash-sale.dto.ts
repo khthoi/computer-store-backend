@@ -4,7 +4,7 @@ import { ApiPropertyOptional } from '@nestjs/swagger';
 import { FlashSaleStatus } from '../entities/flash-sale.entity';
 
 export class QueryFlashSaleDto {
-  @ApiPropertyOptional({ enum: FlashSaleStatus, example: FlashSaleStatus.DANG_DIEN_RA })
+  @ApiPropertyOptional({ enum: FlashSaleStatus, example: FlashSaleStatus.ACTIVE })
   @IsOptional() @IsEnum(FlashSaleStatus)
   status?: FlashSaleStatus;
 

@@ -13,11 +13,13 @@ import { FlashSaleItem } from './flash-sale-item.entity';
 import { Employee } from '../../employees/entities/employee.entity';
 
 export enum FlashSaleStatus {
-  NHAP = 'nhap',
-  SAP_DIEN_RA = 'sap_dien_ra',
-  DANG_DIEN_RA = 'dang_dien_ra',
-  DA_KET_THUC = 'da_ket_thuc',
-  HUY = 'huy',
+  /**
+   * Admin-approved. Customer-facing visibility is additionally gated by
+   * the (batDau, ketThuc) time window — both must be satisfied.
+   */
+  ACTIVE = 'active',
+  /** Admin paused — never shown on the storefront, regardless of time window. */
+  PAUSED = 'paused',
 }
 
 @Entity('flash_sale')
@@ -33,7 +35,7 @@ export class FlashSale {
   @Column({ name: 'mo_ta', type: 'text', nullable: true })
   moTa: string | null;
 
-  @Column({ name: 'trang_thai', type: 'varchar', length: 20, default: 'nhap' })
+  @Column({ name: 'trang_thai', type: 'varchar', length: 20, default: 'active' })
   trangThai: FlashSaleStatus;
 
   @Column({ name: 'bat_dau', type: 'datetime' })

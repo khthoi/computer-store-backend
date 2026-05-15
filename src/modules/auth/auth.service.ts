@@ -23,6 +23,9 @@ import { RegisterCustomerDto } from './dto/register-customer.dto';
 import { JwtPayload } from './strategies/jwt.strategy';
 import { AuthCustomerDto } from './dto/auth-customer.dto';
 import { AuthEmployeeDto } from './dto/auth-employee.dto';
+import { AuthUserResponseDto } from './dto/auth-user-response.dto';
+import { v2 as cloudinary } from 'cloudinary';
+import type { GoogleProfilePayload } from './strategies/google.strategy';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 const ACCESS_EXPIRES_IN: any = process.env.JWT_EXPIRES_IN ?? '5h';
@@ -39,6 +42,20 @@ const REFRESH_TOKEN_TTL = parseTtlSeconds(process.env.JWT_REFRESH_EXPIRES_IN ?? 
 const REFRESH_SHORT_TOKEN_TTL = parseTtlSeconds(process.env.JWT_REFRESH_SHORT_TTL ?? '1d');
 
 const RESET_TOKEN_TTL = 24 * 3600; // 24 hours
+const MOJIBAKE_PATTERN = /(?:Ã.|Â.|Ä.|Å.|Æ.|Ð.|Ñ.|á[\u0080-\u00BF]|â[\u0080-\u00BF])/u;
+
+function normalizePossiblyMojibakeText(value?: string | null): string | undefined {
+  if (value == null || !MOJIBAKE_PATTERN.test(value)) {
+    return value ?? undefined;
+  }
+
+  try {
+    const decoded = Buffer.from(value, 'latin1').toString('utf8');
+    return decoded.includes('�') ? value : decoded;
+  } catch {
+    return value;
+  }
+}
 
 @Injectable()
 export class AuthService {
@@ -52,13 +69,19 @@ export class AuthService {
     private readonly mailService: MailService,
     private readonly auditLogsService: AuditLogsService,
     private readonly cls: ClsService,
-  ) {}
+  ) {
+    cloudinary.config({
+      cloud_name: configService.get<string>('CLOUDINARY_CLOUD_NAME'),
+      api_key: configService.get<string>('CLOUDINARY_API_KEY')?.trim(),
+      api_secret: configService.get<string>('CLOUDINARY_API_SECRET'),
+    });
+  }
 
   // ─── Validate helpers (dùng bởi Passport strategies) ─────────────────────
 
   async validateCustomer(email: string, matKhau: string): Promise<Customer | null> {
     const customer = await this.usersService.findByEmail(email);
-    if (!customer) return null;
+    if (!customer || !customer.matKhauHash) return null;
     const ok = await bcrypt.compare(matKhau, customer.matKhauHash);
     return ok ? customer : null;
   }
@@ -72,7 +95,7 @@ export class AuthService {
 
   // ─── Register ─────────────────────────────────────────────────────────────
 
-  async register(dto: RegisterCustomerDto): Promise<{ customer: AuthCustomerDto; accessToken: string; refreshToken: string }> {
+  async register(dto: RegisterCustomerDto): Promise<{ user: AuthUserResponseDto; accessToken: string; expiresIn: number; refreshToken: string }> {
     const existing = await this.usersService.findByEmail(dto.email);
     if (existing) throw new ConflictException('Email đã được đăng ký');
 
@@ -89,14 +112,14 @@ export class AuthService {
     // TODO: enqueue email verification job (Phase 6+)
 
     const tokens = await this.issueCustomerTokens(customer);
-    return { customer: this.toCustomerDto(customer), ...tokens };
+    return { user: this.toCustomerUserDto(customer), expiresIn: ACCESS_TOKEN_TTL, ...tokens };
   }
 
   // ─── Login ────────────────────────────────────────────────────────────────
 
-  async loginCustomer(customer: Customer, rememberMe = false): Promise<{ customer: AuthCustomerDto; accessToken: string; refreshToken: string }> {
+  async loginCustomer(customer: Customer, rememberMe = false): Promise<{ user: AuthUserResponseDto; accessToken: string; expiresIn: number; refreshToken: string }> {
     const tokens = await this.issueCustomerTokens(customer, rememberMe);
-    return { customer: this.toCustomerDto(customer), ...tokens };
+    return { user: this.toCustomerUserDto(customer), expiresIn: ACCESS_TOKEN_TTL, ...tokens };
   }
 
   async loginEmployee(
@@ -334,13 +357,86 @@ export class AuthService {
     await this.redisService.clearAllCustomerSessions(customerId);
   }
 
+  // ─── Google OAuth ─────────────────────────────────────────────────────────
+
+  /**
+   * Tìm hoặc tạo customer dựa trên profile Google.
+   * Chính sách: tự động link bằng email — Google đã xác minh email rồi.
+   */
+  async findOrCreateCustomerFromGoogle(profile: GoogleProfilePayload): Promise<Customer> {
+    // 1. Đã link Google trước đó?
+    const byGoogleId = await this.usersService.findByGoogleId(profile.providerUserId);
+    if (byGoogleId) return byGoogleId;
+
+    // 2. Có account email/password sẵn → tự link.
+    const byEmail = await this.usersService.findByEmail(profile.email);
+    if (byEmail) {
+      const fullCustomer = await this.usersService.findByIdRaw(byEmail.id);
+      if (!fullCustomer) throw new UnauthorizedException();
+      fullCustomer.googleId = profile.providerUserId;
+      if (!fullCustomer.xacMinhEmail) fullCustomer.xacMinhEmail = true;
+      if (!fullCustomer.anhDaiDien && profile.picture) {
+        fullCustomer.anhDaiDien = await this.uploadGoogleAvatar(profile.picture, fullCustomer.id);
+      }
+      return this.usersService.saveCustomer(fullCustomer);
+    }
+
+    // 3. Tạo mới — không có matKhauHash, đã verify email.
+    const avatarUrl = profile.picture ? await this.uploadGoogleAvatar(profile.picture, null) : null;
+    return this.usersService.create({
+      email: profile.email,
+      hoTen: profile.fullName,
+      googleId: profile.providerUserId,
+      matKhauHash: null,
+      xacMinhEmail: true,
+      trangThai: 'HoatDong',
+      anhDaiDien: avatarUrl,
+    });
+  }
+
+  /**
+   * Đăng nhập sau khi đã có Customer từ Google — issue tokens và trả về DTO.
+   */
+  async loginWithGoogle(customer: Customer): Promise<{ user: AuthUserResponseDto; accessToken: string; expiresIn: number; refreshToken: string }> {
+    const tokens = await this.issueCustomerTokens(customer, true);
+    return { user: this.toCustomerUserDto(customer), expiresIn: ACCESS_TOKEN_TTL, ...tokens };
+  }
+
+  /** Tải avatar Google → upload lên Cloudinary, trả về secure URL. */
+  private async uploadGoogleAvatar(remoteUrl: string, customerId: number | null): Promise<string | null> {
+    try {
+      const folder = `customer-avatars/google${customerId ? `/${customerId}` : ''}`;
+      const result = await cloudinary.uploader.upload(remoteUrl, {
+        folder,
+        resource_type: 'image',
+        overwrite: true,
+        invalidate: true,
+      });
+      return result.secure_url ?? null;
+    } catch {
+      // Cloudinary lỗi → trả URL gốc thay vì fail toàn bộ flow OAuth
+      return remoteUrl;
+    }
+  }
+
   // ─── Response mappers ─────────────────────────────────────────────────────
+
+  private toCustomerUserDto(customer: Customer): AuthUserResponseDto {
+    return {
+      id: String(customer.id),
+      email: customer.email,
+      name: normalizePossiblyMojibakeText(customer.hoTen) ?? customer.hoTen,
+      phone: customer.soDienThoai,
+      avatarUrl: customer.anhDaiDien,
+      role: 'customer',
+    };
+  }
 
   private toCustomerDto(customer: Customer): AuthCustomerDto {
     return {
       id: customer.id,
       email: customer.email,
-      hoTen: customer.hoTen,
+      hoTen: normalizePossiblyMojibakeText(customer.hoTen) ?? customer.hoTen,
       soDienThoai: customer.soDienThoai,
       gioiTinh: customer.gioiTinh,
       ngaySinh: customer.ngaySinh,
@@ -358,7 +454,7 @@ export class AuthService {
       id: String(employee.id),
       code: employee.maNhanVien,
       email: employee.email,
-      fullName: employee.hoTen,
+      fullName: normalizePossiblyMojibakeText(employee.hoTen) ?? employee.hoTen,
       avatar: employee.anhDaiDien ?? null,
       roles: employee.roles?.map((r) => r.tenVaiTro) ?? [],
     };

@@ -294,6 +294,14 @@ export class UsersService {
     return this.customerRepo.save(customer);
   }
 
+  async findByGoogleId(googleId: string): Promise<Customer | null> {
+    return this.customerRepo.findOne({ where: { googleId } });
+  }
+
+  async saveCustomer(customer: Customer): Promise<Customer> {
+    return this.customerRepo.save(customer);
+  }
+
   // ─── Admin full profile update ────────────────────────────────────────────
 
   async adminUpdateFull(id: number, dto: AdminUpdateCustomerDto): Promise<CustomerDetailResponseDto> {

@@ -1,6 +1,6 @@
-import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException, OnModuleInit, Logger } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { DataSource, In, LessThanOrEqual, Repository } from 'typeorm';
+import { DataSource, In, Repository } from 'typeorm';
 import { FlashSale, FlashSaleStatus } from './entities/flash-sale.entity';
 import { FlashSaleItem } from './entities/flash-sale-item.entity';
 import { ProductVariant } from '../products/entities/product-variant.entity';
@@ -20,7 +20,34 @@ import { AuditLogsService } from '../audit-logs/audit-logs.service';
 const VARIANT_RELATIONS = ['items', 'items.phienBan', 'items.phienBan.product', 'items.phienBan.images', 'createdByEmployee'];
 
 @Injectable()
-export class FlashSalesService {
+export class FlashSalesService implements OnModuleInit {
+  private readonly logger = new Logger(FlashSalesService.name);
+
+  /**
+   * One-shot data migration: legacy status values (nhap / sap_dien_ra /
+   * dang_dien_ra / da_ket_thuc / huy) are mapped to the new active/paused
+   * scheme. Idempotent — running on a fresh DB is a no-op.
+   */
+  async onModuleInit() {
+    try {
+      const result = await this.dataSource.query(
+        `UPDATE flash_sale
+            SET trang_thai = CASE
+                WHEN trang_thai IN ('nhap', 'huy') THEN 'paused'
+                WHEN trang_thai IN ('sap_dien_ra', 'dang_dien_ra', 'da_ket_thuc') THEN 'active'
+                ELSE trang_thai
+            END
+          WHERE trang_thai NOT IN ('active', 'paused')`,
+      );
+      const affected = (result as { affectedRows?: number }).affectedRows ?? 0;
+      if (affected > 0) {
+        this.logger.log(`Migrated ${affected} flash_sale row(s) to new status scheme`);
+      }
+    } catch (err) {
+      this.logger.warn(`Flash sale status migration skipped: ${(err as Error).message}`);
+    }
+  }
+
   constructor(
     @InjectRepository(FlashSale)
     private readonly flashSaleRepo: Repository<FlashSale>,
@@ -43,7 +70,7 @@ export class FlashSalesService {
       bannerAlt: dto.bannerAlt ?? null,
       assetIdBanner: dto.assetIdBanner ?? null,
       createdBy,
-      trangThai: dto.trangThai ?? FlashSaleStatus.NHAP,
+      trangThai: dto.trangThai ?? FlashSaleStatus.ACTIVE,
     });
     const saved = await this.flashSaleRepo.save(flashSale);
 
@@ -95,6 +122,10 @@ export class FlashSalesService {
     return this.toDto(fs);
   }
 
+  /**
+   * Customer-facing: returns the flash sale that is BOTH approved (status='active')
+   * AND currently within its time window. Returns null when no such event exists.
+   */
   async findActive(): Promise<FlashSaleResponseDto | null> {
     const now = new Date();
     const fs = await this.flashSaleRepo
@@ -103,7 +134,7 @@ export class FlashSalesService {
       .leftJoinAndSelect('items.phienBan', 'pv')
       .leftJoinAndSelect('pv.product', 'p')
       .leftJoinAndSelect('pv.images', 'img')
-      .where('fs.trangThai = :status', { status: FlashSaleStatus.DANG_DIEN_RA })
+      .where('fs.trangThai = :status', { status: FlashSaleStatus.ACTIVE })
       .andWhere('fs.batDau <= :now', { now })
       .andWhere('fs.ketThuc >= :now', { now })
       .orderBy('fs.batDau', 'DESC')
@@ -117,7 +148,7 @@ export class FlashSalesService {
       .createQueryBuilder('fsi')
       .innerJoin('fsi.flashSale', 'fs')
       .where('fsi.phienBanId = :phienBanId', { phienBanId })
-      .andWhere('fs.trangThai = :status', { status: FlashSaleStatus.DANG_DIEN_RA })
+      .andWhere('fs.trangThai = :status', { status: FlashSaleStatus.ACTIVE })
       .andWhere('fs.batDau <= :now', { now })
       .andWhere('fs.ketThuc >= :now', { now })
       .andWhere('fsi.soLuongDaBan < fsi.soLuongGioiHan')
@@ -127,9 +158,20 @@ export class FlashSalesService {
   async update(id: number, dto: UpdateFlashSaleDto): Promise<FlashSaleResponseDto> {
     const fs = await this.flashSaleRepo.findOne({ where: { id } });
     if (!fs) throw new NotFoundException(`Flash sale #${id} không tồn tại`);
-    if (fs.trangThai === FlashSaleStatus.DANG_DIEN_RA) {
-      throw new BadRequestException('Không thể sửa flash sale đang diễn ra');
+
+    // Block edits while the event is live and customer-visible. Pause first
+    // (status='paused') to modify items/prices without surprising shoppers.
+    const now = new Date();
+    const isLiveNow =
+      fs.trangThai === FlashSaleStatus.ACTIVE &&
+      fs.batDau <= now &&
+      fs.ketThuc >= now;
+    if (isLiveNow && dto.items !== undefined) {
+      throw new BadRequestException(
+        'Flash sale đang diễn ra trên storefront — vui lòng tạm dừng trước khi sửa danh sách sản phẩm',
+      );
     }
+
     const label = fs.ten;
     const beforeSnapshot = { ten: fs.ten, trangThai: fs.trangThai, batDau: fs.batDau, ketThuc: fs.ketThuc };
     const { items, ...fsFields } = dto;
@@ -167,38 +209,47 @@ export class FlashSalesService {
     return this.findOne(id);
   }
 
-  async cancel(id: number): Promise<void> {
+  /**
+   * Pause a flash sale (admin-side action). The event will not appear on the
+   * storefront until reactivated. Time window remains as configured.
+   */
+  async pause(id: number): Promise<FlashSaleResponseDto> {
     const fs = await this.flashSaleRepo.findOne({ where: { id } });
     if (!fs) throw new NotFoundException(`Flash sale #${id} không tồn tại`);
-    const oldStatus = fs.trangThai;
-    await this.flashSaleRepo.update(id, { trangThai: FlashSaleStatus.HUY });
-    this.auditLogsService.log({
-      entityType: 'FlashSale',
-      entityId: String(id),
-      entityLabel: fs.ten,
-      actionType: 'DoiTrangThai',
-      actionDetail: `Đổi trạng thái ${oldStatus} → ${FlashSaleStatus.HUY}`,
-      before: JSON.stringify({ trangThai: oldStatus }),
-      after: JSON.stringify({ trangThai: FlashSaleStatus.HUY }),
-    });
-  }
-
-  async endEarly(id: number): Promise<FlashSaleResponseDto> {
-    const fs = await this.flashSaleRepo.findOne({ where: { id } });
-    if (!fs) throw new NotFoundException(`Flash sale #${id} không tồn tại`);
-    if (fs.trangThai === FlashSaleStatus.DA_KET_THUC || fs.trangThai === FlashSaleStatus.HUY) {
-      throw new BadRequestException('Flash sale đã kết thúc hoặc bị hủy');
+    if (fs.trangThai === FlashSaleStatus.PAUSED) {
+      throw new BadRequestException('Flash sale đã ở trạng thái tạm dừng');
     }
     const oldStatus = fs.trangThai;
-    await this.flashSaleRepo.update(id, { trangThai: FlashSaleStatus.DA_KET_THUC });
+    await this.flashSaleRepo.update(id, { trangThai: FlashSaleStatus.PAUSED });
     this.auditLogsService.log({
       entityType: 'FlashSale',
       entityId: String(id),
       entityLabel: fs.ten,
       actionType: 'DoiTrangThai',
-      actionDetail: `Đổi trạng thái ${oldStatus} → ${FlashSaleStatus.DA_KET_THUC}`,
+      actionDetail: `Đổi trạng thái ${oldStatus} → ${FlashSaleStatus.PAUSED}`,
       before: JSON.stringify({ trangThai: oldStatus }),
-      after: JSON.stringify({ trangThai: FlashSaleStatus.DA_KET_THUC }),
+      after: JSON.stringify({ trangThai: FlashSaleStatus.PAUSED }),
+    });
+    return this.findOne(id);
+  }
+
+  /** Reactivate a paused flash sale. */
+  async activate(id: number): Promise<FlashSaleResponseDto> {
+    const fs = await this.flashSaleRepo.findOne({ where: { id } });
+    if (!fs) throw new NotFoundException(`Flash sale #${id} không tồn tại`);
+    if (fs.trangThai === FlashSaleStatus.ACTIVE) {
+      throw new BadRequestException('Flash sale đã ở trạng thái hoạt động');
+    }
+    const oldStatus = fs.trangThai;
+    await this.flashSaleRepo.update(id, { trangThai: FlashSaleStatus.ACTIVE });
+    this.auditLogsService.log({
+      entityType: 'FlashSale',
+      entityId: String(id),
+      entityLabel: fs.ten,
+      actionType: 'DoiTrangThai',
+      actionDetail: `Đổi trạng thái ${oldStatus} → ${FlashSaleStatus.ACTIVE}`,
+      before: JSON.stringify({ trangThai: oldStatus }),
+      after: JSON.stringify({ trangThai: FlashSaleStatus.ACTIVE }),
     });
     return this.findOne(id);
   }
@@ -209,9 +260,19 @@ export class FlashSalesService {
     const tomorrow = new Date(today.getTime() + 86_400_000);
     const [totalEvents, activeNow, upcomingCount, todayCount] = await Promise.all([
       this.flashSaleRepo.count(),
-      this.flashSaleRepo.count({ where: { trangThai: FlashSaleStatus.DANG_DIEN_RA } }),
-      this.flashSaleRepo.count({ where: { trangThai: FlashSaleStatus.SAP_DIEN_RA } }),
-      this.flashSaleRepo.createQueryBuilder('fs')
+      this.flashSaleRepo
+        .createQueryBuilder('fs')
+        .where('fs.trangThai = :s', { s: FlashSaleStatus.ACTIVE })
+        .andWhere('fs.batDau <= :now', { now })
+        .andWhere('fs.ketThuc >= :now', { now })
+        .getCount(),
+      this.flashSaleRepo
+        .createQueryBuilder('fs')
+        .where('fs.trangThai = :s', { s: FlashSaleStatus.ACTIVE })
+        .andWhere('fs.batDau > :now', { now })
+        .getCount(),
+      this.flashSaleRepo
+        .createQueryBuilder('fs')
         .where('fs.batDau >= :today AND fs.batDau < :tomorrow', { today, tomorrow })
         .getCount(),
     ]);
@@ -244,48 +305,6 @@ export class FlashSalesService {
         trangThai: pv.trangThai,
         tonKho: pv.stockLevel?.soLuongTon ?? 0,
       };
-    });
-  }
-
-  async activateScheduled(): Promise<void> {
-    const now = new Date();
-    const toActivate = await this.flashSaleRepo.find({
-      where: { trangThai: FlashSaleStatus.SAP_DIEN_RA, batDau: LessThanOrEqual(now) },
-      select: ['id', 'ten'],
-    });
-    if (toActivate.length === 0) return;
-    await this.flashSaleRepo.createQueryBuilder().update()
-      .set({ trangThai: FlashSaleStatus.DANG_DIEN_RA })
-      .where('trang_thai = :s AND bat_dau <= :now', { s: FlashSaleStatus.SAP_DIEN_RA, now })
-      .execute();
-    this.auditLogsService.log({
-      entityType: 'FlashSale',
-      entityId: 'batch',
-      entityLabel: `${toActivate.length} flash sale(s)`,
-      actionType: 'DoiTrangThai',
-      actionDetail: `Scheduler kích hoạt ${toActivate.length} flash sale: ${toActivate.map((f) => f.ten).join(', ')}`,
-      after: JSON.stringify({ trangThai: FlashSaleStatus.DANG_DIEN_RA, ids: toActivate.map((f) => f.id) }),
-    });
-  }
-
-  async endExpired(): Promise<void> {
-    const now = new Date();
-    const toEnd = await this.flashSaleRepo.find({
-      where: { trangThai: FlashSaleStatus.DANG_DIEN_RA, ketThuc: LessThanOrEqual(now) },
-      select: ['id', 'ten'],
-    });
-    if (toEnd.length === 0) return;
-    await this.flashSaleRepo.createQueryBuilder().update()
-      .set({ trangThai: FlashSaleStatus.DA_KET_THUC })
-      .where('trang_thai = :s AND ket_thuc < :now', { s: FlashSaleStatus.DANG_DIEN_RA, now })
-      .execute();
-    this.auditLogsService.log({
-      entityType: 'FlashSale',
-      entityId: 'batch',
-      entityLabel: `${toEnd.length} flash sale(s)`,
-      actionType: 'DoiTrangThai',
-      actionDetail: `Scheduler kết thúc ${toEnd.length} flash sale hết hạn: ${toEnd.map((f) => f.ten).join(', ')}`,
-      after: JSON.stringify({ trangThai: FlashSaleStatus.DA_KET_THUC, ids: toEnd.map((f) => f.id) }),
     });
   }
 

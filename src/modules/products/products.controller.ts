@@ -81,38 +81,48 @@ export class ProductsController {
   })
   @ApiResponse({ status: 404, description: 'Biến thể sản phẩm không tồn tại' })
   findSpecsByVariant(@Param('id', ParseIntPipe) id: number) {
-    return this.specsService.findValuesByVariant(id);
+    return this.specsService.getGroupedSpecsByVariant(id);
   }
 
   @Get(':slug')
-  @ApiOperation({ summary: 'Chi tiết sản phẩm theo slug' })
+  @ApiOperation({ summary: 'Chi tiết sản phẩm theo slug (storefront)' })
   @ApiParam({ name: 'slug', description: 'Slug của sản phẩm', example: 'asus-rog-strix-rtx-4070' })
   @ApiOkResponse({
     schema: {
       example: {
-        id: 1,
+        id: '1',
         name: 'ASUS ROG Strix GeForce RTX 4070',
         slug: 'asus-rog-strix-rtx-4070',
-        description: 'Card màn hình cao cấp dòng ROG với VRAM 12GB GDDR6X, hiệu năng vượt trội cho gaming 1440p.',
-        brand: { id: 2, name: 'ASUS', logo: 'https://res.cloudinary.com/demo/image/upload/asus-logo.png' },
-        category: { id: 3, name: 'Card màn hình', slug: 'card-man-hinh' },
+        code: 'SP-001',
+        sku: 'ROG-RTX4070-12G',
+        shortDescription: 'Card màn hình cao cấp dòng ROG',
+        descriptionHtml: '<p>Card màn hình cao cấp...</p>',
+        warrantyPolicy: 'Bảo hành 36 tháng',
+        averageRating: 4.5,
+        reviewCount: 128,
+        status: 'published',
+        defaultVariantId: '5',
+        category: { id: '3', name: 'Card màn hình', slug: 'card-man-hinh' },
+        brand:    { id: '2', name: 'ASUS', slug: 'asus', logo: 'https://.../asus.png' },
         variants: [
           {
-            id: 5,
-            sku: 'ROG-RTX4070-12G',
-            name: 'RTX 4070 12GB',
-            price: 20500000,
-            stock: 14,
-            isDefault: true,
-            images: ['https://res.cloudinary.com/demo/image/upload/rog-rtx4070-1.jpg'],
+            id: '5', sku: 'ROG-RTX4070-12G', name: 'RTX 4070 12GB',
+            description: 'Phiên bản 12GB GDDR6X',
+            originalPrice: 22000000, salePrice: 20500000, stock: 14,
+            weight: 1.2, warrantyPolicy: null, warrantyMonths: 36,
+            status: 'visible', isDefault: true,
+            images: [
+              { id: '11', url: 'https://.../rog-rtx4070-1.jpg', alt: null, type: 'main', order: 0 },
+            ],
           },
         ],
         createdAt: '2024-01-15T08:00:00.000Z',
+        updatedAt: '2024-01-15T08:00:00.000Z',
       },
     },
   })
   @ApiResponse({ status: 404, description: 'Sản phẩm không tồn tại' })
   findBySlug(@Param('slug') slug: string) {
-    return this.productsService.findBySlug(slug);
+    return this.productsService.findPublicDetailBySlug(slug);
   }
 }

@@ -79,4 +79,11 @@ export class SpecificationsController {
   findGroupsByCategory(@Param('id', ParseIntPipe) id: number) {
     return this.specsService.findGroupsByCategory(id);
   }
+
+  @Get('categories/:id/facets')
+  @ApiOperation({ summary: 'Facet filter (storefront) theo danh mục' })
+  @ApiParam({ name: 'id', description: 'ID của danh mục', example: 3 })
+  findFacetsByCategory(@Param('id', ParseIntPipe) id: number) {
+    return this.specsService.getStorefrontFacetsForCategory(id);
+  }
 }

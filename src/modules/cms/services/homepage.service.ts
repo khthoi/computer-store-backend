@@ -89,7 +89,11 @@ export class HomepageService {
     const before = await this.findOneEntity(id);
     const { items, ...sectionData } = dto;
     await this.sectionRepo.update(id, sectionData);
-    if (items !== undefined) {
+    const switchedAwayFromManual = dto.type !== undefined && dto.type !== 'manual';
+
+    if (switchedAwayFromManual) {
+      await this.itemRepo.delete({ sectionId: id });
+    } else if (items !== undefined) {
       await this.itemRepo.delete({ sectionId: id });
       if (items.length) {
         const sectionItems = items.map((item, idx) =>

@@ -1,17 +1,22 @@
 import {
-  Controller, Get, Post, Body, Query, Request,
+  Controller, Get, Post, Body, Query, Request, Param, ParseIntPipe,
 } from '@nestjs/common';
 import {
   ApiTags, ApiOperation, ApiOkResponse, ApiQuery, ApiBearerAuth,
 } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
 import { SearchService } from './search.service';
+import { SearchSuggestionsService } from './search-suggestions.service';
 import { SearchQueryDto } from './dto/search-query.dto';
+import { QuickSuggestionResponseDto } from './dto/search-response.dto';
 
 @ApiTags('Search')
 @Controller('search')
 export class SearchController {
-  constructor(private readonly searchService: SearchService) {}
+  constructor(
+    private readonly searchService: SearchService,
+    private readonly suggestionsService: SearchSuggestionsService,
+  ) {}
 
   @Get()
   @Public()
@@ -36,17 +41,28 @@ export class SearchController {
 
   @Get('suggestions')
   @Public()
-  @ApiOperation({ summary: 'Gợi ý tìm kiếm (autocomplete)' })
-  @ApiQuery({ name: 'q', required: true, example: 'intel' })
-  @ApiOkResponse({
-    schema: {
-      example: [
-        { id: 1, name: 'Intel Core i9-14900K', slug: 'cpu-intel-core-i9-14900k' },
-      ],
-    },
+  @ApiOperation({
+    summary: 'Gợi ý tìm kiếm gom nhóm (products + variants + brands + categories)',
   })
-  suggestions(@Query('q') q: string) {
-    return this.searchService.suggestions(q ?? '');
+  @ApiQuery({ name: 'q', required: true, example: 'intel' })
+  @ApiOkResponse({ type: QuickSuggestionResponseDto })
+  suggestions(@Query('q') q: string): Promise<QuickSuggestionResponseDto> {
+    return this.suggestionsService.quickSuggestions(q ?? '');
+  }
+
+  @Get('products/:productId/variants')
+  @Public()
+  @ApiOperation({ summary: 'Lấy danh sách phiên bản của một sản phẩm cho dropdown gợi ý' })
+  @ApiQuery({ name: 'limit', required: false, example: 10 })
+  getProductVariants(
+    @Param('productId', ParseIntPipe) productId: number,
+    @Query('limit') limit?: string,
+  ) {
+    const parsed = limit ? Number.parseInt(limit, 10) : undefined;
+    return this.suggestionsService.getProductVariants(
+      productId,
+      Number.isFinite(parsed) ? (parsed as number) : undefined,
+    );
   }
 
   @Post('history')

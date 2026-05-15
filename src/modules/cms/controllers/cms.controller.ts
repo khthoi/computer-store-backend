@@ -30,6 +30,7 @@ import { HomepageService } from '../services/homepage.service';
 import { MenuService } from '../services/menu.service';
 import { PagesService } from '../services/pages.service';
 import { PopupsService } from '../services/popups.service';
+import { AnnouncementBarsService } from '../services/announcement-bars.service';
 import { SiteConfigService } from '../services/site-config.service';
 
 @ApiTags('CMS')
@@ -43,6 +44,7 @@ export class CmsController {
     private readonly faqService: FaqService,
     private readonly menuService: MenuService,
     private readonly popupsService: PopupsService,
+    private readonly announcementBarsService: AnnouncementBarsService,
     private readonly siteConfigService: SiteConfigService,
   ) {}
 
@@ -278,19 +280,22 @@ export class CmsController {
   }
 
   @Get('faq')
-  @ApiOperation({ summary: 'Danh sach FAQ theo nhom' })
+  @ApiOperation({ summary: 'Danh sách FAQ công khai theo nhóm (đã lọc ẩn, sắp xếp)' })
   @ApiOkResponse({
     schema: {
       example: [
         {
-          id: 1,
-          title: 'Van chuyen va Giao hang',
+          id: '1',
+          name: 'Vận chuyển và Giao hàng',
+          slug: 'van-chuyen-giao-hang',
+          description: 'Thông tin về thời gian, phí và theo dõi đơn hàng.',
+          icon: 'TruckIcon',
           sortOrder: 1,
           items: [
             {
-              id: 1,
-              question: 'Bao lau de nhan duoc hang?',
-              answer: '3-5 ngay lam viec',
+              id: '1',
+              question: 'Bao lâu để nhận được hàng?',
+              answer: '<p>3-5 ngày làm việc tuỳ khu vực.</p>',
               helpfulCount: 12,
             },
           ],
@@ -360,6 +365,30 @@ export class CmsController {
   })
   getActivePopups() {
     return this.popupsService.findActive();
+  }
+
+  @Get('announcement-bars')
+  @ApiOperation({ summary: 'Thanh thông báo đang hoạt động' })
+  @ApiOkResponse({
+    schema: {
+      example: [
+        {
+          id: '1',
+          name: 'Free ship toàn quốc',
+          position: 'top',
+          content: 'Miễn phí vận chuyển cho đơn hàng trên 500.000đ',
+          backgroundColor: '#0F172A',
+          textColor: '#FFFFFF',
+          showCloseButton: true,
+          isScrolling: false,
+          linkUrl: '/promotions',
+          linkLabel: 'Xem ngay',
+        },
+      ],
+    },
+  })
+  getActiveAnnouncementBars() {
+    return this.announcementBarsService.findActive();
   }
 
   @Get('site-config')

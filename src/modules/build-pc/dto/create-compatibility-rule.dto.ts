@@ -14,10 +14,10 @@ export class CreateCompatibilityRuleDto {
   @Type(() => Number)
   slotNguonId: number;
 
-  @ApiProperty({ maxLength: 50, description: 'Tech key (maps to maKtNguon + maKtDich)' })
+  @ApiProperty({ maxLength: 50, description: 'Mã kỹ thuật của thông số ở slot nguồn (vd. socket)' })
   @IsString()
   @MaxLength(50)
-  maKyThuat: string;
+  maKtNguon: string;
 
   @ApiPropertyOptional({ minimum: 1 })
   @IsOptional()
@@ -25,6 +25,12 @@ export class CreateCompatibilityRuleDto {
   @Min(1)
   @Type(() => Number)
   slotDichId?: number;
+
+  @ApiPropertyOptional({ maxLength: 50, description: 'Mã kỹ thuật của thông số ở slot đích (vd. mb_socket). Bắt buộc khi slotDichId có giá trị.' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(50)
+  maKtDich?: string;
 
   @ApiProperty({ enum: ['exact_match', 'contains', 'min_sum', 'min_value'] })
   @IsIn(['exact_match', 'contains', 'min_sum', 'min_value'])

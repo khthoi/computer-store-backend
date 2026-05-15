@@ -16,6 +16,9 @@ import { AuditLogsModule } from '../audit-logs/audit-logs.module';
 import { BannersService } from './services/banners.service';
 import { HomepageService } from './services/homepage.service';
 import { HomepagePreviewService } from './services/homepage-preview.service';
+import { StorefrontHomeService } from './services/storefront-home.service';
+import { FlashSalesModule } from '../flash-sales/flash-sales.module';
+import { PromotionsModule } from '../promotions/promotions.module';
 import { PagesService } from './services/pages.service';
 import { FaqService } from './services/faq.service';
 import { MenuService } from './services/menu.service';
@@ -27,6 +30,7 @@ import { AdminCmsController } from './controllers/admin-cms.controller';
 import { AdminCmsHomepageController } from './controllers/admin-cms-homepage.controller';
 import { AdminCmsContentController } from './controllers/admin-cms-content.controller';
 import { AdminCmsAnnouncementsController } from './controllers/admin-cms-announcements.controller';
+import { StorefrontHomeController } from './controllers/storefront-home.controller';
 
 @Module({
   imports: [
@@ -45,6 +49,8 @@ import { AdminCmsAnnouncementsController } from './controllers/admin-cms-announc
     ]),
     RedisModule,
     AuditLogsModule,
+    FlashSalesModule,
+    PromotionsModule,
   ],
   controllers: [
     CmsController,
@@ -52,11 +58,13 @@ import { AdminCmsAnnouncementsController } from './controllers/admin-cms-announc
     AdminCmsHomepageController,
     AdminCmsContentController,
     AdminCmsAnnouncementsController,
+    StorefrontHomeController,
   ],
   providers: [
     BannersService,
     HomepageService,
     HomepagePreviewService,
+    StorefrontHomeService,
     PagesService,
     FaqService,
     MenuService,

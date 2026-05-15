@@ -46,9 +46,9 @@ export class CreateSpecTypeDto {
   @IsBoolean()
   coTheLoc?: boolean;
 
-  @ApiPropertyOptional({ enum: ['checkbox', 'range', 'toggle', 'select', 'combo-select'] })
+  @ApiPropertyOptional({ enum: ['checkbox', 'range', 'toggle', 'select'] })
   @IsOptional()
-  @IsIn(['checkbox', 'range', 'toggle', 'select', 'combo-select'])
+  @IsIn(['checkbox', 'range', 'toggle', 'select'])
   widgetLoc?: string;
 
   @ApiPropertyOptional({ default: 0 })

@@ -23,6 +23,20 @@ export class AnnouncementBarsService {
     return bars.map(AnnouncementBarResponseDto.fromEntity);
   }
 
+  async findActive(): Promise<AnnouncementBarResponseDto[]> {
+    const now = new Date();
+    const bars = await this.repo
+      .createQueryBuilder('b')
+      .leftJoinAndSelect('b.createdByEmployee', 'emp')
+      .where('b.status = :status', { status: BarStatus.ACTIVE })
+      .andWhere('(b.startDate IS NULL OR b.startDate <= :now)', { now })
+      .andWhere('(b.endDate IS NULL OR b.endDate >= :now)', { now })
+      .orderBy('b.position', 'ASC')
+      .addOrderBy('b.updatedAt', 'DESC')
+      .getMany();
+    return bars.map(AnnouncementBarResponseDto.fromEntity);
+  }
+
   async findOne(id: number): Promise<AnnouncementBarResponseDto> {
     const bar = await this.repo.findOne({
       where: { id },

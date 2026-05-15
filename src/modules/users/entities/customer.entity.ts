@@ -29,8 +29,12 @@ export class Customer {
   @Column({ name: 'ho_ten', length: 255 })
   hoTen: string;
 
-  @Column({ name: 'mat_khau_hash', length: 255, select: false })
-  matKhauHash: string;
+  @Column({ name: 'mat_khau_hash', length: 255, select: false, nullable: true })
+  matKhauHash: string | null;
+
+  @Column({ name: 'google_id', length: 64, nullable: true })
+  @Index('uq_kh_google_id', { unique: true })
+  googleId: string | null;
 
   @Column({ name: 'ngay_sinh', type: 'date', nullable: true })
   ngaySinh: Date | null;

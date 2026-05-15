@@ -4,9 +4,11 @@ import { JwtModule } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { AuthService } from './auth.service';
 import { AuthController } from './auth.controller';
+import { GoogleOAuthController } from './google-oauth.controller';
 import { JwtStrategy } from './strategies/jwt.strategy';
 import { LocalCustomerStrategy } from './strategies/local-customer.strategy';
 import { LocalEmployeeStrategy } from './strategies/local-employee.strategy';
+import { GoogleStrategy } from './strategies/google.strategy';
 import { UsersModule } from '../users/users.module';
 import { EmployeesModule } from '../employees/employees.module';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
@@ -26,8 +28,8 @@ import { AuditLogsModule } from '../audit-logs/audit-logs.module';
     EmployeesModule,
     AuditLogsModule,
   ],
-  controllers: [AuthController],
-  providers: [AuthService, JwtStrategy, LocalCustomerStrategy, LocalEmployeeStrategy],
+  controllers: [AuthController, GoogleOAuthController],
+  providers: [AuthService, JwtStrategy, LocalCustomerStrategy, LocalEmployeeStrategy, GoogleStrategy],
   exports: [AuthService, JwtModule],
 })
 export class AuthModule {}

@@ -81,9 +81,20 @@ export class HomepagePreviewService {
 
     if (!hasScope) return [];
 
-    // One row per product: only show the default variant, unless specific variants were scoped
+    // One row per product: prefer the default variant; fall back to the first
+    // visible variant when no variant has been flagged as default.
+    // (Hard `is_mac_dinh = true` filter would silently hide products that were
+    // imported without explicitly setting a default variant.)
     if (!skipDefaultVariantFilter) {
-      qb.andWhere('v.is_mac_dinh = :isMacDinh', { isMacDinh: true });
+      qb.andWhere(
+        `v.phien_ban_id = (
+          SELECT _v.phien_ban_id FROM phien_ban_san_pham _v
+          WHERE _v.san_pham_id = sp.san_pham_id
+            AND _v.trang_thai = 'HienThi'
+          ORDER BY _v.is_mac_dinh DESC, _v.phien_ban_id ASC
+          LIMIT 1
+        )`,
+      );
     }
 
     const rows = await qb.limit(maxProducts).getRawMany<RawPreviewRow>();

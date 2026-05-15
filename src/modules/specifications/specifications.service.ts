@@ -443,11 +443,310 @@ export class SpecificationsService {
     return this.valueRepo.find({ where: { phienBanId }, order: { loaiThongSoId: 'ASC' } });
   }
 
+  async getGroupedSpecsByVariant(
+    phienBanId: number,
+  ): Promise<{ groupName: string; specs: { name: string; value: string; unit: string | null }[] }[]> {
+    const values = await this.valueRepo.find({
+      where: { phienBanId },
+      relations: ['loaiThongSo', 'loaiThongSo.group'],
+    });
+    if (!values.length) return [];
+
+    const groupMap = new Map<
+      number,
+      { groupName: string; specs: { name: string; value: string; unit: string | null; order: number }[] }
+    >();
+
+    for (const v of values) {
+      const type = v.loaiThongSo;
+      if (!type || !type.group) continue;
+      const groupId = type.group.id;
+      if (!groupMap.has(groupId)) {
+        groupMap.set(groupId, { groupName: type.group.tenNhom, specs: [] });
+      }
+      groupMap.get(groupId)!.specs.push({
+        name: type.tenLoai,
+        value: v.giaTriThongSo,
+        unit: type.donVi ?? null,
+        order: type.thuTuHienThi ?? 0,
+      });
+    }
+
+    return Array.from(groupMap.values()).map((g) => ({
+      groupName: g.groupName,
+      specs: g.specs
+        .sort((a, b) => a.order - b.order)
+        .map(({ name, value, unit }) => ({ name, value, unit })),
+    }));
+  }
+
   async saveSpecValues(phienBanId: number, dto: SaveSpecValuesDto): Promise<SpecValue[]> {
     const filled = dto.specs.filter((item) => item.giaTriThongSo?.trim());
     await this.valueRepo.delete({ phienBanId });
     if (!filled.length) return [];
     return this.valueRepo.save(filled.map((item) => this.valueRepo.create({ phienBanId, ...item })));
+  }
+
+  /**
+   * Storefront facet view — list of filterable groups + types for one category.
+   * Resolves inheritance via getResolvedSpecGroupsView and enriches each
+   * filterable type with options (DISTINCT giaTriChuan/giaTriThongSo + COUNT)
+   * for checkbox/select, or {min,max} for range widgets.
+   */
+  async getStorefrontFacetsForCategory(categoryId: number): Promise<
+    Array<{
+      id: string;
+      label: string;
+      displayOrder: number;
+      types: Array<{
+        key: string;
+        specTypeId: number;
+        label: string;
+        unit: string | null;
+        widget: string;
+        displayOrder: number;
+        options?: { value: string; label: string; count: number }[];
+        min?: number;
+        max?: number;
+        step?: number;
+      }>;
+    }>
+  > {
+    // Build ancestor path: [root, ..., categoryId]
+    const pathIds: number[] = [];
+    let cur: number | null = categoryId;
+    for (let i = 0; i < 5 && cur != null; i++) {
+      pathIds.unshift(cur);
+      const cat = await this.categoryRepo.findOne({
+        where: { id: cur },
+        select: ['id', 'danhMucChaId'],
+      });
+      cur = cat?.danhMucChaId ?? null;
+    }
+    if (!pathIds.length) return [];
+
+    const allLinks = await this.catGroupRepo.find({
+      where: { danhMucId: In(pathIds) },
+    });
+
+    // Last-write-wins (root → leaf)
+    const resolved = new Map<number, CategorySpecGroup>();
+    for (const catId of pathIds) {
+      for (const link of allLinks.filter((l) => l.danhMucId === catId)) {
+        resolved.set(link.nhomThongSoId, link);
+      }
+    }
+
+    // Only keep groups marked hienThiBoLoc + not excluded
+    const filterLinks = Array.from(resolved.values())
+      .filter((l) => l.hanhDong !== 'loai_tru' && l.hienThiBoLoc === true)
+      .sort(
+        (a, b) =>
+          (a.thuTuBoLoc ?? 0) - (b.thuTuBoLoc ?? 0) ||
+          a.thuTuHienThi - b.thuTuHienThi,
+      );
+    if (!filterLinks.length) return [];
+
+    const groupIds = filterLinks.map((l) => l.nhomThongSoId);
+    const groups = await this.groupRepo.find({
+      where: { id: In(groupIds) },
+      relations: ['types'],
+    });
+    const groupMap = new Map(groups.map((g) => [g.id, g]));
+
+    // Collect descendant category ids (resolve all sub-categories for product scope)
+    const descendantIds = await this.collectDescendantIds(categoryId);
+
+    // Pre-load all spec values for all filterable types in scope (one query),
+    // then bucket per typeId in JS to avoid N+1.
+    const allFilterableTypeIds: number[] = [];
+    for (const link of filterLinks) {
+      const g = groupMap.get(link.nhomThongSoId);
+      if (!g) continue;
+      for (const t of g.types ?? []) {
+        if (t.coTheLoc && t.widgetLoc) allFilterableTypeIds.push(t.id);
+      }
+    }
+    if (!allFilterableTypeIds.length) return [];
+
+    type Row = {
+      loaiThongSoId: number;
+      giaTriChuan: string | null;
+      giaTriThongSo: string;
+      giaTriSo: string | null;
+      sanPhamId: number;
+    };
+    const rows: Row[] = await this.valueRepo
+      .createQueryBuilder('v')
+      .innerJoin(
+        'phien_ban_san_pham',
+        'pv',
+        'pv.phien_ban_id = v.phien_ban_id',
+      )
+      .innerJoin('san_pham', 'p', 'p.id = pv.san_pham_id')
+      .select('v.loai_thong_so_id', 'loaiThongSoId')
+      .addSelect('v.gia_tri_chuan', 'giaTriChuan')
+      .addSelect('v.gia_tri_thong_so', 'giaTriThongSo')
+      .addSelect('v.gia_tri_so', 'giaTriSo')
+      .addSelect('pv.san_pham_id', 'sanPhamId')
+      .where('v.loai_thong_so_id IN (:...ids)', { ids: allFilterableTypeIds })
+      .andWhere('p.danh_muc_id IN (:...catIds)', { catIds: descendantIds })
+      .andWhere(`p.trang_thai = 'DangBan'`)
+      .getRawMany();
+
+    const rowsByType = new Map<number, Row[]>();
+    for (const r of rows) {
+      const tid = Number(r.loaiThongSoId);
+      const arr = rowsByType.get(tid) ?? [];
+      arr.push(r);
+      rowsByType.set(tid, arr);
+    }
+
+    const result: Array<{
+      id: string;
+      label: string;
+      displayOrder: number;
+      types: Array<{
+        key: string;
+        specTypeId: number;
+        label: string;
+        unit: string | null;
+        widget: string;
+        displayOrder: number;
+        options?: { value: string; label: string; count: number }[];
+        min?: number;
+        max?: number;
+        step?: number;
+      }>;
+    }> = [];
+
+    for (const link of filterLinks) {
+      const group = groupMap.get(link.nhomThongSoId);
+      if (!group) continue;
+      const types = (group.types ?? [])
+        .filter((t) => t.coTheLoc && t.widgetLoc)
+        .sort(
+          (a, b) =>
+            (a.thuTuLoc ?? 0) - (b.thuTuLoc ?? 0) ||
+            a.thuTuHienThi - b.thuTuHienThi,
+        );
+
+      const facetTypes: Array<{
+        key: string;
+        specTypeId: number;
+        label: string;
+        unit: string | null;
+        widget: string;
+        displayOrder: number;
+        options?: { value: string; label: string; count: number }[];
+        min?: number;
+        max?: number;
+        step?: number;
+      }> = [];
+
+      for (const t of types) {
+        // Normalize legacy 'combo-select' rows → 'checkbox' (merged widget type).
+        const widget =
+          t.widgetLoc === 'combo-select' ? 'checkbox' : (t.widgetLoc as string);
+        const bucket = rowsByType.get(t.id) ?? [];
+        if (!bucket.length) continue;
+
+        if (widget === 'range') {
+          let lo = Number.POSITIVE_INFINITY;
+          let hi = Number.NEGATIVE_INFINITY;
+          for (const r of bucket) {
+            if (r.giaTriSo == null) continue;
+            const n = Number(r.giaTriSo);
+            if (!Number.isFinite(n)) continue;
+            if (n < lo) lo = n;
+            if (n > hi) hi = n;
+          }
+          if (!Number.isFinite(lo) || !Number.isFinite(hi) || hi < lo) continue;
+          const span = hi - lo;
+          const step =
+            span <= 0 ? 1 : span < 10 ? 0.1 : Math.max(1, Math.round(span / 50));
+          facetTypes.push({
+            key: `spec_${t.id}`,
+            specTypeId: t.id,
+            label: t.tenLoai,
+            unit: t.donVi ?? null,
+            widget,
+            displayOrder: t.thuTuLoc ?? t.thuTuHienThi ?? 0,
+            min: lo,
+            max: hi,
+            step,
+          });
+          continue;
+        }
+
+        if (widget === 'toggle') {
+          facetTypes.push({
+            key: `spec_${t.id}`,
+            specTypeId: t.id,
+            label: t.tenLoai,
+            unit: t.donVi ?? null,
+            widget,
+            displayOrder: t.thuTuLoc ?? t.thuTuHienThi ?? 0,
+          });
+          continue;
+        }
+
+        // checkbox / select → option list + count
+        const counts = new Map<string, { label: string; products: Set<number> }>();
+        for (const r of bucket) {
+          const value = (r.giaTriChuan ?? r.giaTriThongSo ?? '').toString().trim();
+          if (!value) continue;
+          const label = (r.giaTriThongSo ?? value).toString().trim();
+          if (!counts.has(value)) counts.set(value, { label, products: new Set() });
+          counts.get(value)!.products.add(Number(r.sanPhamId));
+        }
+        if (!counts.size) continue;
+
+        const options = Array.from(counts.entries())
+          .map(([value, { label, products }]) => ({
+            value,
+            label,
+            count: products.size,
+          }))
+          .sort((a, b) => b.count - a.count || a.label.localeCompare(b.label, 'vi'))
+          .slice(0, 100);
+
+        facetTypes.push({
+          key: `spec_${t.id}`,
+          specTypeId: t.id,
+          label: t.tenLoai,
+          unit: t.donVi ?? null,
+          widget,
+          displayOrder: t.thuTuLoc ?? t.thuTuHienThi ?? 0,
+          options,
+        });
+      }
+
+      if (!facetTypes.length) continue;
+      result.push({
+        id: String(group.id),
+        label: group.tenNhom,
+        displayOrder: link.thuTuBoLoc ?? link.thuTuHienThi ?? 0,
+        types: facetTypes,
+      });
+    }
+
+    return result;
+  }
+
+  /** BFS over Category tree: rootId + all descendants. */
+  private async collectDescendantIds(rootId: number): Promise<number[]> {
+    const ids: number[] = [rootId];
+    let queue: number[] = [rootId];
+    while (queue.length) {
+      const children = await this.categoryRepo.find({
+        where: { danhMucChaId: In(queue) },
+        select: ['id'],
+      });
+      queue = children.map((c) => c.id);
+      ids.push(...queue);
+    }
+    return ids;
   }
 
   async getSpecTemplateForCategory(categoryId: number) {

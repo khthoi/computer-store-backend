@@ -28,11 +28,18 @@ export class InventoryService {
     const page = query.page ?? 1;
     const limit = query.limit ?? 20;
 
-    // Count query (no selects / pagination, just filters)
-    const countQb = this.stockRepo
-      .createQueryBuilder('tk')
-      .leftJoin('phien_ban_san_pham', 'pb', 'pb.phien_ban_id = tk.phien_ban_id')
-      .leftJoin('san_pham', 'sp', 'sp.san_pham_id = pb.san_pham_id');
+    // Drive the query from `phien_ban_san_pham` so brand-new variants without
+    // a `ton_kho` row still appear (quantityOnHand defaults to 0 via COALESCE).
+    const buildBase = () =>
+      this.dataSource
+        .createQueryBuilder()
+        .from('phien_ban_san_pham', 'pb')
+        .leftJoin('ton_kho', 'tk', 'tk.phien_ban_id = pb.phien_ban_id')
+        .leftJoin('san_pham', 'sp', 'sp.san_pham_id = pb.san_pham_id');
+
+    // Count query (no selects / pagination, just filters).
+    // Need a non-NULL select for getCount() on a raw QueryBuilder.
+    const countQb = buildBase().select('pb.phien_ban_id');
     this.applyStockFilters(countQb, query);
     const total = await countQb.getCount();
 
@@ -40,10 +47,12 @@ export class InventoryService {
     const sortCol = this.resolveSortColumn(query.sortKey ?? 'updatedAt');
     const sortDir = (query.sortDir === 'asc' ? 'ASC' : 'DESC') as 'ASC' | 'DESC';
 
-    const qb = this.stockRepo
-      .createQueryBuilder('tk')
-      .select('tk.ton_kho_id', 'id')
-      .addSelect('tk.phien_ban_id', 'variantId')
+    const qb = buildBase()
+      // Use variant id as the row id so it is globally unique and stable
+      // (ton_kho.ton_kho_id is a separate sequence — it can numerically
+      // collide with pb.phien_ban_id of another variant, breaking React keys).
+      .select('pb.phien_ban_id', 'id')
+      .addSelect('pb.phien_ban_id', 'variantId')
       .addSelect('pb.san_pham_id', 'productId')
       .addSelect('sp.ten_san_pham', 'productName')
       .addSelect('pb.ten_phien_ban', 'variantName')
@@ -54,16 +63,16 @@ export class InventoryService {
         `(SELECT COALESCE(SUM(ct.so_luong), 0)
           FROM chi_tiet_don_hang ct
           INNER JOIN don_hang dh ON dh.don_hang_id = ct.don_hang_id
-          WHERE ct.phien_ban_id = tk.phien_ban_id
+          WHERE ct.phien_ban_id = pb.phien_ban_id
             AND dh.trang_thai_don IN ('ChoTT', 'DaXacNhan', 'DongGoi', 'DangGiao'))`,
         'quantityReserved',
       )
       .addSelect('COALESCE(tk.gia_von_trung_binh, 0)', 'costPrice')
       .addSelect('COALESCE(tk.nguong_canh_bao, 0)', 'lowStockThreshold')
-      .addSelect('tk.ngay_cap_nhat', 'updatedAt')
+      .addSelect('COALESCE(tk.ngay_cap_nhat, pb.ngay_cap_nhat)', 'updatedAt')
       .addSelect(
         `(SELECT img.url_hinh_anh FROM hinh_anh_san_pham img
-          WHERE img.phien_ban_id = tk.phien_ban_id
+          WHERE img.phien_ban_id = pb.phien_ban_id
           ORDER BY CASE WHEN img.loai_anh = 'AnhChinh' THEN 0 ELSE 1 END, img.thu_tu ASC
           LIMIT 1)`,
         'thumbnailUrl',
@@ -71,7 +80,7 @@ export class InventoryService {
       .addSelect(
         `(SELECT pnk.nha_cung_cap_id FROM phieu_nhap_kho pnk
           INNER JOIN chi_tiet_phieu_nhap ctpn ON ctpn.phieu_nhap_id = pnk.phieu_nhap_id
-          WHERE ctpn.phien_ban_id = tk.phien_ban_id AND pnk.nha_cung_cap_id IS NOT NULL
+          WHERE ctpn.phien_ban_id = pb.phien_ban_id AND pnk.nha_cung_cap_id IS NOT NULL
           ORDER BY pnk.ngay_nhap DESC LIMIT 1)`,
         'supplierId',
       )
@@ -79,17 +88,15 @@ export class InventoryService {
         `(SELECT ncc.ten_nha_cung_cap FROM phieu_nhap_kho pnk
           INNER JOIN chi_tiet_phieu_nhap ctpn ON ctpn.phieu_nhap_id = pnk.phieu_nhap_id
           INNER JOIN nha_cung_cap ncc ON ncc.nha_cung_cap_id = pnk.nha_cung_cap_id
-          WHERE ctpn.phien_ban_id = tk.phien_ban_id AND pnk.nha_cung_cap_id IS NOT NULL
+          WHERE ctpn.phien_ban_id = pb.phien_ban_id AND pnk.nha_cung_cap_id IS NOT NULL
           ORDER BY pnk.ngay_nhap DESC LIMIT 1)`,
         'supplierName',
       )
       .addSelect(
         `(SELECT MAX(lsnx.thoi_diem) FROM lich_su_nhap_xuat lsnx
-          WHERE lsnx.phien_ban_id = tk.phien_ban_id AND lsnx.loai_giao_dich = 'Nhap')`,
+          WHERE lsnx.phien_ban_id = pb.phien_ban_id AND lsnx.loai_giao_dich = 'Nhap')`,
         'lastRestockedAt',
       )
-      .leftJoin('phien_ban_san_pham', 'pb', 'pb.phien_ban_id = tk.phien_ban_id')
-      .leftJoin('san_pham', 'sp', 'sp.san_pham_id = pb.san_pham_id')
       .orderBy(sortCol, sortDir)
       .offset((page - 1) * limit)
       .limit(limit);
@@ -102,33 +109,35 @@ export class InventoryService {
   }
 
   private resolveSortColumn(sortKey: string): string {
+    // COALESCE so variants without a `ton_kho` row (NULL tk.*) still sort sensibly.
     const map: Record<string, string> = {
       productName: 'sp.ten_san_pham',
       sku: 'pb.sku',
-      quantityOnHand: 'tk.so_luong_ton',
-      lowStockThreshold: 'tk.nguong_canh_bao',
-      costPrice: 'tk.gia_von_trung_binh',
+      quantityOnHand: 'COALESCE(tk.so_luong_ton, 0)',
+      lowStockThreshold: 'COALESCE(tk.nguong_canh_bao, 0)',
+      costPrice: 'COALESCE(tk.gia_von_trung_binh, 0)',
       sellingPrice: 'pb.gia_ban',
-      updatedAt: 'tk.ngay_cap_nhat',
+      updatedAt: 'COALESCE(tk.ngay_cap_nhat, pb.ngay_cap_nhat)',
     };
-    return map[sortKey] ?? 'tk.ngay_cap_nhat';
+    return map[sortKey] ?? 'COALESCE(tk.ngay_cap_nhat, pb.ngay_cap_nhat)';
   }
 
-  private applyStockFilters(qb: SelectQueryBuilder<StockLevel>, query: QueryStockDto): void {
+  private applyStockFilters(qb: SelectQueryBuilder<unknown>, query: QueryStockDto): void {
     if (query.q?.trim()) {
       qb.andWhere('(sp.ten_san_pham LIKE :q OR pb.sku LIKE :q)', { q: `%${query.q.trim()}%` });
     }
     if (query.alertLevel) {
+      // `ton_kho` may be missing for brand-new variants — treat NULL as 0.
       if (query.alertLevel === 'out_of_stock_inv') {
-        qb.andWhere('tk.so_luong_ton = 0');
+        qb.andWhere('COALESCE(tk.so_luong_ton, 0) = 0');
       } else if (query.alertLevel === 'low_stock') {
-        qb.andWhere('(tk.so_luong_ton > 0 AND tk.so_luong_ton < tk.nguong_canh_bao)');
+        qb.andWhere('(COALESCE(tk.so_luong_ton, 0) > 0 AND COALESCE(tk.so_luong_ton, 0) < COALESCE(tk.nguong_canh_bao, 0))');
       } else if (query.alertLevel === 'ok') {
-        qb.andWhere('(tk.so_luong_ton > 0 AND tk.so_luong_ton >= tk.nguong_canh_bao)');
+        qb.andWhere('(COALESCE(tk.so_luong_ton, 0) > 0 AND COALESCE(tk.so_luong_ton, 0) >= COALESCE(tk.nguong_canh_bao, 0))');
       }
     }
     if (query.lowStockOnly) {
-      qb.andWhere('tk.so_luong_ton < tk.nguong_canh_bao');
+      qb.andWhere('COALESCE(tk.so_luong_ton, 0) < COALESCE(tk.nguong_canh_bao, 0)');
     }
     if (query.categoryId) {
       qb.andWhere('sp.danh_muc_id = :categoryId', { categoryId: query.categoryId });
@@ -138,7 +147,7 @@ export class InventoryService {
         `EXISTS (
           SELECT 1 FROM phieu_nhap_kho pnk2
           INNER JOIN chi_tiet_phieu_nhap ctpn2 ON ctpn2.phieu_nhap_id = pnk2.phieu_nhap_id
-          WHERE ctpn2.phien_ban_id = tk.phien_ban_id AND pnk2.nha_cung_cap_id = :supplierId
+          WHERE ctpn2.phien_ban_id = pb.phien_ban_id AND pnk2.nha_cung_cap_id = :supplierId
         )`,
         { supplierId: query.supplierId },
       );

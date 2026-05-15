@@ -1,6 +1,6 @@
-import { IsOptional, IsString, IsInt, IsIn, IsNumber, Min, Max } from 'class-validator';
+import { IsOptional, IsString, IsInt, IsIn, IsNumber, Min, Max, IsBoolean } from 'class-validator';
 import { ApiPropertyOptional } from '@nestjs/swagger';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 import { PaginationDto } from '../../../common/dto/pagination.dto';
 
 export class QueryProductDto extends PaginationDto {
@@ -62,4 +62,50 @@ export class QueryProductDto extends PaginationDto {
   @Min(1)
   @Max(1000)
   pageSize?: number;
+
+  /** Storefront filter — only products with at least one variant in stock */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  inStock?: boolean;
+
+  /**
+   * Storefront filter — only products currently on sale: either
+   * (a) a variant has a static markdown (`gia_ban < gia_goc`), or
+   * (b) a variant is included in a flash sale that is `status='active'`
+   *     AND its `[batDau, ketThuc]` window covers NOW.
+   */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Transform(({ value }) => value === true || value === 'true' || value === '1')
+  @IsBoolean()
+  onSale?: boolean;
+
+  /** Storefront filter — minimum average rating (1..5) */
+  @ApiPropertyOptional()
+  @IsOptional()
+  @Type(() => Number)
+  @IsNumber()
+  @Min(1)
+  @Max(5)
+  ratingMin?: number;
+
+  /**
+   * Storefront facet filters. Each entry is `<specTypeId>:<spec>` where `<spec>` is one of:
+   * - `<v1>,<v2>` — multi-select / checkbox values (matched against giaTriChuan ?? giaTriThongSo)
+   * - `<min>..<max>` — numeric range (matched against giaTriSo)
+   * - `true` — toggle on (any non-empty value)
+   * Send as repeated query param: `?specs=1:rtx-4070,rtx-4080&specs=2:8..16`.
+   */
+  @ApiPropertyOptional({ isArray: true, type: String })
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined || value === null
+      ? undefined
+      : Array.isArray(value)
+        ? value.map(String)
+        : [String(value)],
+  )
+  specs?: string[];
 }

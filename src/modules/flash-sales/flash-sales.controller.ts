@@ -16,7 +16,7 @@ export class FlashSalesController {
       example: {
         id: 3,
         ten: 'Flash Sale Cuối Tuần',
-        trangThai: 'dang_dien_ra',
+        trangThai: 'active',
         batDau: '2024-06-01T10:00:00.000Z',
         ketThuc: '2024-06-01T14:00:00.000Z',
         bannerTitle: 'Giảm sốc cuối tuần',
@@ -40,7 +40,7 @@ export class FlashSalesController {
       example: {
         id: 3,
         ten: 'Flash Sale Cuối Tuần',
-        trangThai: 'dang_dien_ra',
+        trangThai: 'active',
         batDau: '2024-06-01T10:00:00.000Z',
         ketThuc: '2024-06-01T14:00:00.000Z',
         items: [

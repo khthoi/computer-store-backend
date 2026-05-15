@@ -20,7 +20,8 @@ import { RegisterCustomerDto } from './dto/register-customer.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
 import { ResetPasswordDto } from './dto/reset-password.dto';
-import { AuthLoginCustomerResponseDto, AuthLoginEmployeeResponseDto } from './dto/auth-login-response.dto';
+import { AuthLoginEmployeeResponseDto } from './dto/auth-login-response.dto';
+import { AuthCustomerLoginResponseDto } from './dto/auth-user-response.dto';
 import { AuthTokenResponseDto } from './dto/auth-token-response.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -46,7 +47,7 @@ export class AuthController {
   @Public()
   @Post('register')
   @ApiOperation({ summary: 'Đăng ký tài khoản khách hàng' })
-  @ApiOkResponse({ type: AuthLoginCustomerResponseDto, description: 'Đăng ký thành công, refresh token được set trong cookie' })
+  @ApiOkResponse({ type: AuthCustomerLoginResponseDto, description: 'Đăng ký thành công, refresh token được set trong cookie' })
   @ApiResponse({ status: 409, description: 'Email đã được đăng ký' })
   async register(@Body() dto: RegisterCustomerDto, @Res({ passthrough: true }) res: Response) {
     const { refreshToken, ...data } = await this.authService.register(dto);
@@ -60,7 +61,7 @@ export class AuthController {
   @UseGuards(AuthGuard('local-customer'))
   @ApiOperation({ summary: 'Đăng nhập khách hàng' })
   @ApiBody({ type: LoginDto })
-  @ApiOkResponse({ type: AuthLoginCustomerResponseDto, description: 'Đăng nhập thành công, refresh token được set trong cookie' })
+  @ApiOkResponse({ type: AuthCustomerLoginResponseDto, description: 'Đăng nhập thành công, refresh token được set trong cookie' })
   @ApiResponse({ status: 401, description: 'Email hoặc mật khẩu không đúng' })
   async loginCustomer(@Req() req: Request, @Res({ passthrough: true }) res: Response) {
     const rememberMe = Boolean((req.body as { rememberMe?: boolean })?.rememberMe);

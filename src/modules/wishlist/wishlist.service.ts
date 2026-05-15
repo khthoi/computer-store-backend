@@ -32,8 +32,14 @@ export class WishlistService {
     // Fetch variant info + stock status in one query
     const variants = await this.dataSource.query(
       `SELECT v.phien_ban_id, v.ten_phien_ban, v.gia_ban, v.trang_thai,
-              sp.ten_san_pham, sp.Slug AS slug,
-              COALESCE(tk.so_luong_ton, 0) AS stock
+              sp.ten_san_pham, sp.slug AS slug,
+              COALESCE(tk.so_luong_ton, 0) AS stock,
+              (SELECT _h.url_hinh_anh
+                 FROM hinh_anh_san_pham _h
+                 WHERE _h.phien_ban_id = v.phien_ban_id
+                   AND _h.url_hinh_anh IS NOT NULL
+                 ORDER BY FIELD(_h.loai_anh, 'AnhChinh', 'AnhPhu') ASC, _h.thu_tu ASC
+                 LIMIT 1) AS image_url
        FROM phien_ban_san_pham v
        INNER JOIN san_pham sp ON sp.san_pham_id = v.san_pham_id
        LEFT JOIN ton_kho tk ON tk.phien_ban_id = v.phien_ban_id
@@ -62,6 +68,7 @@ export class WishlistService {
                 productName: v.ten_san_pham,
                 slug: v.slug,
                 stock: Number(v.stock),
+                imageUrl: v.image_url ?? null,
               }
             : null,
         };

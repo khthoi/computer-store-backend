@@ -15,6 +15,10 @@ import { UpdateProductDto } from './dto/update-product.dto';
 import { slugify } from '../../common/helpers/slugify';
 import { BrandsService } from '../brands/brands.service';
 import { ProductListResponse, mapProductListResponse } from './dto/product-response.dto';
+import {
+  PublicProductDetailResponse,
+  mapPublicProductDetail,
+} from './dto/product-detail-response.dto';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 @Injectable()
@@ -29,7 +33,7 @@ export class ProductsService {
   ) {}
 
   async create(dto: CreateProductDto, employeeId: number): Promise<Product> {
-    const slug = dto.slug ?? slugify(dto.tenSanPham);
+    const slug = this.resolveSlug(dto.slug, dto.tenSanPham);
     await this.assertSlugUnique(slug);
     await this.assertMaUnique(dto.maSanPham);
 
@@ -87,22 +91,29 @@ export class ProductsService {
   async findBySlug(slug: string): Promise<Product> {
     const product = await this.productRepo.findOne({
       where: { slug, trangThai: 'DangBan' },
-      relations: ['variants', 'variants.images'],
+      relations: ['danhMuc', 'variants', 'variants.images', 'variants.stockLevel'],
     });
     if (!product) throw new NotFoundException('Sản phẩm không tồn tại');
     return product;
+  }
+
+  async findPublicDetailBySlug(slug: string): Promise<PublicProductDetailResponse> {
+    const product = await this.findBySlug(slug);
+    const brands = await this.brandsService.getProductBrands(product.id);
+    return mapPublicProductDetail(product, brands);
   }
 
   async update(id: number, dto: UpdateProductDto): Promise<Product> {
     const product = await this.findOne(id);
     const beforeStatus = product.trangThai;
 
-    if (dto.slug && dto.slug !== product.slug) await this.assertSlugUnique(dto.slug);
-    if (dto.tenSanPham && !dto.slug) {
-      const newSlug = slugify(dto.tenSanPham);
-      if (newSlug !== product.slug) {
-        await this.assertSlugUnique(newSlug);
-        dto.slug = newSlug;
+    if (dto.slug !== undefined || dto.tenSanPham !== undefined) {
+      const nextSlug = this.resolveSlug(dto.slug, dto.tenSanPham ?? product.tenSanPham);
+      if (nextSlug !== product.slug) {
+        await this.assertSlugUnique(nextSlug, id);
+        dto.slug = nextSlug;
+      } else if (dto.slug !== undefined) {
+        dto.slug = nextSlug;
       }
     }
     if (dto.maSanPham && dto.maSanPham !== product.maSanPham) {
@@ -130,6 +141,20 @@ export class ProductsService {
     });
 
     return result;
+  }
+
+  async checkSlugExists(slug: string, excludeId?: number): Promise<{ slug: string; exists: boolean }> {
+    const normalizedSlug = this.resolveSlug(slug);
+    const exists = await this.productRepo
+      .createQueryBuilder('product')
+      .where('product.slug = :slug', { slug: normalizedSlug })
+      .andWhere(excludeId ? 'product.id != :excludeId' : '1=1', { excludeId })
+      .getExists();
+
+    return {
+      slug: normalizedSlug,
+      exists,
+    };
   }
 
   async remove(id: number): Promise<void> {
@@ -461,8 +486,21 @@ export class ProductsService {
 
   // ── Helpers ───────────────────────────────────────────────────────────────
 
-  private async assertSlugUnique(slug: string): Promise<void> {
-    const exists = await this.productRepo.findOne({ where: { slug } });
+  private resolveSlug(slug?: string, fallbackName?: string): string {
+    const raw = (slug ?? fallbackName ?? '').trim();
+    const normalized = slugify(raw);
+    if (!normalized) {
+      throw new BadRequestException('Slug sản phẩm không hợp lệ');
+    }
+    return normalized;
+  }
+
+  private async assertSlugUnique(slug: string, excludeId?: number): Promise<void> {
+    const exists = await this.productRepo
+      .createQueryBuilder('product')
+      .where('product.slug = :slug', { slug })
+      .andWhere(excludeId ? 'product.id != :excludeId' : '1=1', { excludeId })
+      .getOne();
     if (exists) throw new ConflictException(`Slug "${slug}" đã tồn tại`);
   }
 

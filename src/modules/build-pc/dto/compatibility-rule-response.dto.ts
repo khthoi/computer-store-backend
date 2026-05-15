@@ -26,8 +26,10 @@ export class CompatibilityRuleResponseDto {
   slotNguonTen: string;
   slotDichId: string;
   slotDichTen: string;
-  maKyThuat: string;
-  maKyThuatTen: string;
+  maKtNguon: string;
+  maKtNguonTen: string;
+  maKtDich: string;
+  maKtDichTen: string;
   loaiKiemTra: string;
   giaTriMacDinh?: string;
   heSo?: number;
@@ -44,8 +46,10 @@ export class CompatibilityRuleResponseDto {
     dto.slotNguonTen = e.slotNguon?.tenSlot ?? '';
     dto.slotDichId = e.slotDichId ? String(e.slotDichId) : '';
     dto.slotDichTen = e.slotDich?.tenSlot ?? '';
-    dto.maKyThuat = e.maKtNguon;
-    dto.maKyThuatTen = TECH_KEY_LABELS[e.maKtNguon] ?? e.maKtNguon;
+    dto.maKtNguon = e.maKtNguon;
+    dto.maKtNguonTen = TECH_KEY_LABELS[e.maKtNguon] ?? e.maKtNguon;
+    dto.maKtDich = e.maKtDich ?? '';
+    dto.maKtDichTen = e.maKtDich ? (TECH_KEY_LABELS[e.maKtDich] ?? e.maKtDich) : '';
     const normalizedLoai = LOAI_KIEM_TRA_MAP[e.loaiKiemTra] ?? e.loaiKiemTra;
     dto.loaiKiemTra = VALID_LOAI_KIEM_TRA.has(normalizedLoai) ? normalizedLoai : 'exact_match';
     dto.giaTriMacDinh = e.giaTriMacDinh ?? undefined;

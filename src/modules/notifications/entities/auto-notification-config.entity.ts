@@ -18,7 +18,7 @@ export class AutoNotificationConfig {
   @Column({ name: 'mo_ta', type: 'text', nullable: true })
   description: string | null;
 
-  @Column({ name: 'kenh_gui', type: 'json' })
+  @Column({ name: 'kenh_gui', type: 'simple-json' })
   channels: string[];
 
   @Column({ name: 'template_tieu_de', length: 300 })

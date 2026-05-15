@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException } from '@nestjs/common';
+import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BuildSlot } from './entities/build-slot.entity';
@@ -7,6 +7,7 @@ import { SavedBuild } from './entities/saved-build.entity';
 import { BuildDetail } from './entities/build-detail.entity';
 import { SpecType } from '../specifications/entities/spec-type.entity';
 import { CategorySpecGroup } from '../specifications/entities/category-spec-group.entity';
+import { BuildPcCompatibilityEngine, CompatibilityResult } from './build-pc-compatibility.engine';
 import { CreateSavedBuildDto } from './dto/create-saved-build.dto';
 import { CheckCompatibilityDto } from './dto/check-compatibility.dto';
 import { CreateBuildSlotDto } from './dto/create-build-slot.dto';
@@ -28,6 +29,7 @@ export class BuildPcService {
     @InjectRepository(SpecType) private readonly specTypeRepo: Repository<SpecType>,
     @InjectRepository(CategorySpecGroup) private readonly categorySpecGroupRepo: Repository<CategorySpecGroup>,
     private readonly auditLogsService: AuditLogsService,
+    private readonly compatibilityEngine: BuildPcCompatibilityEngine,
   ) {}
 
   // ── Slots ─────────────────────────────────────────────────────────────────
@@ -184,12 +186,15 @@ export class BuildPcService {
   }
 
   async createRule(dto: CreateCompatibilityRuleDto): Promise<CompatibilityRuleResponseDto> {
+    if (dto.slotDichId != null && !dto.maKtDich) {
+      throw new BadRequestException('Quy tắc liên slot phải chỉ định mã kỹ thuật slot đích');
+    }
     const rule = this.ruleRepo.create({
       tenQuyTac: dto.tenQuyTac,
       slotNguonId: dto.slotNguonId,
-      maKtNguon: dto.maKyThuat,
+      maKtNguon: dto.maKtNguon,
       slotDichId: dto.slotDichId ?? null,
-      maKtDich: dto.maKyThuat,
+      maKtDich: dto.maKtDich ?? dto.maKtNguon,
       loaiKiemTra: dto.loaiKiemTra,
       heSo: dto.heSo ?? 1.0,
       giaTriMacDinh: dto.giaTriMacDinh ?? null,
@@ -222,8 +227,12 @@ export class BuildPcService {
     const before = { loaiKiemTra: rule.loaiKiemTra, thongBaoLoi: rule.thongBaoLoi };
     if (dto.tenQuyTac !== undefined) rule.tenQuyTac = dto.tenQuyTac;
     if (dto.slotNguonId !== undefined) rule.slotNguonId = dto.slotNguonId;
-    if (dto.maKyThuat !== undefined) { rule.maKtNguon = dto.maKyThuat; rule.maKtDich = dto.maKyThuat; }
+    if (dto.maKtNguon !== undefined) rule.maKtNguon = dto.maKtNguon;
+    if (dto.maKtDich !== undefined) rule.maKtDich = dto.maKtDich;
     if (dto.slotDichId !== undefined) rule.slotDichId = dto.slotDichId ?? null;
+    if (rule.slotDichId != null && !rule.maKtDich) {
+      throw new BadRequestException('Quy tắc liên slot phải chỉ định mã kỹ thuật slot đích');
+    }
     if (dto.loaiKiemTra !== undefined) rule.loaiKiemTra = dto.loaiKiemTra;
     if (dto.heSo !== undefined) rule.heSo = dto.heSo;
     if (dto.giaTriMacDinh !== undefined) rule.giaTriMacDinh = dto.giaTriMacDinh ?? null;
@@ -266,11 +275,8 @@ export class BuildPcService {
 
   // ── Compatibility check ───────────────────────────────────────────────────
 
-  async checkCompatibility(dto: CheckCompatibilityDto): Promise<{ compatible: boolean; errors: string[] }> {
-    // Placeholder: full spec-based engine requires SpecValue lookup
-    // Returns compatible = true as stub; real logic reads gia_tri_thong_so per variant
-    void dto;
-    return { compatible: true, errors: [] };
+  async checkCompatibility(dto: CheckCompatibilityDto): Promise<CompatibilityResult> {
+    return this.compatibilityEngine.check(dto);
   }
 
   // ── Admin: Saved Builds ────────────────────────────────────────────────────

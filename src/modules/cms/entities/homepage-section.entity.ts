@@ -32,7 +32,7 @@ export class HomepageSection {
   })
   type: string;
 
-  @Column({ name: 'source_config', type: 'json', nullable: true })
+  @Column({ name: 'source_config', type: 'simple-json', nullable: true })
   sourceConfig: Record<string, unknown> | null;
 
   @Column({

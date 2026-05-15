@@ -9,6 +9,7 @@ import { CreateFaqItemDto } from '../dto/create-faq-item.dto';
 import { UpdateFaqItemDto } from '../dto/update-faq-item.dto';
 import { FaqGroupResponseDto } from '../dto/faq-group-response.dto';
 import { FaqItemResponseDto } from '../dto/faq-item-response.dto';
+import { FaqPublicGroupDto } from '../dto/faq-public.dto';
 import { AuditLogsService } from '../../audit-logs/audit-logs.service';
 
 @Injectable()
@@ -21,12 +22,15 @@ export class FaqService {
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
-  async findAllPublic() {
-    return this.groupRepo.find({
+  async findAllPublic(): Promise<FaqPublicGroupDto[]> {
+    const groups = await this.groupRepo.find({
       where: { isVisible: true },
       relations: ['items'],
       order: { sortOrder: 'ASC' },
     });
+    return groups
+      .map(FaqPublicGroupDto.from)
+      .filter((g) => g.items.length > 0);
   }
 
   async findAllGroups(): Promise<FaqGroupResponseDto[]> {

@@ -1,5 +1,5 @@
 import {
-  Controller, Get, Post, Put, Patch, Delete, Body, Param, Query, ParseIntPipe, Request,
+  Controller, Get, Post, Put, Patch, Body, Param, Query, ParseIntPipe, Request,
 } from '@nestjs/common';
 import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiBearerAuth, ApiParam, ApiQuery } from '@nestjs/swagger';
 import { RequirePermission } from '../../common/decorators/permission.decorator';
@@ -80,26 +80,27 @@ export class AdminFlashSalesController {
     return this.flashSalesService.update(id, dto);
   }
 
-  @Patch(':id/end')
+  @Patch(':id/pause')
   @RequirePermission('flash-sales.update')
-  @ApiOperation({ summary: 'Kết thúc sớm flash sale (đặt trạng thái da_ket_thuc)' })
+  @ApiOperation({ summary: 'Tạm dừng flash sale — ẩn khỏi storefront ngay lập tức' })
   @ApiParam({ name: 'id', example: 5 })
-  @ApiResponse({ status: 200, description: 'Flash sale đã kết thúc sớm' })
-  @ApiResponse({ status: 400, description: 'Flash sale đã kết thúc hoặc bị hủy' })
+  @ApiResponse({ status: 200, description: 'Flash sale đã tạm dừng' })
+  @ApiResponse({ status: 400, description: 'Flash sale đã ở trạng thái tạm dừng' })
   @ApiResponse({ status: 404, description: 'Flash sale không tồn tại' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  endEarly(@Param('id', ParseIntPipe) id: number) {
-    return this.flashSalesService.endEarly(id);
+  pause(@Param('id', ParseIntPipe) id: number) {
+    return this.flashSalesService.pause(id);
   }
 
-  @Delete(':id')
-  @RequirePermission('flash-sales.delete')
-  @ApiOperation({ summary: 'Hủy flash sale (chuyển trạng thái sang huy)' })
+  @Patch(':id/activate')
+  @RequirePermission('flash-sales.update')
+  @ApiOperation({ summary: 'Kích hoạt lại flash sale đang tạm dừng' })
   @ApiParam({ name: 'id', example: 5 })
-  @ApiResponse({ status: 200, description: 'Flash sale đã bị hủy' })
+  @ApiResponse({ status: 200, description: 'Flash sale đã chuyển sang hoạt động' })
+  @ApiResponse({ status: 400, description: 'Flash sale đã ở trạng thái hoạt động' })
   @ApiResponse({ status: 404, description: 'Flash sale không tồn tại' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  cancel(@Param('id', ParseIntPipe) id: number) {
-    return this.flashSalesService.cancel(id);
+  activate(@Param('id', ParseIntPipe) id: number) {
+    return this.flashSalesService.activate(id);
   }
 }

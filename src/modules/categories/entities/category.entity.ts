@@ -25,7 +25,7 @@ export class Category {
   @Column({ name: 'node_type', length: 20, default: 'category' })
   nodeType: string; // 'category' | 'filter' | 'label'
 
-  @Column({ name: 'filter_params', type: 'json', nullable: true })
+  @Column({ name: 'filter_params', type: 'simple-json', nullable: true })
   filterParams: Record<string, unknown> | null;
 
   @Column({ name: 'danh_muc_cha_id', nullable: true })

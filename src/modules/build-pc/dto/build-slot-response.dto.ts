@@ -6,6 +6,7 @@ export class BuildSlotResponseDto {
   maKhe: string;
   danhMucId: number;
   danhMucTen: string;
+  danhMucSlug: string;
   soLuong: number;
   batBuoc: boolean;
   thuTu: number;
@@ -21,6 +22,7 @@ export class BuildSlotResponseDto {
     dto.maKhe = e.maKhe;
     dto.danhMucId = e.danhMucId;
     dto.danhMucTen = e.danhMuc?.tenDanhMuc ?? '';
+    dto.danhMucSlug = e.danhMuc?.slug ?? '';
     dto.soLuong = e.soLuongMax;
     dto.batBuoc = e.batBuoc;
     dto.thuTu = e.thuTu;

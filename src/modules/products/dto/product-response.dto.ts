@@ -41,6 +41,7 @@ export interface VariantListResponse {
   sku: string;
   name: string;
   price: number;
+  originalPrice: number;
   stock: number;
   status: 'active' | 'inactive';
   thumbnailUrl: string | null;
@@ -55,6 +56,7 @@ export function mapVariantListResponse(v: ProductVariant): VariantListResponse {
     sku: v.sku,
     name: v.tenPhienBan,
     price: Number(v.giaBan),
+    originalPrice: Number(v.giaGoc),
     stock: v.stockLevel?.soLuongTon ?? 0,
     status: mapVariantStatus(v.trangThai),
     thumbnailUrl: mainImage?.urlHinhAnh ?? null,
@@ -67,10 +69,12 @@ export function mapVariantListResponse(v: ProductVariant): VariantListResponse {
 
 export interface ProductListResponse {
   id: string;
+  code: string;
   name: string;
   slug: string;
   category: string;
   categoryId: string;
+  categorySlug: string;
   brands: string[];
   brandIds: string[];
   totalStock: number;
@@ -164,10 +168,12 @@ export function mapProductListResponse(product: Product, brands: Brand[]): Produ
 
   return {
     id: String(product.id),
+    code: product.maSanPham,
     name: product.tenSanPham,
     slug: product.slug,
     category: product.danhMuc?.tenDanhMuc ?? '',
     categoryId: String(product.danhMuc?.id ?? ''),
+    categorySlug: product.danhMuc?.slug ?? '',
     brands: brands.map((b) => b.tenThuongHieu),
     brandIds: brands.map((b) => String(b.id)),
     totalStock,

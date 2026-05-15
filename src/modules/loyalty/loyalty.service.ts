@@ -412,6 +412,11 @@ export class LoyaltyService {
 
   // ─── Mappers ──────────────────────────────────────────────────────────────
 
+  /** Public-safe mapper for storefront use (no internal-only fields). */
+  toEarnRulePublicDto(r: LoyaltyEarnRule): EarnRuleResponseDto {
+    return this.toEarnRuleDto(r);
+  }
+
   private toEarnRuleDto(r: LoyaltyEarnRule): EarnRuleResponseDto {
     return {
       id: String(r.id),

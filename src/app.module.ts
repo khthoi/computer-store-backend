@@ -50,6 +50,7 @@ import { LoyaltyModule } from './modules/loyalty/loyalty.module';
 import { ReviewsModule } from './modules/reviews/reviews.module';
 import { ReturnsModule } from './modules/returns/returns.module';
 import { SupportModule } from './modules/support/support.module';
+import { ContactMessagesModule } from './modules/contact-messages/contact-messages.module';
 
 // Phase 7 — Notifications · Wishlist · Search
 import { NotificationsModule } from './modules/notifications/notifications.module';
@@ -144,6 +145,7 @@ import { PermissionGuard } from './common/guards/permission.guard';
     ReviewsModule,
     ReturnsModule,
     SupportModule,
+    ContactMessagesModule,
 
     // Phase 7
     NotificationsModule,

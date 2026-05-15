@@ -33,7 +33,7 @@ export class SpecType {
   coTheLoc: boolean;
 
   @Column({ name: 'widget_loc', length: 20, nullable: true })
-  widgetLoc: string | null; // 'checkbox' | 'range' | 'toggle' | 'select' | 'combo-select'
+  widgetLoc: string | null; // 'checkbox' | 'range' | 'toggle' | 'select'
 
   @Column({ name: 'thu_tu_loc', type: 'smallint', default: 0 })
   thuTuLoc: number;

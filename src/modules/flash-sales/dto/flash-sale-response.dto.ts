@@ -54,7 +54,7 @@ export class FlashSaleResponseDto {
   @ApiPropertyOptional({ example: 'Giảm giá sốc ngày 11/11' })
   moTa?: string;
 
-  @ApiProperty({ example: 'nhap', enum: ['nhap', 'sap_dien_ra', 'dang_dien_ra', 'da_ket_thuc', 'huy'] })
+  @ApiProperty({ example: 'active', enum: ['active', 'paused'] })
   trangThai: string;
 
   @ApiProperty({ example: '2024-11-11T00:00:00.000Z' })
@@ -98,7 +98,7 @@ export class FlashSaleSummaryResponseDto {
   @ApiProperty({ example: 'Flash Sale 11/11' })
   ten: string;
 
-  @ApiProperty({ example: 'nhap', enum: ['nhap', 'sap_dien_ra', 'dang_dien_ra', 'da_ket_thuc', 'huy'] })
+  @ApiProperty({ example: 'active', enum: ['active', 'paused'] })
   trangThai: string;
 
   @ApiProperty({ example: '2024-11-11T00:00:00.000Z' })

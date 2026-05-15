@@ -21,12 +21,18 @@ export class WishlistController {
         id: 1,
         items: [
           {
-            id: 5, variantId: 12, addedAt: '2024-06-01T10:00:00.000Z',
+            id: 5,
+            variantId: 12,
+            addedAt: '2024-06-01T10:00:00.000Z',
             variant: {
-              phien_ban_id: 12, ten_phien_ban: 'Intel Core i9-14900K',
-              gia_ban: '12990000.00', trang_thai: 'HienThi',
-              ten_san_pham: 'CPU Intel Core i9', slug: 'cpu-intel-core-i9',
+              variantId: 12,
+              variantName: 'Intel Core i9-14900K',
+              price: 12990000,
+              status: 'HienThi',
+              productName: 'CPU Intel Core i9',
+              slug: 'cpu-intel-core-i9',
               stock: 15,
+              imageUrl: 'https://cdn.example.com/variant-12.jpg',
             },
           },
         ],

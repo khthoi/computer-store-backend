@@ -35,6 +35,52 @@ export class LoyaltyController {
   }
 
   @Public()
+  @Get('earn-rules')
+  @ApiOperation({ summary: 'Danh sách quy tắc tích điểm đang hoạt động (public)' })
+  @ApiOkResponse({
+    schema: {
+      example: [
+        {
+          id: '1',
+          name: 'Tích điểm theo chi tiêu',
+          description: '1 điểm cho mỗi 100.000đ chi tiêu',
+          pointsPerUnit: 1,
+          spendPerUnit: 100000,
+          minOrderValue: null,
+          maxPointsPerOrder: null,
+          bonusTrigger: null,
+          bonusPoints: null,
+          scopes: [],
+          isActive: true,
+          priority: 10,
+          validFrom: null,
+          validUntil: null,
+        },
+      ],
+    },
+  })
+  async getEarnRules() {
+    const rules = await this.loyaltyService.findActiveEarnRules();
+    return rules.map((r) => this.loyaltyService.toEarnRulePublicDto(r));
+  }
+
+  @Public()
+  @Get('tiers')
+  @ApiOperation({ summary: 'Danh sách hạng thành viên đang hoạt động (public)' })
+  @ApiOkResponse({
+    schema: {
+      example: [
+        { id: 1, name: 'Bronze', displayName: 'Hạng Đồng', minPoints: 0, maxPoints: 999, color: '#cd7f32', description: 'Khách hàng mới', sortOrder: 1 },
+        { id: 2, name: 'Silver', displayName: 'Hạng Bạc',  minPoints: 1000, maxPoints: 4999, color: '#c0c0c0', description: 'Khách hàng thân thiết', sortOrder: 2 },
+        { id: 3, name: 'Gold',   displayName: 'Hạng Vàng', minPoints: 5000, maxPoints: null, color: '#ffd700', description: 'Khách hàng VIP', sortOrder: 3 },
+      ],
+    },
+  })
+  getTiers() {
+    return this.loyaltyService.findAllMembershipTiers(true);
+  }
+
+  @Public()
   @Get('catalog')
   @ApiOperation({ summary: 'Danh sách phần thưởng đang hoạt động có thể đổi điểm (public)' })
   @ApiOkResponse({

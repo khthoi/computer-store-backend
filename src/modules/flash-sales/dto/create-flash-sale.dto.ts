@@ -56,9 +56,13 @@ export class CreateFlashSaleDto {
   @IsOptional() @IsInt()
   assetIdBanner?: number;
 
-  @ApiPropertyOptional({ enum: FlashSaleStatus, example: FlashSaleStatus.NHAP, description: 'Trạng thái ban đầu — chỉ nhap hoặc sap_dien_ra' })
-  @IsOptional() @IsEnum([FlashSaleStatus.NHAP, FlashSaleStatus.SAP_DIEN_RA])
-  trangThai?: FlashSaleStatus.NHAP | FlashSaleStatus.SAP_DIEN_RA;
+  @ApiPropertyOptional({
+    enum: FlashSaleStatus,
+    example: FlashSaleStatus.ACTIVE,
+    description: 'Trạng thái: active (hoạt động) hoặc paused (tạm dừng). Mặc định: active.',
+  })
+  @IsOptional() @IsEnum(FlashSaleStatus)
+  trangThai?: FlashSaleStatus;
 
   @ApiProperty({ type: [CreateFlashSaleItemDto] })
   @IsArray() @ValidateNested({ each: true }) @Type(() => CreateFlashSaleItemDto)

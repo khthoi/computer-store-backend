@@ -90,7 +90,7 @@ export class Popup {
   @Column({ name: 'hien_thi_mot_lan', default: false })
   showOnce: boolean;
 
-  @Column({ name: 'trang_muc_tieu', type: 'json', nullable: true })
+  @Column({ name: 'trang_muc_tieu', type: 'simple-json', nullable: true })
   targetPages: string[] | null;
 
   @Column({ name: 'ngay_bat_dau', type: 'datetime', nullable: true })

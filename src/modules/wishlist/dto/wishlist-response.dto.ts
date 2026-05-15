@@ -21,6 +21,9 @@ export class WishlistVariantDto {
 
   @ApiProperty({ example: 50 })
   stock: number;
+
+  @ApiPropertyOptional({ example: 'https://cdn.example.com/variant-5.jpg', nullable: true })
+  imageUrl: string | null;
 }
 
 export class WishlistItemResponseDto {
