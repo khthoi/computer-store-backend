@@ -22,7 +22,12 @@ export class JwtStrategy extends PassportStrategy(Strategy, 'jwt') {
     private readonly redisService: RedisService,
   ) {
     super({
-      jwtFromRequest: ExtractJwt.fromAuthHeaderAsBearerToken(),
+      // EventSource (used by SSE clients in the browser) cannot set custom headers,
+      // so accept the token from an `?access_token=` query param as a fallback.
+      jwtFromRequest: ExtractJwt.fromExtractors([
+        ExtractJwt.fromAuthHeaderAsBearerToken(),
+        ExtractJwt.fromUrlQueryParameter('access_token'),
+      ]),
       ignoreExpiration: false,
       secretOrKey: config.get<string>('jwt.secret', 'fallback_secret'),
     });

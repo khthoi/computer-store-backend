@@ -151,6 +151,38 @@ export class AdminLoyaltyController {
     return this.loyaltyService.adjustPoints(dto);
   }
 
+  // ─── Customer Loyalty View ────────────────────────────────────────────────
+
+  @Get('customers/:customerId/summary')
+  @RequirePermission('loyalty.read')
+  @ApiOperation({ summary: 'Tổng quan điểm tích lũy của một khách hàng (số dư, tổng tích, tổng tiêu, số lần đổi)' })
+  @ApiParam({ name: 'customerId', example: 15 })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  getCustomerSummary(@Param('customerId', ParseIntPipe) customerId: number) {
+    return this.loyaltyService.getCustomerSummary(customerId);
+  }
+
+  @Get('customers/:customerId/transactions')
+  @RequirePermission('loyalty.read')
+  @ApiOperation({ summary: 'Lịch sử giao dịch điểm của khách hàng (100 giao dịch gần nhất)' })
+  @ApiParam({ name: 'customerId', example: 15 })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  getCustomerTransactions(@Param('customerId', ParseIntPipe) customerId: number) {
+    return this.loyaltyService.getCustomerTransactionsAdmin(customerId);
+  }
+
+  @Get('customers/:customerId/redemptions')
+  @RequirePermission('loyalty.read')
+  @ApiOperation({ summary: 'Lịch sử đổi điểm của khách hàng' })
+  @ApiParam({ name: 'customerId', example: 15 })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @ApiResponse({ status: 403, description: 'Forbidden' })
+  getCustomerRedemptions(@Param('customerId', ParseIntPipe) customerId: number) {
+    return this.loyaltyService.getCustomerRedemptionsAdmin(customerId);
+  }
+
   // ─── Membership Tiers ─────────────────────────────────────────────────────
 
   @Get('tiers')

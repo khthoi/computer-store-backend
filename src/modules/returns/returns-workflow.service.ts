@@ -9,7 +9,6 @@ import { ReturnRequestItem } from './entities/return-request-item.entity';
 import { CreateReturnDto } from './dto/create-return.dto';
 import { ProcessReturnDto, RejectAfterInspectionDto } from './dto/process-return.dto';
 import { ConfirmGoodsReceivedDto } from './dto/confirm-received.dto';
-import { ReturnRequestResponseDto } from './dto/return-response.dto';
 import { ReturnsQueryService } from './returns-query.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
@@ -29,7 +28,7 @@ export class ReturnsWorkflowService {
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
-  async submitReturn(dto: CreateReturnDto, customerId: number): Promise<ReturnRequestResponseDto> {
+  async submitReturn(dto: CreateReturnDto, customerId: number) {
     const [order] = await this.dataSource.query(
       `SELECT don_hang_id, trang_thai_don, ngay_cap_nhat
        FROM don_hang
@@ -139,7 +138,7 @@ export class ReturnsWorkflowService {
       }),
     });
 
-    return this.queryService.toDto(saved);
+    return this.queryService.getMyReturnDetail(saved.id, customerId);
   }
 
   async processReturn(id: number, dto: ProcessReturnDto, employeeId: number) {

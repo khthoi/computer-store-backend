@@ -1,6 +1,8 @@
 import 'dotenv/config';
+import { join } from 'path';
 import { NestFactory } from '@nestjs/core';
 import { Logger } from '@nestjs/common';
+import type { NestExpressApplication } from '@nestjs/platform-express';
 import { SwaggerModule, DocumentBuilder } from '@nestjs/swagger';
 import helmet from 'helmet';
 import cookieParser from 'cookie-parser';
@@ -11,14 +13,22 @@ import { LoggingInterceptor } from './common/interceptors/logging.interceptor';
 import { globalValidationPipe } from './common/pipes/validation.pipe';
 
 async function bootstrap() {
-  const app = await NestFactory.create(AppModule, { bufferLogs: true });
+  const app = await NestFactory.create<NestExpressApplication>(AppModule, { bufferLogs: true });
   const logger = new Logger('Bootstrap');
 
   // Trust one proxy hop (nginx) so req.ip reads X-Forwarded-For correctly in production
   app.getHttpAdapter().getInstance().set('trust proxy', 1);
 
-  // Security headers
-  app.use(helmet());
+  // Serve locally-stored uploads (e.g. support ticket attachments) at /uploads/*
+  app.useStaticAssets(join(process.cwd(), 'uploads'), { prefix: '/uploads/' });
+
+  // Security headers — disable cross-origin policies that would block <img>/<a> to /uploads from FE origin
+  app.use(
+    helmet({
+      crossOriginResourcePolicy: { policy: 'cross-origin' },
+      crossOriginEmbedderPolicy: false,
+    }),
+  );
 
   // Cookie parser (for HttpOnly refresh token)
   app.use(cookieParser());

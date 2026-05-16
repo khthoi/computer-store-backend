@@ -31,4 +31,24 @@ export class VNPayReturnDto {
   @IsOptional()
   @IsString()
   vnp_SecureHash?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  vnp_TransactionStatus?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  vnp_PayDate?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  vnp_OrderInfo?: string;
+
+  @ApiPropertyOptional()
+  @IsOptional()
+  @IsString()
+  vnp_CardType?: string;
 }

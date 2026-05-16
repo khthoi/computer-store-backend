@@ -149,6 +149,28 @@ export class LoyaltyService {
     return rows.map((t) => this.toTransactionDto(t));
   }
 
+  async getTransactionsPaginated(
+    khachHangId: number,
+    page = 1,
+    limit = 10,
+  ): Promise<{ items: LoyaltyTransactionResponseDto[]; total: number; page: number; limit: number; totalPages: number }> {
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.max(1, Math.min(100, Number(limit) || 10));
+    const [rows, total] = await this.transactionRepo.findAndCount({
+      where: { khachHangId },
+      order: { ngayTao: 'DESC' },
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
+    });
+    return {
+      items: rows.map((t) => this.toTransactionDto(t)),
+      total,
+      page: safePage,
+      limit: safeLimit,
+      totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+    };
+  }
+
   // ─── Earn Points (called when order → DaGiao) ─────────────────────────────
 
   async earnPointsForOrder(
@@ -410,6 +432,28 @@ export class LoyaltyService {
     return list.map((r) => this.toRedemptionDto(r));
   }
 
+  async getMyRedemptionsPaginated(
+    khachHangId: number,
+    page = 1,
+    limit = 10,
+  ): Promise<{ items: LoyaltyRedemptionResponseDto[]; total: number; page: number; limit: number; totalPages: number }> {
+    const safePage = Math.max(1, Number(page) || 1);
+    const safeLimit = Math.max(1, Math.min(100, Number(limit) || 10));
+    const [rows, total] = await this.redemptionRepo.findAndCount({
+      where: { khachHangId },
+      order: { ngayDoi: 'DESC' },
+      skip: (safePage - 1) * safeLimit,
+      take: safeLimit,
+    });
+    return {
+      items: rows.map((r) => this.toRedemptionDto(r)),
+      total,
+      page: safePage,
+      limit: safeLimit,
+      totalPages: Math.max(1, Math.ceil(total / safeLimit)),
+    };
+  }
+
   // ─── Mappers ──────────────────────────────────────────────────────────────
 
   /** Public-safe mapper for storefront use (no internal-only fields). */
@@ -493,6 +537,86 @@ export class LoyaltyService {
       couponCode: r.maCoupon,
       status: r.trangThai,
       redeemedAt: r.ngayDoi,
+    };
+  }
+
+  // ─── Admin: Customer Loyalty View ─────────────────────────────────────────
+
+  async getCustomerSummary(customerId: number): Promise<{
+    currentBalance: number;
+    lifetimeEarned: number;
+    lifetimeSpent: number;
+    totalRedemptions: number;
+  }> {
+    const currentBalance = await this.getBalance(customerId);
+
+    const earnedRow = await this.transactionRepo
+      .createQueryBuilder('t')
+      .select('COALESCE(SUM(t.diem), 0)', 'sum')
+      .where('t.khach_hang_id = :id', { id: customerId })
+      .andWhere('t.diem > 0')
+      .getRawOne<{ sum: string }>();
+
+    const spentRow = await this.transactionRepo
+      .createQueryBuilder('t')
+      .select('COALESCE(SUM(-t.diem), 0)', 'sum')
+      .where('t.khach_hang_id = :id', { id: customerId })
+      .andWhere('t.diem < 0')
+      .getRawOne<{ sum: string }>();
+
+    const totalRedemptions = await this.redemptionRepo.count({
+      where: { khachHangId: customerId },
+    });
+
+    return {
+      currentBalance,
+      lifetimeEarned: Number(earnedRow?.sum ?? 0),
+      lifetimeSpent: Number(spentRow?.sum ?? 0),
+      totalRedemptions,
+    };
+  }
+
+  async getCustomerTransactionsAdmin(customerId: number) {
+    const rows = await this.transactionRepo.find({
+      where: { khachHangId: customerId },
+      order: { ngayTao: 'DESC' },
+      take: 100,
+    });
+    return {
+      data: rows.map((t) => ({
+        id: String(t.id),
+        customerId: String(t.khachHangId),
+        type: t.loaiGiaoDich,
+        points: t.diem,
+        balanceBefore: t.soDuTruoc,
+        balanceAfter: t.soDuSau,
+        description: t.moTa,
+        referenceType: t.loaiThamChieu ?? undefined,
+        referenceId: t.thamChieuId != null ? String(t.thamChieuId) : undefined,
+        createdAt: t.ngayTao,
+      })),
+    };
+  }
+
+  async getCustomerRedemptionsAdmin(customerId: number) {
+    const rows = await this.redemptionRepo.find({
+      where: { khachHangId: customerId },
+      order: { ngayDoi: 'DESC' },
+    });
+    return {
+      data: rows.map((r) => ({
+        id: String(r.id),
+        customerId: String(r.khachHangId),
+        catalogItemId: String(r.catalogId),
+        catalogItemName: r.tenSnapshot,
+        pointsSpent: r.diemDaDoi,
+        couponCode: r.maCoupon,
+        promotionId: String(r.promotionId),
+        status: r.trangThai,
+        redeemedAt: r.ngayDoi,
+        usedAt: r.ngaySuDung ?? undefined,
+        orderId: r.donHangId != null ? String(r.donHangId) : undefined,
+      })),
     };
   }
 

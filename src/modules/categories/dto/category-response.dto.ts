@@ -19,6 +19,7 @@ export class CategoryResponseDto {
   imageUrl: string | null;
   imageAssetId: string | null;
   imageAlt: string | null;
+  isComparisonRoot: boolean;
 
   static from(cat: Category, productCount = 0): CategoryResponseDto {
     return {
@@ -40,6 +41,7 @@ export class CategoryResponseDto {
       imageUrl: cat.hinhAnh ?? null,
       imageAssetId: cat.assetId != null ? String(cat.assetId) : null,
       imageAlt: cat.imageAlt ?? null,
+      isComparisonRoot: Boolean(cat.laChuanSoSanh),
     };
   }
 

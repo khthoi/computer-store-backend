@@ -1,5 +1,5 @@
-import { Controller, Get, Post, Body, Request } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiBearerAuth } from '@nestjs/swagger';
+import { Controller, Get, Post, Body, Query, Request } from '@nestjs/common';
+import { ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiBearerAuth, ApiQuery } from '@nestjs/swagger';
 import { Public } from '../../common/decorators/public.decorator';
 import { LoyaltyService } from './loyalty.service';
 import { RedeemPointsDto } from './dto/redeem-points.dto';
@@ -20,18 +20,34 @@ export class LoyaltyController {
 
   @Get('transactions')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Lịch sử giao dịch điểm tích lũy (100 giao dịch gần nhất)' })
+  @ApiOperation({ summary: 'Lịch sử giao dịch điểm tích lũy — phân trang khi truyền page/limit, ngược lại trả 100 dòng gần nhất' })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 10 })
   @ApiOkResponse({
     schema: {
-      example: [
-        { id: 88, loaiGiaoDich: 'earn', diem: 120, soDuTruoc: 1130, soDuSau: 1250, moTa: 'Tích điểm đơn hàng #201', loaiThamChieu: 'don_hang', thamChieuId: 201, ngayTao: '2024-05-28T09:00:00.000Z' },
-        { id: 75, loaiGiaoDich: 'redeem', diem: -500, soDuTruoc: 1630, soDuSau: 1130, moTa: 'Đổi điểm: Giảm 50k', loaiThamChieu: 'loyalty_redemption', thamChieuId: 12, ngayTao: '2024-05-20T14:00:00.000Z' },
-      ],
+      example: {
+        items: [
+          { id: 88, transactionType: 'earn', points: 120, balanceBefore: 1130, balanceAfter: 1250, description: 'Tích điểm đơn hàng #201', referenceType: 'don_hang', referenceId: 201, createdAt: '2024-05-28T09:00:00.000Z' },
+        ],
+        total: 1, page: 1, limit: 10, totalPages: 1,
+      },
     },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getTransactions(@Request() req: any) {
-    return this.loyaltyService.getTransactions(req.user?.sub ?? req.user?.customerId);
+  getTransactions(
+    @Request() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const customerId = req.user?.sub ?? req.user?.customerId;
+    if (page !== undefined || limit !== undefined) {
+      return this.loyaltyService.getTransactionsPaginated(
+        customerId,
+        page ? Number(page) : 1,
+        limit ? Number(limit) : 10,
+      );
+    }
+    return this.loyaltyService.getTransactions(customerId);
   }
 
   @Public()
@@ -97,17 +113,24 @@ export class LoyaltyController {
 
   @Get('redemptions')
   @ApiBearerAuth()
-  @ApiOperation({ summary: 'Lịch sử đổi điểm của khách hàng đang đăng nhập' })
-  @ApiOkResponse({
-    schema: {
-      example: [
-        { id: 12, catalogId: 1, tenSnapshot: 'Giảm 50.000đ cho đơn từ 500k', diemDaDoi: 500, maCoupon: 'LR-A1B2C3', promotionId: 7, trangThai: 'completed', ngayDoi: '2024-05-20T14:00:00.000Z', ngaySuDung: '2024-05-21T10:00:00.000Z', donHangId: 205 },
-      ],
-    },
-  })
+  @ApiOperation({ summary: 'Lịch sử đổi điểm — phân trang khi truyền page/limit' })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 10 })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  getMyRedemptions(@Request() req: any) {
-    return this.loyaltyService.getMyRedemptions(req.user?.sub ?? req.user?.customerId);
+  getMyRedemptions(
+    @Request() req: any,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    const customerId = req.user?.sub ?? req.user?.customerId;
+    if (page !== undefined || limit !== undefined) {
+      return this.loyaltyService.getMyRedemptionsPaginated(
+        customerId,
+        page ? Number(page) : 1,
+        limit ? Number(limit) : 10,
+      );
+    }
+    return this.loyaltyService.getMyRedemptions(customerId);
   }
 
   @Post('redeem')

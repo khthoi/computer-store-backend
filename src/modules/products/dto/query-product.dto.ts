@@ -28,6 +28,21 @@ export class QueryProductDto extends PaginationDto {
   @IsInt()
   brandId?: number;
 
+  /**
+   * Multi-brand filter — OR-matches any of the supplied brand IDs.
+   * Send as repeated query param: `?brandIds=1&brandIds=2`.
+   */
+  @ApiPropertyOptional({ isArray: true, type: Number })
+  @IsOptional()
+  @Transform(({ value }) =>
+    value === undefined || value === null
+      ? undefined
+      : (Array.isArray(value) ? value : [value])
+          .map((v) => Number(v))
+          .filter((n) => Number.isFinite(n) && n > 0),
+  )
+  brandIds?: number[];
+
   /** Backend-native status filter */
   @ApiPropertyOptional({ enum: ['DangBan', 'NgungBan', 'Nhap'] })
   @IsOptional()

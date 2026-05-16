@@ -6,6 +6,7 @@ export enum PhuongThucThanhToan {
   COD = 'COD',
   VNPAY = 'VNPay',
   MOMO = 'MoMo',
+  ZALOPAY = 'ZaloPay',
 }
 
 export class CheckoutDto {

@@ -61,6 +61,9 @@ export class Category {
   @Column({ name: 'image_alt', length: 200, nullable: true })
   imageAlt: string | null;
 
+  @Column({ name: 'la_chuan_so_sanh', type: 'boolean', default: false })
+  laChuanSoSanh: boolean;
+
   @ManyToOne(() => Category, (c) => c.children, { nullable: true, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'danh_muc_cha_id' })
   parent: Category | null;

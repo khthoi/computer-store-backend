@@ -16,11 +16,16 @@ export class LoggingInterceptor implements NestInterceptor {
     const req = context.switchToHttp().getRequest();
     const { method, url } = req;
     const start = Date.now();
+    // Strip sensitive query params (e.g. `access_token` used by SSE handshakes)
+    // before logging so JWTs never leak into application logs.
+    const safeUrl = typeof url === 'string'
+      ? url.replace(/([?&])access_token=[^&]*/g, '$1access_token=***')
+      : url;
 
     return next.handle().pipe(
       tap(() => {
         const ms = Date.now() - start;
-        this.logger.log(`${method} ${url} — ${ms}ms`);
+        this.logger.log(`${method} ${safeUrl} — ${ms}ms`);
       }),
     );
   }

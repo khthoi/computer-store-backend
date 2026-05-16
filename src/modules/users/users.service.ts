@@ -5,11 +5,14 @@ import {
   ForbiddenException,
   ConflictException,
   BadRequestException,
+  HttpException,
+  HttpStatus,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository, ILike, QueryFailedError } from 'typeorm';
 import * as bcrypt from 'bcryptjs';
 import { randomBytes } from 'crypto';
+import { v2 as cloudinary } from 'cloudinary';
 import { Customer } from './entities/customer.entity';
 import { ShippingAddress } from './entities/shipping-address.entity';
 import { UpdateProfileDto } from './dto/update-profile.dto';
@@ -31,6 +34,9 @@ import { ConfigService } from '@nestjs/config';
 
 const RESET_TOKEN_TTL = 24 * 3600; // 24 hours
 
+/** Maximum shipping addresses a single customer may own. */
+export const MAX_SHIPPING_ADDRESSES_PER_CUSTOMER = 3;
+
 @Injectable()
 export class UsersService {
   private readonly logger = new Logger(UsersService.name);
@@ -45,7 +51,13 @@ export class UsersService {
     private readonly mailService: MailService,
     private readonly configService: ConfigService,
     private readonly cls: ClsService,
-  ) {}
+  ) {
+    cloudinary.config({
+      cloud_name: configService.get<string>('CLOUDINARY_CLOUD_NAME'),
+      api_key: configService.get<string>('CLOUDINARY_API_KEY'),
+      api_secret: configService.get<string>('CLOUDINARY_API_SECRET'),
+    });
+  }
 
   // ─── Profile ───────────────────────────────────────────────────────────────
 
@@ -63,6 +75,43 @@ export class UsersService {
     return this.toProfileDto(saved);
   }
 
+  async uploadAvatar(customerId: number, file: Express.Multer.File): Promise<CustomerProfileResponseDto> {
+    const today = new Date().toISOString().substring(0, 10);
+    const rateKey = `avatar_daily:${customerId}:${today}`;
+    const countStr = await this.redisService.get(rateKey);
+    const count = countStr ? parseInt(countStr, 10) : 0;
+    if (count >= 3) {
+      throw new HttpException('Bạn đã đổi ảnh đại diện 3 lần hôm nay. Vui lòng thử lại vào ngày mai.', HttpStatus.TOO_MANY_REQUESTS);
+    }
+
+    const url = await this.uploadAvatarToCloudinary(file);
+
+    const customer = await this.customerRepo.findOne({ where: { id: customerId } });
+    if (!customer) throw new NotFoundException('Khách hàng không tồn tại');
+    customer.anhDaiDien = url;
+    const saved = await this.customerRepo.save(customer);
+
+    const now = new Date();
+    const midnight = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1));
+    const ttl = Math.ceil((midnight.getTime() - now.getTime()) / 1000);
+    await this.redisService.set(rateKey, String(count + 1), ttl);
+
+    return this.toProfileDto(saved);
+  }
+
+  private uploadAvatarToCloudinary(file: Express.Multer.File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: 'pc-store/avatars', resource_type: 'image' },
+        (error, result) => {
+          if (error) return reject(new Error(error.message ?? 'Upload ảnh thất bại'));
+          resolve((result as { secure_url: string }).secure_url);
+        },
+      );
+      stream.end(file.buffer);
+    });
+  }
+
   // ─── Addresses ─────────────────────────────────────────────────────────────
 
   async getAddresses(customerId: number): Promise<ShippingAddressResponseDto[]> {
@@ -74,6 +123,12 @@ export class UsersService {
   }
 
   async addAddress(customerId: number, dto: CreateAddressDto): Promise<ShippingAddressResponseDto> {
+    const existing = await this.addressRepo.count({ where: { khachHangId: customerId } });
+    if (existing >= MAX_SHIPPING_ADDRESSES_PER_CUSTOMER) {
+      throw new BadRequestException(
+        `Bạn chỉ có thể lưu tối đa ${MAX_SHIPPING_ADDRESSES_PER_CUSTOMER} địa chỉ giao hàng. Hãy xóa bớt địa chỉ cũ trước khi thêm mới.`,
+      );
+    }
     if (dto.laMacDinh) {
       await this.addressRepo.update({ khachHangId: customerId }, { laMacDinh: false });
     }
@@ -326,6 +381,12 @@ export class UsersService {
   // ─── Admin address CRUD ───────────────────────────────────────────────────
 
   async adminAddAddress(customerId: number, dto: AdminCreateAddressDto): Promise<ShippingAddressResponseDto> {
+    const existing = await this.addressRepo.count({ where: { khachHangId: customerId } });
+    if (existing >= MAX_SHIPPING_ADDRESSES_PER_CUSTOMER) {
+      throw new BadRequestException(
+        `Khách hàng đã đạt giới hạn tối đa ${MAX_SHIPPING_ADDRESSES_PER_CUSTOMER} địa chỉ giao hàng.`,
+      );
+    }
     if (dto.isDefault) {
       await this.addressRepo.update({ khachHangId: customerId }, { laMacDinh: false });
     }

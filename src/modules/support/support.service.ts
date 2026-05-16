@@ -4,6 +4,8 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, In, Repository } from 'typeorm';
 import { Subject } from 'rxjs';
+import { promises as fs } from 'fs';
+import { join } from 'path';
 import { SupportTicket } from './entities/support-ticket.entity';
 import { TicketMessage } from './entities/ticket-message.entity';
 import { TicketAttachment } from './entities/ticket-attachment.entity';
@@ -14,6 +16,7 @@ import { AssignTicketDto } from './dto/assign-ticket.dto';
 import { QueryTicketsDto } from './dto/query-tickets.dto';
 import { UpdateTicketMetaDto } from './dto/update-ticket-meta.dto';
 import { TicketMessageResponseDto } from './dto/ticket-message-response.dto';
+import { TicketDetailResponseDto } from './dto/ticket-detail-response.dto';
 import { TicketPriority, TicketStatus } from './support.enums';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
@@ -68,23 +71,47 @@ export class SupportService {
       .then(([items, total]) => ({ items, total, page, limit, totalPages: Math.ceil(total / limit) }));
   }
 
-  async getMyTicketDetail(ticketId: number, customerId: number): Promise<SupportTicket> {
-    const ticket = await this.ticketRepo.findOne({ where: { id: ticketId, customerId } });
+  async getMyTicketDetail(ticketId: number, customerId: number): Promise<TicketDetailResponseDto> {
+    const ticket = await this.ticketRepo.findOne({
+      where: { id: ticketId, customerId },
+      relations: ['customer', 'assignedTo', 'order'],
+    });
     if (!ticket) throw new NotFoundException('Ticket không tồn tại hoặc không thuộc về bạn');
-    return ticket;
+
+    const allMessages = await this.loadMessages(ticket);
+    const visible = allMessages.filter((m) => m.loaiTinNhan !== 'InternalNote');
+    const last = [...visible].reverse().find((m) => m.senderType !== 'HeThong');
+    return TicketDetailResponseDto.from(
+      ticket,
+      visible,
+      visible.length,
+      last ? new Date(last.createdAt) : null,
+      new Date(),
+    );
   }
 
-  async sendCustomerMessage(ticketId: number, dto: SendMessageDto, customerId: number): Promise<TicketMessage> {
-    const ticket = await this.ticketRepo.findOne({ where: { id: ticketId, customerId } });
+  async sendCustomerMessage(
+    ticketId: number,
+    dto: SendMessageDto,
+    customerId: number,
+    files: Express.Multer.File[] = [],
+  ): Promise<TicketMessageResponseDto> {
+    const ticket = await this.ticketRepo.findOne({ where: { id: ticketId, customerId }, relations: ['customer'] });
     if (!ticket) throw new NotFoundException('Ticket không tồn tại hoặc không thuộc về bạn');
     if (ticket.status === TicketStatus.DaDong) throw new BadRequestException('Ticket đã đóng, không thể gửi thêm tin nhắn');
+    if (!dto.content?.trim() && files.length === 0) {
+      throw new BadRequestException('Tin nhắn phải có nội dung hoặc đính kèm file');
+    }
 
     await this.ticketRepo.save(ticket);
     const message = await this.messageRepo.save(
-      this.messageRepo.create({ ticketId, senderType: 'KhachHang', senderId: customerId, content: dto.content, messageType: 'Reply', newStatus: null }),
+      this.messageRepo.create({ ticketId, senderType: 'KhachHang', senderId: customerId, content: dto.content ?? '', messageType: 'Reply', newStatus: null }),
     );
-    this.emitToStream(ticketId, { type: 'message', data: message });
-    return message;
+    const attachments = await this.saveAttachments(message.id, ticketId, files);
+    const senderName = (ticket.customer as any)?.hoTen ?? 'Khách hàng';
+    const response = TicketMessageResponseDto.from(message, senderName, null, attachments);
+    this.emitToStream(ticketId, { type: 'message', data: response });
+    return response;
   }
 
   // ─── Admin mutations ──────────────────────────────────────────────────────
@@ -124,7 +151,12 @@ export class SupportService {
     return saved;
   }
 
-  async sendStaffMessage(ticketId: number, dto: SendMessageDto, employeeId: number): Promise<TicketMessageResponseDto> {
+  async sendStaffMessage(
+    ticketId: number,
+    dto: SendMessageDto,
+    employeeId: number,
+    files: Express.Multer.File[] = [],
+  ): Promise<TicketMessageResponseDto> {
     const ticket = await this.ticketRepo.findOne({ where: { id: ticketId }, relations: ['customer'] });
     if (!ticket) throw new NotFoundException(`Ticket #${ticketId} không tồn tại`);
     if (ticket.status === TicketStatus.DaDong) throw new BadRequestException('Ticket đã đóng');
@@ -149,16 +181,54 @@ export class SupportService {
     if (isPublicReply && !ticket.firstResponseAt) ticket.firstResponseAt = new Date();
     await this.ticketRepo.save(ticket);
 
+    if (!dto.content?.trim() && files.length === 0) {
+      throw new BadRequestException('Tin nhắn phải có nội dung hoặc đính kèm file');
+    }
+
     const message = await this.messageRepo.save(
-      this.messageRepo.create({ ticketId, senderType: 'NhanVien', senderId: employeeId, content: dto.content, messageType: dto.messageType ?? 'Reply', newStatus: null }),
+      this.messageRepo.create({ ticketId, senderType: 'NhanVien', senderId: employeeId, content: dto.content ?? '', messageType: dto.messageType ?? 'Reply', newStatus: null }),
     );
-    this.emitToStream(ticketId, { type: 'message', data: message });
+    const attachments = await this.saveAttachments(message.id, ticketId, files);
 
     const sender = await this.dataSource.getRepository(Employee).findOne({
       where: { id: employeeId },
       select: ['id', 'hoTen', 'anhDaiDien'],
     });
-    return TicketMessageResponseDto.from(message, sender?.hoTen ?? 'Nhân viên', sender?.anhDaiDien, []);
+    const response = TicketMessageResponseDto.from(message, sender?.hoTen ?? 'Nhân viên', sender?.anhDaiDien, attachments);
+    this.emitToStream(ticketId, { type: 'message', data: response });
+    return response;
+  }
+
+  // ─── Attachment persistence ───────────────────────────────────────────────
+
+  private async saveAttachments(
+    messageId: number,
+    ticketId: number,
+    files: Express.Multer.File[],
+  ): Promise<TicketAttachment[]> {
+    if (!files?.length) return [];
+    const dirAbs = join(process.cwd(), 'uploads', 'support', String(ticketId));
+    await fs.mkdir(dirAbs, { recursive: true });
+    const saved: TicketAttachment[] = [];
+    for (const file of files) {
+      if (!file?.buffer || file.size === 0) continue;
+      const safeBase = file.originalname.replace(/[^\w.\-]+/g, '_').slice(0, 120);
+      const fileName = `${Date.now()}-${Math.random().toString(36).slice(2, 8)}-${safeBase}`;
+      const absPath = join(dirAbs, fileName);
+      await fs.writeFile(absPath, file.buffer);
+      const row = await this.attachmentRepo.save(
+        this.attachmentRepo.create({
+          messageId,
+          fileName: file.originalname,
+          fileUrl: `/uploads/support/${ticketId}/${fileName}`,
+          fileType: file.mimetype || 'application/octet-stream',
+          fileSize: file.size,
+          assetId: null,
+        }),
+      );
+      saved.push(row);
+    }
+    return saved;
   }
 
   async closeTicket(ticketId: number, employeeId: number): Promise<SupportTicket> {

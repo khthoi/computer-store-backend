@@ -7,8 +7,14 @@ export class WishlistVariantDto {
   @ApiProperty({ example: 'Intel Core i9-14900K Box' })
   variantName: string;
 
+  @ApiProperty({ example: 'CPU-I9-14900K-BOX' })
+  sku: string;
+
   @ApiProperty({ example: 15000000 })
   price: number;
+
+  @ApiProperty({ example: 17000000 })
+  originalPrice: number;
 
   @ApiProperty({ example: 'DangBan' })
   status: string;
@@ -24,6 +30,12 @@ export class WishlistVariantDto {
 
   @ApiPropertyOptional({ example: 'https://cdn.example.com/variant-5.jpg', nullable: true })
   imageUrl: string | null;
+
+  @ApiPropertyOptional({ example: 'CPU' })
+  categoryName: string | null;
+
+  @ApiProperty({ example: ['Intel'], type: [String] })
+  brands: string[];
 }
 
 export class WishlistItemResponseDto {
@@ -46,4 +58,16 @@ export class WishlistResponseDto {
 
   @ApiProperty({ type: [WishlistItemResponseDto] })
   items: WishlistItemResponseDto[];
+
+  @ApiProperty({ example: 42 })
+  total: number;
+
+  @ApiProperty({ example: 1 })
+  page: number;
+
+  @ApiProperty({ example: 10 })
+  limit: number;
+
+  @ApiProperty({ example: 5 })
+  totalPages: number;
 }

@@ -40,6 +40,21 @@ export class OrderItem {
   @Column({ name: 'sku_snapshot', length: 100 })
   skuSnapshot: string;
 
+  @Column({ name: 'gia_goc_snapshot', type: 'decimal', precision: 18, scale: 2, nullable: true })
+  giaGocSnapshot: number | null;
+
+  @Column({ name: 'flash_sale_id_snapshot', type: 'int', nullable: true })
+  flashSaleIdSnapshot: number | null;
+
+  @Column({ name: 'flash_sale_ten_snapshot', length: 300, nullable: true })
+  flashSaleTenSnapshot: string | null;
+
+  @Column({ name: 'khuyen_mai_id_snapshot', type: 'int', nullable: true })
+  khuyenMaiIdSnapshot: number | null;
+
+  @Column({ name: 'khuyen_mai_ten_snapshot', length: 300, nullable: true })
+  khuyenMaiTenSnapshot: string | null;
+
   @ManyToOne(() => Order, (o) => o.items, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'don_hang_id' })
   order: Order;

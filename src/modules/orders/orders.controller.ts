@@ -96,6 +96,28 @@ export class OrdersController {
     return this.ordersService.findOne(id, userId);
   }
 
+  @Get(':id/success-summary')
+  @ApiOperation({ summary: 'Tóm tắt đầy đủ đơn hàng cho trang /checkout/success' })
+  @ApiParam({ name: 'id', example: 101 })
+  getSuccessSummary(
+    @CurrentUser('sub') userId: number,
+    @Param('id', ParseIntPipe) id: number,
+  ) {
+    return this.ordersService.getSuccessSummary(id, userId);
+  }
+
+  @Get(':id/recommendations')
+  @ApiOperation({ summary: 'Sản phẩm gợi ý sau khi đặt đơn (cùng danh mục)' })
+  @ApiParam({ name: 'id', example: 101 })
+  @ApiQuery({ name: 'limit', required: false, example: 10 })
+  getRecommendations(
+    @CurrentUser('sub') userId: number,
+    @Param('id', ParseIntPipe) id: number,
+    @Query('limit') limit?: string,
+  ) {
+    return this.ordersService.getRecommendations(id, userId, Number(limit) || 10);
+  }
+
   @Delete(':id/cancel')
   @ApiOperation({ summary: 'Hủy đơn hàng (chỉ khi Chờ xác nhận)' })
   cancelOrder(

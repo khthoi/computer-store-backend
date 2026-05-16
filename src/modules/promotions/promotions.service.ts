@@ -408,6 +408,38 @@ export class PromotionsService {
     return this.usageRepo.count({ where: { promotionId, customerId } });
   }
 
+  /**
+   * Atomically consumes one usage slot of a coupon-style promotion.
+   * Returns false if the promotion has been exhausted between the time it was
+   * applied (preview) and the time the order's payment was confirmed —
+   * caller must then refund / cancel the order.
+   */
+  async recordCouponConsumption(
+    promotionId: number,
+    customerId: number,
+    orderId: number,
+    discountAmount: number,
+  ): Promise<boolean> {
+    const result = await this.promotionRepo
+      .createQueryBuilder()
+      .update(Promotion)
+      .set({ usageCount: () => 'usage_count + 1' })
+      .where('promotion_id = :id', { id: promotionId })
+      .andWhere('(total_usage_limit IS NULL OR usage_count < total_usage_limit)')
+      .execute();
+    if (!result.affected) return false;
+    await this.usageRepo.save({ promotionId, customerId, orderId, discountAmount });
+    this.auditLogsService.log({
+      entityType:  'PromotionUsage',
+      entityId:    String(promotionId),
+      entityLabel: `Khuyến mãi #${promotionId}`,
+      actionType:  'CapNhat',
+      actionDetail: `Tiêu thụ lượt dùng (sau thanh toán) cho đơn #${orderId}, khách #${customerId}, giảm ${discountAmount.toLocaleString('vi-VN')} ₫`,
+      after: JSON.stringify({ promotionId, customerId, orderId, discountAmount }),
+    });
+    return true;
+  }
+
   async recordUsage(promotionId: number, customerId: number, orderId: number, discountAmount: number): Promise<void> {
     await this.usageRepo.save({ promotionId, customerId, orderId, discountAmount });
     await this.promotionRepo.increment({ id: promotionId }, 'usageCount', 1);

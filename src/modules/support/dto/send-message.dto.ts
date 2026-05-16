@@ -1,11 +1,13 @@
-import { IsString, IsEnum, IsOptional, MinLength } from 'class-validator';
-import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsEnum, IsOptional } from 'class-validator';
+import { ApiPropertyOptional } from '@nestjs/swagger';
 
 export class SendMessageDto {
-  @ApiProperty({ example: 'Chúng tôi đã xác nhận và sẽ hỗ trợ bạn trong 24h tới.' })
+  // Content may be empty when the message is attachment-only; the service enforces
+  // that either content or at least one file is provided.
+  @ApiPropertyOptional({ example: 'Chúng tôi đã xác nhận và sẽ hỗ trợ bạn trong 24h tới.' })
+  @IsOptional()
   @IsString()
-  @MinLength(1)
-  content: string;
+  content?: string;
 
   @ApiPropertyOptional({ enum: ['Reply', 'InternalNote'], default: 'Reply' })
   @IsOptional()

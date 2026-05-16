@@ -1,9 +1,12 @@
 import {
   Controller, Get, Post, Put, Patch, Body, Param, ParseIntPipe, Request, Query, Sse,
+  UseInterceptors, UploadedFiles,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import {
   ApiTags, ApiOperation, ApiOkResponse, ApiResponse,
-  ApiBearerAuth, ApiParam, ApiQuery,
+  ApiBearerAuth, ApiParam, ApiQuery, ApiConsumes, ApiBody,
 } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -95,17 +98,39 @@ export class AdminSupportController {
 
   @Post(':id/messages')
   @RequirePermission('support.update')
-  @ApiOperation({ summary: 'Nhân viên gửi phản hồi (Reply hoặc InternalNote)' })
+  @ApiOperation({ summary: 'Nhân viên gửi phản hồi (Reply hoặc InternalNote, đính kèm file qua field "files")' })
   @ApiParam({ name: 'id', example: 1 })
+  @ApiConsumes('multipart/form-data', 'application/json')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        content: { type: 'string', example: 'Chúng tôi đã ghi nhận yêu cầu của bạn' },
+        messageType: { type: 'string', enum: ['Reply', 'InternalNote'], default: 'Reply' },
+        files: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+          description: 'Tối đa 5 file, mỗi file ≤ 10MB',
+        },
+      },
+    },
+  })
   @ApiResponse({ status: 201, description: 'TicketMessageResponseDto' })
   @ApiResponse({ status: 400, description: 'Ticket đã đóng' })
+  @UseInterceptors(
+    FilesInterceptor('files', 5, {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+    }),
+  )
   sendMessage(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: SendMessageDto,
+    @UploadedFiles() files: Express.Multer.File[] = [],
     @Request() req: any,
   ) {
     const employeeId: number = req.user?.employeeId ?? req.user?.sub;
-    return this.supportService.sendStaffMessage(id, dto, employeeId);
+    return this.supportService.sendStaffMessage(id, dto, employeeId, files);
   }
 
   @Get(':id/messages')

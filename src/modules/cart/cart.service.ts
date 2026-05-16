@@ -12,6 +12,7 @@ import { AddCartItemDto } from './dto/add-cart-item.dto';
 import { UpdateCartItemDto } from './dto/update-cart-item.dto';
 import { CartItemResponseDto, CartResponseDto } from './dto/cart-response.dto';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { PromotionEvaluatorService, EvaluationContext } from '../promotions/promotion-evaluator.service';
 
 @Injectable()
 export class CartService {
@@ -20,7 +21,60 @@ export class CartService {
     @InjectRepository(CartItem) private itemRepo: Repository<CartItem>,
     private dataSource: DataSource,
     private readonly auditLogsService: AuditLogsService,
+    private readonly promotionEvaluator: PromotionEvaluatorService,
   ) {}
+
+  async setCoupon(userId: number, code: string): Promise<CartResponseDto> {
+    const cart = await this.cartRepo.findOne({ where: { khachHangId: userId }, relations: ['items'] });
+    if (!cart) throw new NotFoundException('Giỏ hàng không tồn tại');
+    if (!cart.items?.length) throw new BadRequestException('Giỏ hàng đang trống');
+    // Validate by attempting to apply. Throws BadRequestException if invalid.
+    const subtotal = cart.items.reduce((s, i) => s + Number(i.giaTaiThoiDiem) * i.soLuong, 0);
+    const { categoryIds, brandIds } = await this.collectScopeIds(cart.items.map((i) => i.phienBanId));
+    const ctx: EvaluationContext = {
+      items: cart.items.map((i) => ({ variantId: i.phienBanId, quantity: i.soLuong, price: Number(i.giaTaiThoiDiem) })),
+      subtotal,
+      customerId: userId,
+      isFirstOrder: false,
+      categoryIds,
+      brandIds,
+    };
+    await this.promotionEvaluator.applyCoupon(code, ctx);
+    await this.cartRepo.update(cart.id, { couponCode: code });
+    return this.getMyCart(userId);
+  }
+
+  async clearCoupon(userId: number): Promise<CartResponseDto> {
+    const cart = await this.cartRepo.findOne({ where: { khachHangId: userId } });
+    if (cart && cart.couponCode) {
+      await this.cartRepo.update(cart.id, { couponCode: null });
+    }
+    return this.getMyCart(userId);
+  }
+
+  private async collectScopeIds(variantIds: number[]): Promise<{ categoryIds: number[]; brandIds: number[] }> {
+    if (!variantIds.length) return { categoryIds: [], brandIds: [] };
+    const rows: Array<{ phienBanId: number; danhMucId: number | null; brandIds: string | null }> =
+      await this.dataSource.query(
+        `SELECT pbsp.phien_ban_id AS phienBanId,
+                sp.danh_muc_id   AS danhMucId,
+                (SELECT GROUP_CONCAT(spth.thuong_hieu_id) FROM san_pham_thuong_hieu spth
+                   WHERE spth.san_pham_id = sp.san_pham_id) AS brandIds
+         FROM phien_ban_san_pham pbsp
+         JOIN san_pham sp ON sp.san_pham_id = pbsp.san_pham_id
+         WHERE pbsp.phien_ban_id IN (?)`,
+        [variantIds],
+      );
+    const categoryIds = Array.from(new Set(rows.map((r) => Number(r.danhMucId)).filter((x) => Number.isFinite(x))));
+    const brandIds = Array.from(
+      new Set(
+        rows
+          .flatMap((r) => (r.brandIds ? r.brandIds.split(',').map((s) => Number(s)) : []))
+          .filter((x) => Number.isFinite(x)),
+      ),
+    );
+    return { categoryIds, brandIds };
+  }
 
   async getMyCart(userId: number): Promise<CartResponseDto> {
     let cart = await this.cartRepo.findOne({
@@ -174,10 +228,17 @@ export class CartService {
     if (items.length > 0) {
       const ids = items.map((i) => i.phienBanId);
       const variants = await this.dataSource.query(
-        `SELECT pbsp.phien_ban_id, pbsp.ten_phien_ban, pbsp.sku, pbsp.gia_ban, pbsp.trang_thai,
-                sp.ten_san_pham, hi.url_hinh_anh
+        `SELECT pbsp.phien_ban_id, pbsp.ten_phien_ban, pbsp.sku, pbsp.gia_ban, pbsp.gia_goc, pbsp.trang_thai,
+                sp.ten_san_pham, sp.slug AS product_slug,
+                dm.ten_danh_muc AS category_name,
+                (SELECT GROUP_CONCAT(th.ten_thuong_hieu SEPARATOR '|||')
+                   FROM san_pham_thuong_hieu spth
+                   JOIN thuong_hieu th ON th.thuong_hieu_id = spth.thuong_hieu_id
+                  WHERE spth.san_pham_id = sp.san_pham_id) AS brand_names,
+                hi.url_hinh_anh
          FROM phien_ban_san_pham pbsp
          JOIN san_pham sp ON sp.san_pham_id = pbsp.san_pham_id
+         LEFT JOIN danh_muc dm ON dm.danh_muc_id = sp.danh_muc_id
          LEFT JOIN hinh_anh_san_pham hi ON hi.phien_ban_id = pbsp.phien_ban_id AND hi.loai_anh = 'AnhChinh'
          WHERE pbsp.phien_ban_id IN (?)`,
         [ids],
@@ -185,32 +246,70 @@ export class CartService {
       variantMap = new Map(variants.map((v: any) => [v.phien_ban_id, v]));
     }
 
+    const mappedItems = items.map((item): CartItemResponseDto => {
+      const v = variantMap.get(item.phienBanId);
+      return {
+        id: item.id,
+        variantId: item.phienBanId,
+        quantity: item.soLuong,
+        priceAtTime: Number(item.giaTaiThoiDiem),
+        addedAt: item.ngayThem,
+        variant: v
+          ? {
+              variantId: v.phien_ban_id,
+              variantName: v.ten_phien_ban,
+              sku: v.sku,
+              price: Number(v.gia_ban),
+              originalPrice: Number(v.gia_goc),
+              status: v.trang_thai,
+              productName: v.ten_san_pham,
+              slug: v.product_slug ?? null,
+              categoryName: v.category_name ?? null,
+              brands: v.brand_names
+                ? String(v.brand_names)
+                    .split('|||')
+                    .map((s: string) => s.trim())
+                    .filter((s: string) => s.length > 0)
+                : [],
+              thumbnail: v.url_hinh_anh ?? null,
+            }
+          : null,
+      };
+    });
+
+    const subtotal = mappedItems.reduce((s, i) => s + i.priceAtTime * i.quantity, 0);
+    let appliedPromotions: any[] = [];
+    if (items.length > 0) {
+      const { categoryIds, brandIds } = await this.collectScopeIds(items.map((i) => i.phienBanId));
+      const ctx: EvaluationContext = {
+        items: mappedItems.map((i) => ({ variantId: i.variantId, quantity: i.quantity, price: i.priceAtTime })),
+        subtotal,
+        customerId: cart.khachHangId,
+        isFirstOrder: false,
+        categoryIds,
+        brandIds,
+      };
+      try {
+        appliedPromotions = await this.promotionEvaluator.evaluateForCart(ctx, cart.couponCode);
+      } catch {
+        appliedPromotions = [];
+      }
+    }
+    const totalDiscount = appliedPromotions
+      .filter((p) => p.status === 'active')
+      .reduce((s: number, p: any) => s + Number(p.discountAmount ?? 0), 0);
+    const total = Math.max(0, subtotal - totalDiscount);
+
     return {
       id: cart.id,
       customerId: cart.khachHangId,
       couponCode: cart.couponCode,
       updatedAt: cart.ngayCapNhat,
-      items: items.map((item): CartItemResponseDto => {
-        const v = variantMap.get(item.phienBanId);
-        return {
-          id: item.id,
-          variantId: item.phienBanId,
-          quantity: item.soLuong,
-          priceAtTime: Number(item.giaTaiThoiDiem),
-          addedAt: item.ngayThem,
-          variant: v
-            ? {
-                variantId: v.phien_ban_id,
-                variantName: v.ten_phien_ban,
-                sku: v.sku,
-                price: Number(v.gia_ban),
-                status: v.trang_thai,
-                productName: v.ten_san_pham,
-                thumbnail: v.url_hinh_anh ?? null,
-              }
-            : null,
-        };
-      }),
+      items: mappedItems,
+      subtotal,
+      totalDiscount,
+      total,
+      appliedPromotions,
     };
   }
 }

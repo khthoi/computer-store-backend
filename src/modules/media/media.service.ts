@@ -183,6 +183,57 @@ export class MediaService {
     return uploaded;
   }
 
+  /**
+   * Lightweight customer-side upload — bypasses folder-config validation and
+   * audit logging (those are admin concerns) but still lands the file in
+   * Cloudinary + creates a `media_asset` row so downstream junction tables
+   * (e.g. `yeu_cau_doi_tra_asset`) can reference it by id like any other asset.
+   *
+   * `nguoiUploadId` is left null since the uploader isn't an employee.
+   */
+  async uploadCustomerEvidence(
+    file: Express.Multer.File,
+    options?: { folder?: string; altText?: string },
+  ): Promise<MediaAsset> {
+    if (!file?.buffer || file.size === 0) {
+      throw new BadRequestException('Tệp tải lên không hợp lệ');
+    }
+    if (!file.mimetype?.startsWith('image/') && !file.mimetype?.startsWith('video/')) {
+      throw new BadRequestException(`Tệp "${file.originalname}" không phải ảnh hoặc video`);
+    }
+    const originalName = decodeOriginalName(file);
+    const folder = options?.folder ?? 'pc-store/returns';
+    const result = await this.uploadToCloudinary(file, folder, originalName);
+
+    const loaiFile = isRenderableImageFile(file, originalName)
+      ? 'image'
+      : result.resource_type === 'image'
+        ? 'image'
+        : result.resource_type === 'video'
+          ? 'video'
+          : 'raw';
+
+    const asset = this.repo.create({
+      cloudinaryId: result.public_id as string,
+      cloudinaryVer: result.version as number,
+      urlGoc: result.secure_url as string,
+      tenFileGoc: originalName,
+      loaiFile,
+      mimeType: file.mimetype,
+      kichThuocByte: file.size,
+      chieuRong: (result.width as number) ?? null,
+      chieuCao: (result.height as number) ?? null,
+      altText: options?.altText ?? null,
+      caption: null,
+      thuMuc: folder,
+      thuMucId: null,
+      trangThai: 'active',
+      phamVi: 'public',
+      nguoiUploadId: null,
+    });
+    return this.repo.save(asset);
+  }
+
   async findAll(query: QueryMediaDto) {
     const {
       page = 1,

@@ -218,17 +218,108 @@ export class ReturnsQueryService {
   }
 
   async getMyReturns(customerId: number, query: QueryReturnsDto) {
+    const page = query.page ?? 1;
+    const limit = query.limit ?? 20;
     const qb = this.returnRepo.createQueryBuilder('r')
       .where('r.customerId = :customerId', { customerId });
     if (query.status) qb.andWhere('r.status = :status', { status: query.status });
-    const page = query.page ?? 1;
-    const limit = query.limit ?? 20;
-    const [items, total] = await qb
+
+    const [returns, total] = await qb
       .orderBy('r.createdAt', 'DESC')
       .skip((page - 1) * limit)
       .take(limit)
       .getManyAndCount();
-    return { items: items.map((r) => this.toDto(r)), total, page, limit, totalPages: Math.ceil(total / limit) };
+
+    if (!returns.length) return { items: [], total, page, limit, totalPages: 0 };
+
+    const items = await this.enrichReturns(returns);
+    return { items, total, page, limit, totalPages: Math.ceil(total / limit) };
+  }
+
+  async getMyReturnDetail(id: number, customerId: number) {
+    const r = await this.returnRepo.findOne({ where: { id, customerId } });
+    if (!r) throw new NotFoundException('Yêu cầu đổi/trả không tồn tại');
+    const items = await this.enrichReturns([r]);
+    return items[0];
+  }
+
+  private async enrichReturns(returns: ReturnRequest[]) {
+    const returnIds = returns.map((r) => r.id);
+    const orderIds  = [...new Set(returns.map((r) => r.orderId))];
+
+    const [orders, items, assets]: [
+      Array<{ don_hang_id: number; ma_don_hang: string }>,
+      Array<{
+        yeu_cau_id: number; phien_ban_id: number; so_luong: number;
+        ten_phien_ban: string | null; ten_san_pham: string | null;
+        thumb: string | null;
+      }>,
+      Array<{ yeu_cau_id: number; url: string | null }>,
+    ] = await Promise.all([
+      this.dataSource.query(
+        `SELECT don_hang_id, ma_don_hang FROM don_hang WHERE don_hang_id IN (?)`,
+        [orderIds],
+      ),
+      this.dataSource.query(
+        `SELECT ycct.yeu_cau_id, ycct.phien_ban_id, ycct.so_luong,
+                pbsp.ten_phien_ban, sp.ten_san_pham,
+                (SELECT url_hinh_anh FROM hinh_anh_san_pham
+                 WHERE phien_ban_id = ycct.phien_ban_id ORDER BY thu_tu LIMIT 1) AS thumb
+         FROM yeu_cau_doi_tra_chi_tiet ycct
+         LEFT JOIN phien_ban_san_pham pbsp ON pbsp.phien_ban_id = ycct.phien_ban_id
+         LEFT JOIN san_pham sp ON sp.san_pham_id = pbsp.san_pham_id
+         WHERE ycct.yeu_cau_id IN (?)`,
+        [returnIds],
+      ),
+      this.dataSource.query(
+        `SELECT a.yeu_cau_id, ma.url_goc AS url
+         FROM yeu_cau_doi_tra_asset a
+         LEFT JOIN media_asset ma ON ma.asset_id = a.asset_id
+         WHERE a.yeu_cau_id IN (?) AND a.loai_asset = 'customer_evidence'
+         ORDER BY a.thu_tu ASC`,
+        [returnIds],
+      ),
+    ]);
+
+    const orderMap = new Map(orders.map((o) => [Number(o.don_hang_id), o.ma_don_hang]));
+    const itemsByReturn = new Map<number, typeof items>();
+    for (const it of items) {
+      const k = Number(it.yeu_cau_id);
+      if (!itemsByReturn.has(k)) itemsByReturn.set(k, []);
+      itemsByReturn.get(k)!.push(it);
+    }
+    const assetsByReturn = new Map<number, string[]>();
+    for (const a of assets) {
+      const k = Number(a.yeu_cau_id);
+      if (!assetsByReturn.has(k)) assetsByReturn.set(k, []);
+      if (a.url) assetsByReturn.get(k)!.push(a.url);
+    }
+
+    return returns.map((r) => ({
+      id: String(r.id),
+      orderId: orderMap.get(r.orderId) ?? String(r.orderId),
+      orderNumericId: r.orderId,
+      status: r.status,
+      reason: r.reason,
+      resolution: r.resolution,
+      requestType: r.requestType,
+      description: r.description,
+      submittedAt: r.createdAt instanceof Date
+        ? r.createdAt.toISOString()
+        : String(r.createdAt),
+      resolvedAt: r.updatedAt && (r.status === 'HoanThanh' || r.status === 'TuChoi')
+        ? (r.updatedAt instanceof Date ? r.updatedAt.toISOString() : String(r.updatedAt))
+        : null,
+      rejectionReason: (r as { rejectNotes?: string | null }).rejectNotes ?? null,
+      items: (itemsByReturn.get(r.id) ?? []).map((i) => ({
+        variantId: String(i.phien_ban_id),
+        productName: i.ten_san_pham ?? '',
+        variantLabel: i.ten_phien_ban ?? '',
+        thumbnailUrl: i.thumb ?? null,
+        quantity: Number(i.so_luong),
+      })),
+      evidenceUrls: assetsByReturn.get(r.id) ?? [],
+    }));
   }
 
   async getReturnAssets(returnRequestId: number): Promise<ReturnAssetResponseDto[]> {

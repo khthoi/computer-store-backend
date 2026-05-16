@@ -5,6 +5,7 @@ import {
   IsInt,
   IsIn,
   IsObject,
+  IsBoolean,
   MaxLength,
   Matches,
   Min,
@@ -94,4 +95,13 @@ export class CreateCategoryDto {
   @IsString()
   @MaxLength(200)
   imageAlt?: string;
+
+  @ApiPropertyOptional({
+    description:
+      'Đánh dấu danh mục làm gốc so sánh — mọi danh mục con cháu được coi là cùng một nhóm sản phẩm có thể so sánh với nhau.',
+    default: false,
+  })
+  @IsOptional()
+  @IsBoolean()
+  isComparisonRoot?: boolean;
 }

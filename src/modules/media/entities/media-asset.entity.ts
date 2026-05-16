@@ -72,12 +72,12 @@ export class MediaAsset {
   @Column({ name: 'pham_vi', length: 10, default: 'public' })
   phamVi: string; // 'public' | 'private'
 
-  @Column({ name: 'nguoi_upload_id' })
-  nguoiUploadId: number;
+  @Column({ name: 'nguoi_upload_id', nullable: true })
+  nguoiUploadId: number | null;
 
-  @ManyToOne(() => Employee, { nullable: false, eager: false })
+  @ManyToOne(() => Employee, { nullable: true, eager: false, onDelete: 'SET NULL' })
   @JoinColumn({ name: 'nguoi_upload_id' })
-  nguoiUpload: Employee;
+  nguoiUpload: Employee | null;
 
   @CreateDateColumn({ name: 'ngay_upload' })
   ngayUpload: Date;

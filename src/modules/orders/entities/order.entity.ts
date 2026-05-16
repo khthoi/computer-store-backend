@@ -88,6 +88,15 @@ export class Order {
   @Column({ name: 'so_tien_giam_gia', type: 'decimal', precision: 18, scale: 2, default: 0 })
   soTienGiamGia: number;
 
+  @Column({ name: 'ma_coupon', length: 50, nullable: true })
+  maCoupon: string | null;
+
+  @Column({ name: 'khuyen_mai_id', type: 'int', nullable: true })
+  khuyenMaiId: number | null;
+
+  @Column({ name: 'coupon_consumed', type: 'boolean', default: false })
+  couponConsumed: boolean;
+
   @Column({ name: 'discount_total', type: 'decimal', precision: 18, scale: 2, default: 0 })
   discountTotal: number;
 

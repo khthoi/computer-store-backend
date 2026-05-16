@@ -31,6 +31,7 @@ export class ProductsSearchService {
       categoryId,
       category,
       brandId,
+      brandIds,
       trangThai,
       status,
       minPrice,
@@ -91,7 +92,14 @@ export class ProductsSearchService {
         { maxPrice },
       );
     }
-    if (brandId) {
+    if (brandIds && brandIds.length > 0) {
+      qb.innerJoin(
+        'san_pham_thuong_hieu',
+        'spth_multi',
+        'spth_multi.san_pham_id = p.id AND spth_multi.thuong_hieu_id IN (:...brandIds)',
+        { brandIds },
+      );
+    } else if (brandId) {
       qb.innerJoin(
         'san_pham_thuong_hieu',
         'spth',
@@ -172,7 +180,12 @@ export class ProductsSearchService {
       createdAt: 'p.ngayTao',
     };
 
-    if (sortBy === 'totalStock') {
+    if (sortBy === 'popularity') {
+      // "Popular" = most-reviewed first, then highest-rated, then newest.
+      qb.orderBy('p.soLuotDanhGia', 'DESC');
+      qb.addOrderBy('p.diemDanhGiaTb', 'DESC');
+      qb.addOrderBy('p.ngayTao', 'DESC');
+    } else if (sortBy === 'totalStock') {
       qb.addSelect(
         '(SELECT COALESCE(SUM(_tk.so_luong_ton), 0) FROM ton_kho _tk INNER JOIN phien_ban_san_pham _pv ON _pv.phien_ban_id = _tk.phien_ban_id WHERE _pv.san_pham_id = p.id)',
         'total_stock_calc',

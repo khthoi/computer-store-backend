@@ -31,6 +31,10 @@ export class ReturnsService {
     return this.queryService.getMyReturns(customerId, query);
   }
 
+  getMyReturnDetail(id: number, customerId: number) {
+    return this.queryService.getMyReturnDetail(id, customerId);
+  }
+
   // ─── Admin — Queries ──────────────────────────────────────────────────────
   findAll(query: QueryReturnsDto) {
     return this.queryService.findAll(query);

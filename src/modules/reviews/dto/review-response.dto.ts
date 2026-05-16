@@ -22,6 +22,12 @@ export class ReviewResponseDto {
   @ApiPropertyOptional({ example: 'Hàng đúng mô tả, giao hàng nhanh' })
   noiDung: string | null;
 
+  @ApiPropertyOptional({
+    example: ['https://res.cloudinary.com/.../review1.jpg'],
+    description: 'URLs ảnh đính kèm review (Cloudinary)',
+  })
+  hinhAnh?: string[];
+
   @ApiProperty({ example: 'Pending', enum: ['Pending', 'Approved', 'Rejected', 'Hidden'] })
   trangThai: string;
 

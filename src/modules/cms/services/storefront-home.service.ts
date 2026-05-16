@@ -10,6 +10,7 @@ import {
   StorefrontHomepageSectionDto,
   StorefrontProductCardDto,
   StorefrontPromotionProductsDto,
+  StorefrontVariantOptionDto,
 } from '../dto/storefront-product-card.dto';
 
 type EnrichedRow = {
@@ -26,6 +27,18 @@ type EnrichedRow = {
   diemDanhGiaTb: string | null;
   soLuotDanhGia: string | null;
   ngayTao: Date | null;
+};
+
+type SiblingVariantRow = {
+  phienBanId: string;
+  sanPhamId: string;
+  sku: string;
+  tenPhienBan: string;
+  giaBan: string;
+  giaGoc: string;
+  isMacDinh: number;
+  soLuongTon: string | null;
+  thumbnailUrl: string | null;
 };
 
 const NEW_BADGE_DAYS = 14;
@@ -125,8 +138,15 @@ export class StorefrontHomeService {
         const remaining = Math.max(0, item.soLuongGioiHan - item.soLuongDaBan);
         const flashPrice = Number(item.giaFlash);
         const originalPrice = Number(item.giaGocSnapshot);
+        const flashVariantId = String(item.phienBanId);
+        const patchedVariants = base.variants.map((v) =>
+          v.id === flashVariantId
+            ? { ...v, price: flashPrice, originalPrice }
+            : v,
+        );
         return {
           ...base,
+          variants: patchedVariants,
           price: flashPrice,
           originalPrice: originalPrice > flashPrice ? originalPrice : undefined,
           stockStatus: remaining === 0 ? 'out-of-stock' : remaining <= 10 ? 'low-stock' : 'in-stock',
@@ -238,14 +258,68 @@ export class StorefrontHomeService {
       .where('v.phien_ban_id IN (:...ids)', { ids: variantIds })
       .getRawMany<EnrichedRow>();
 
+    const productIds = Array.from(new Set(rows.map((r) => r.sanPhamId)));
+    const variantsByProduct = await this.loadVariantsForProducts(productIds);
+
     for (const row of rows) {
-      const dto = this.toCardDto(row);
+      const siblings = variantsByProduct.get(row.sanPhamId) ?? [];
+      const dto = this.toCardDto(row, siblings);
       result.set(dto.variantId, dto);
     }
     return result;
   }
 
-  private toCardDto(row: EnrichedRow): StorefrontProductCardDto {
+  private async loadVariantsForProducts(
+    productIds: string[],
+  ): Promise<Map<string, StorefrontVariantOptionDto[]>> {
+    const grouped = new Map<string, StorefrontVariantOptionDto[]>();
+    if (!productIds.length) return grouped;
+
+    const rows = await this.dataSource
+      .createQueryBuilder()
+      .select('v.phien_ban_id', 'phienBanId')
+      .addSelect('v.san_pham_id', 'sanPhamId')
+      .addSelect('v.sku', 'sku')
+      .addSelect('v.ten_phien_ban', 'tenPhienBan')
+      .addSelect('v.gia_ban', 'giaBan')
+      .addSelect('v.gia_goc', 'giaGoc')
+      .addSelect('v.is_mac_dinh', 'isMacDinh')
+      .addSelect(
+        `(SELECT so_luong_ton FROM ton_kho WHERE phien_ban_id = v.phien_ban_id LIMIT 1)`,
+        'soLuongTon',
+      )
+      .addSelect(
+        `(SELECT url_hinh_anh FROM hinh_anh_san_pham
+            WHERE phien_ban_id = v.phien_ban_id
+            ORDER BY (loai_anh = 'AnhChinh') DESC, thu_tu ASC, hinh_anh_id ASC LIMIT 1)`,
+        'thumbnailUrl',
+      )
+      .from('phien_ban_san_pham', 'v')
+      .where('v.san_pham_id IN (:...ids)', { ids: productIds })
+      .andWhere(`v.trang_thai = 'HienThi'`)
+      .orderBy('v.is_mac_dinh', 'DESC')
+      .addOrderBy('v.phien_ban_id', 'ASC')
+      .getRawMany<SiblingVariantRow>();
+
+    for (const r of rows) {
+      const option: StorefrontVariantOptionDto = {
+        id: String(r.phienBanId),
+        name: r.tenPhienBan,
+        sku: r.sku,
+        price: Number(r.giaBan),
+        originalPrice: Number(r.giaGoc),
+        stock: r.soLuongTon != null ? Number(r.soLuongTon) : 0,
+        isDefault: Number(r.isMacDinh) === 1,
+        thumbnailUrl: r.thumbnailUrl ?? null,
+      };
+      const list = grouped.get(r.sanPhamId) ?? [];
+      list.push(option);
+      grouped.set(r.sanPhamId, list);
+    }
+    return grouped;
+  }
+
+  private toCardDto(row: EnrichedRow, variants: StorefrontVariantOptionDto[]): StorefrontProductCardDto {
     const price = Number(row.giaBan);
     const originalPrice = Number(row.giaGoc);
     const stockQty = row.soLuongTon != null ? Number(row.soLuongTon) : 0;
@@ -271,6 +345,7 @@ export class StorefrontHomeService {
       stockStatus,
       stockQuantity: stockStatus === 'low-stock' || stockStatus === 'out-of-stock' ? stockQty : undefined,
       badge,
+      variants,
     };
   }
 }

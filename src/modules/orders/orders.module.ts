@@ -4,6 +4,7 @@ import { Order } from './entities/order.entity';
 import { OrderItem } from './entities/order-item.entity';
 import { OrderNote } from './entities/order-note.entity';
 import { OrderActivityLog } from './entities/order-activity-log.entity';
+import { OrderAppliedPromotion } from './entities/order-applied-promotion.entity';
 import { OrdersService } from './orders.service';
 import { OrdersReturnsQueryService } from './orders-returns-query.service';
 import { OrderActivityLogService } from './order-activity-log.service';
@@ -12,9 +13,10 @@ import { AdminOrdersController } from './admin-orders.controller';
 import { CartModule } from '../cart/cart.module';
 import { InventoryModule } from '../inventory/inventory.module';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
+import { PromotionsModule } from '../promotions/promotions.module';
 
 @Module({
-  imports: [TypeOrmModule.forFeature([Order, OrderItem, OrderNote, OrderActivityLog]), CartModule, InventoryModule, AuditLogsModule],
+  imports: [TypeOrmModule.forFeature([Order, OrderItem, OrderNote, OrderActivityLog, OrderAppliedPromotion]), CartModule, InventoryModule, AuditLogsModule, PromotionsModule],
   controllers: [OrdersController, AdminOrdersController],
   providers: [OrdersService, OrdersReturnsQueryService, OrderActivityLogService],
   exports: [OrdersService],

@@ -1,8 +1,8 @@
 import {
-  Controller, Get, Post, Delete, Body, Param, ParseIntPipe, Request,
+  Controller, Get, Post, Delete, Body, Param, ParseIntPipe, Query, Request,
 } from '@nestjs/common';
 import {
-  ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiBearerAuth,
+  ApiTags, ApiOperation, ApiOkResponse, ApiResponse, ApiBearerAuth, ApiQuery,
 } from '@nestjs/swagger';
 import { WishlistService } from './wishlist.service';
 import { AddItemDto } from './dto/add-item.dto';
@@ -14,7 +14,9 @@ export class WishlistController {
   constructor(private readonly wishlistService: WishlistService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Danh sách yêu thích kèm tình trạng tồn kho' })
+  @ApiOperation({ summary: 'Danh sách yêu thích kèm tình trạng tồn kho (phân trang)' })
+  @ApiQuery({ name: 'page', required: false, example: 1 })
+  @ApiQuery({ name: 'limit', required: false, example: 10 })
   @ApiOkResponse({
     schema: {
       example: {
@@ -39,8 +41,15 @@ export class WishlistController {
       },
     },
   })
-  getWishlist(@Request() req) {
-    return this.wishlistService.getWishlist(req.user.id);
+  getWishlist(
+    @Request() req,
+    @Query('page') page?: string,
+    @Query('limit') limit?: string,
+  ) {
+    return this.wishlistService.getWishlist(req.user.id, {
+      page: page ? Number(page) : undefined,
+      limit: limit ? Number(limit) : undefined,
+    });
   }
 
   @Post('items')

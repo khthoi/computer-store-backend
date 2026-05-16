@@ -77,4 +77,19 @@ export class CartController {
   clearCart(@CurrentUser('sub') userId: number) {
     return this.cartService.clearCart(userId);
   }
+
+  @Post('coupon')
+  @ApiOperation({ summary: 'Áp mã giảm giá vào giỏ hàng (preview, không trừ usageCount)' })
+  applyCoupon(
+    @CurrentUser('sub') userId: number,
+    @Body() body: { code: string },
+  ) {
+    return this.cartService.setCoupon(userId, body.code);
+  }
+
+  @Delete('coupon')
+  @ApiOperation({ summary: 'Gỡ mã giảm giá khỏi giỏ hàng' })
+  removeCoupon(@CurrentUser('sub') userId: number) {
+    return this.cartService.clearCoupon(userId);
+  }
 }

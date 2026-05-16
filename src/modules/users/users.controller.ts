@@ -3,14 +3,20 @@ import {
   Get,
   Put,
   Post,
+  Patch,
   Delete,
   Body,
   Param,
   ParseIntPipe,
   HttpCode,
   HttpStatus,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
 } from '@nestjs/common';
-import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiResponse, ApiParam } from '@nestjs/swagger';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiConsumes, ApiBody, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
 import { CreateAddressDto } from './dto/create-address.dto';
@@ -40,6 +46,28 @@ export class UsersController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   updateProfile(@CurrentUser() user: JwtPayload, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateProfile(user.sub, dto);
+  }
+
+  @Patch('me/avatar')
+  @ApiOperation({ summary: 'Đổi ảnh đại diện (tối đa 3 lần/ngày)' })
+  @ApiConsumes('multipart/form-data')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: { avatar: { type: 'string', format: 'binary' } },
+      required: ['avatar'],
+    },
+  })
+  @ApiOkResponse({ type: CustomerProfileResponseDto })
+  @ApiResponse({ status: 429, description: 'Đã đổi ảnh đại diện 3 lần hôm nay' })
+  @UseInterceptors(FileInterceptor('avatar', { storage: memoryStorage(), limits: { fileSize: 5 * 1024 * 1024 } }))
+  uploadAvatar(
+    @CurrentUser() user: JwtPayload,
+    @UploadedFile() file: Express.Multer.File,
+  ) {
+    if (!file) throw new BadRequestException('Vui lòng chọn file ảnh');
+    if (!file.mimetype.startsWith('image/')) throw new BadRequestException('Chỉ chấp nhận file ảnh');
+    return this.usersService.uploadAvatar(user.sub, file);
   }
 
   @Get('me/addresses')

@@ -30,12 +30,23 @@ export class CategoriesService {
       if (!parent) throw new NotFoundException('Danh mục cha không tồn tại');
     }
 
+    if (dto.isComparisonRoot) {
+      if ((dto.nodeType ?? 'category') !== 'category') {
+        throw new BadRequestException(
+          'Chỉ danh mục loại "category" mới có thể đặt làm gốc so sánh.',
+        );
+      }
+      await this.assertNoFlagOnAncestors(dto.danhMucChaId ?? null);
+    }
+
     const capDo = dto.danhMucChaId ? await this.getLevel(dto.danhMucChaId) + 1 : 0;
 
+    const { isComparisonRoot, ...rest } = dto;
     const category = this.repo.create({
-      ...dto,
+      ...rest,
       slug,
       capDoHienThi: capDo,
+      laChuanSoSanh: Boolean(isComparisonRoot),
     });
     const saved = await this.repo.save(category);
     this.auditLogsService.log({
@@ -126,7 +137,23 @@ export class CategoriesService {
       throw new BadRequestException('Danh mục không thể là cha của chính nó');
     }
 
-    Object.assign(cat, dto);
+    if (dto.isComparisonRoot === true && !cat.laChuanSoSanh) {
+      const nextNodeType = dto.nodeType ?? cat.nodeType;
+      if (nextNodeType !== 'category') {
+        throw new BadRequestException(
+          'Chỉ danh mục loại "category" mới có thể đặt làm gốc so sánh.',
+        );
+      }
+      const parentId = dto.danhMucChaId !== undefined ? dto.danhMucChaId : cat.danhMucChaId;
+      await this.assertNoFlagOnAncestors(parentId);
+      await this.assertNoFlagOnDescendants(id);
+    }
+
+    const { isComparisonRoot, ...restDto } = dto;
+    Object.assign(cat, restDto);
+    if (isComparisonRoot !== undefined) {
+      cat.laChuanSoSanh = Boolean(isComparisonRoot);
+    }
     const updated = await this.repo.save(cat);
     this.auditLogsService.log({
       entityType: 'DanhMuc',
@@ -200,5 +227,46 @@ export class CategoriesService {
   private async getLevel(parentId: number): Promise<number> {
     const parent = await this.repo.findOne({ where: { id: parentId } });
     return parent ? parent.capDoHienThi : 0;
+  }
+
+  /** Throw if any ancestor (walking parent chain) already has laChuanSoSanh = true. */
+  private async assertNoFlagOnAncestors(startParentId: number | null): Promise<void> {
+    let currentId = startParentId;
+    const visited = new Set<number>();
+    while (currentId != null) {
+      if (visited.has(currentId)) break;
+      visited.add(currentId);
+      const node = await this.repo.findOne({ where: { id: currentId } });
+      if (!node) break;
+      if (node.laChuanSoSanh) {
+        throw new ConflictException(
+          `Danh mục cha "${node.tenDanhMuc}" đã được đặt làm gốc so sánh. Chỉ một danh mục trên một nhánh được phép.`,
+        );
+      }
+      currentId = node.danhMucChaId;
+    }
+  }
+
+  /** Throw if any descendant (recursive children) has laChuanSoSanh = true. */
+  private async assertNoFlagOnDescendants(rootId: number): Promise<void> {
+    const all = await this.repo.find();
+    const childrenOf = new Map<number, Category[]>();
+    for (const c of all) {
+      if (c.danhMucChaId == null) continue;
+      const arr = childrenOf.get(c.danhMucChaId) ?? [];
+      arr.push(c);
+      childrenOf.set(c.danhMucChaId, arr);
+    }
+    const stack: Category[] = (childrenOf.get(rootId) ?? []).slice();
+    while (stack.length) {
+      const node = stack.pop()!;
+      if (node.laChuanSoSanh) {
+        throw new ConflictException(
+          `Danh mục con "${node.tenDanhMuc}" đã được đặt làm gốc so sánh. Chỉ một danh mục trên một nhánh được phép.`,
+        );
+      }
+      const ch = childrenOf.get(node.id);
+      if (ch) stack.push(...ch);
+    }
   }
 }

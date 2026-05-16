@@ -4,6 +4,7 @@ import {
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { DataSource, Repository } from 'typeorm';
+import { v2 as cloudinary } from 'cloudinary';
 import { ProductReview } from './entities/product-review.entity';
 import { ReviewMessage } from './entities/review-message.entity';
 import { CreateReviewDto } from './dto/create-review.dto';
@@ -27,13 +28,35 @@ export class ReviewsService {
 
   // ─── Public ───────────────────────────────────────────────────────────────
 
-  async getApprovedReviews(productId: number, page = 1, limit = 10) {
+  async getApprovedReviews(
+    productId: number,
+    page = 1,
+    limit = 10,
+    filters: { rating?: number; hasImages?: boolean } = {},
+  ) {
     const offset = (page - 1) * limit;
+
+    // Build optional filters — distribution is always unfiltered so the sidebar
+    // bars stay stable regardless of the active filter chip.
+    const filterClauses: string[] = [];
+    const filterParams: (string | number | boolean)[] = [];
+    if (filters.rating && filters.rating >= 1 && filters.rating <= 5) {
+      filterClauses.push('r.rating = ?');
+      filterParams.push(filters.rating);
+    }
+    if (filters.hasImages) {
+      // `hinh_anh` is a TypeORM `simple-json` column (stored as TEXT, not native
+      // JSON). Use a substring check rather than JSON_LENGTH so the filter works
+      // regardless of MySQL column type or whitespace variations.
+      filterClauses.push("r.hinh_anh IS NOT NULL AND r.hinh_anh <> '' AND r.hinh_anh <> '[]'");
+    }
+    const extraWhere = filterClauses.length > 0 ? ` AND ${filterClauses.join(' AND ')}` : '';
+
     const [rows, [{ total }], distRows] = await Promise.all([
       this.dataSource.query(
         `SELECT
           r.review_id, r.phien_ban_id, r.khach_hang_id, r.don_hang_id,
-          r.rating, r.tieu_de, r.noi_dung, r.review_status,
+          r.rating, r.tieu_de, r.noi_dung, r.hinh_anh, r.review_status,
           r.da_phan_hoi, r.helpful_count, r.duyet_tai, r.nguon_danh_gia,
           r.created_at, r.updated_at,
           v.ten_phien_ban, v.sku AS sku_phien_ban,
@@ -41,16 +64,16 @@ export class ReviewsService {
          FROM danh_gia_san_pham r
          INNER JOIN phien_ban_san_pham v ON v.phien_ban_id = r.phien_ban_id
          INNER JOIN khach_hang kh ON kh.khach_hang_id = r.khach_hang_id
-         WHERE v.san_pham_id = ? AND r.review_status = 'Approved'
+         WHERE v.san_pham_id = ? AND r.review_status = 'Approved'${extraWhere}
          ORDER BY r.created_at DESC
          LIMIT ? OFFSET ?`,
-        [productId, limit, offset],
+        [productId, ...filterParams, limit, offset],
       ),
       this.dataSource.query(
         `SELECT COUNT(*) AS total FROM danh_gia_san_pham r
          INNER JOIN phien_ban_san_pham v ON v.phien_ban_id = r.phien_ban_id
-         WHERE v.san_pham_id = ? AND r.review_status = 'Approved'`,
-        [productId],
+         WHERE v.san_pham_id = ? AND r.review_status = 'Approved'${extraWhere}`,
+        [productId, ...filterParams],
       ),
       this.dataSource.query(
         `SELECT r.rating AS rating, COUNT(*) AS cnt
@@ -79,7 +102,11 @@ export class ReviewsService {
 
   // ─── Customer ─────────────────────────────────────────────────────────────
 
-  async submitReview(dto: CreateReviewDto, customerId: number): Promise<ReviewResponseDto> {
+  async submitReview(
+    dto: CreateReviewDto,
+    customerId: number,
+    files: Express.Multer.File[] = [],
+  ): Promise<ReviewResponseDto> {
     const purchase = await this.dataSource.query(
       `SELECT ct.chi_tiet_id
        FROM don_hang dh
@@ -100,6 +127,18 @@ export class ReviewsService {
       throw new ConflictException('Bạn đã đánh giá sản phẩm này cho đơn hàng này rồi');
     }
 
+    // Upload images to Cloudinary (sequential to keep memory predictable; max 5
+    // files per request anyway enforced by FilesInterceptor).
+    const images: Array<{ url: string; publicId: string }> = [];
+    for (const file of files) {
+      if (!file?.buffer || file.size === 0) continue;
+      if (!file.mimetype?.startsWith('image/')) {
+        throw new BadRequestException(`Tệp "${file.originalname}" không phải là ảnh hợp lệ`);
+      }
+      const uploaded = await this.uploadReviewImage(file);
+      images.push(uploaded);
+    }
+
     const review = this.reviewRepo.create({
       variantId: dto.variantId,
       customerId,
@@ -107,9 +146,25 @@ export class ReviewsService {
       rating: dto.rating,
       title: dto.title ?? null,
       content: dto.content ?? null,
+      images: images.length > 0 ? images : null,
       status: 'Pending',
     });
     return this.toDto(await this.reviewRepo.save(review));
+  }
+
+  private uploadReviewImage(file: Express.Multer.File): Promise<{ url: string; publicId: string }> {
+    return new Promise((resolve, reject) => {
+      const stream = cloudinary.uploader.upload_stream(
+        { folder: 'pc-store/reviews', resource_type: 'image' },
+        (error, result) => {
+          if (error || !result) {
+            return reject(new Error(error?.message ?? 'Upload ảnh đánh giá thất bại'));
+          }
+          resolve({ url: result.secure_url, publicId: result.public_id });
+        },
+      );
+      stream.end(file.buffer);
+    });
   }
 
   // ─── Admin ────────────────────────────────────────────────────────────────
@@ -443,24 +498,31 @@ export class ReviewsService {
   // ─── Internal ─────────────────────────────────────────────────────────────
 
   private async recomputeProductRating(variantId: number): Promise<void> {
-    const [agg] = await this.dataSource.query(
-      `SELECT sp.san_pham_id,
-              COUNT(r.review_id)  AS cnt,
-              AVG(r.rating)       AS avg_rating
-       FROM danh_gia_san_pham r
-       INNER JOIN phien_ban_san_pham v ON v.phien_ban_id = r.phien_ban_id
-       INNER JOIN san_pham sp ON sp.san_pham_id = v.san_pham_id
-       WHERE r.phien_ban_id = ? AND r.review_status = 'Approved'
-       GROUP BY sp.san_pham_id`,
+    // Resolve the product id from the variant first, then aggregate across ALL
+    // variants of that product. The previous version filtered by `phien_ban_id`
+    // directly which only counted reviews for one variant — so a product with
+    // multiple variants would have a stale `so_luot_danh_gia` cache that was
+    // smaller than the real count visible to the storefront.
+    const [variantRow] = await this.dataSource.query(
+      `SELECT san_pham_id FROM phien_ban_san_pham WHERE phien_ban_id = ?`,
       [variantId],
     );
-    if (!agg) return;
+    if (!variantRow) return;
+    const productId = Number(variantRow.san_pham_id);
+
+    const [agg] = await this.dataSource.query(
+      `SELECT COUNT(r.review_id) AS cnt, AVG(r.rating) AS avg_rating
+       FROM danh_gia_san_pham r
+       INNER JOIN phien_ban_san_pham v ON v.phien_ban_id = r.phien_ban_id
+       WHERE v.san_pham_id = ? AND r.review_status = 'Approved'`,
+      [productId],
+    );
 
     await this.dataSource.query(
       `UPDATE san_pham
        SET diem_danh_gia_tb = ROUND(?, 2), so_luot_danh_gia = ?
        WHERE san_pham_id = ?`,
-      [agg.avg_rating ?? 0, agg.cnt ?? 0, agg.san_pham_id],
+      [agg?.avg_rating ?? 0, agg?.cnt ?? 0, productId],
     );
   }
 
@@ -505,6 +567,7 @@ export class ReviewsService {
       rating:       review.rating,
       tieuDe:       review.title,
       noiDung:      review.content,
+      hinhAnh:      (review.images ?? []).map((i) => i.url),
       trangThai:    review.status,
       daPhanHoi:    !!review.hasReply,
       helpfulCount: review.helpfulCount,
@@ -518,6 +581,23 @@ export class ReviewsService {
   }
 
   private rawToDto(row: any): ReviewResponseDto {
+    // `hinh_anh` is stored as JSON; MySQL may return it as a string or pre-parsed
+    // object depending on driver version. Normalise to a URL list.
+    let imageUrls: string[] = [];
+    const raw = row.hinh_anh;
+    if (raw) {
+      try {
+        const parsed = typeof raw === 'string' ? JSON.parse(raw) : raw;
+        if (Array.isArray(parsed)) {
+          imageUrls = parsed
+            .map((entry: any) => (typeof entry === 'string' ? entry : entry?.url))
+            .filter((u: unknown): u is string => typeof u === 'string' && u.length > 0);
+        }
+      } catch {
+        imageUrls = [];
+      }
+    }
+
     return {
       reviewId:        row.review_id,
       phienBanId:      row.phien_ban_id,
@@ -526,6 +606,7 @@ export class ReviewsService {
       rating:          row.rating,
       tieuDe:          row.tieu_de ?? null,
       noiDung:         row.noi_dung ?? null,
+      hinhAnh:         imageUrls,
       trangThai:       row.review_status,
       daPhanHoi:       !!row.da_phan_hoi,
       helpfulCount:    row.helpful_count ?? 0,

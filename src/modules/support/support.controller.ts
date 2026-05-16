@@ -1,9 +1,12 @@
 import {
   Controller, Get, Post, Body, Param, ParseIntPipe, Request, Query, Sse,
+  UseInterceptors, UploadedFiles,
 } from '@nestjs/common';
+import { FilesInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import {
   ApiTags, ApiOperation, ApiOkResponse, ApiResponse,
-  ApiBearerAuth, ApiParam, ApiQuery,
+  ApiBearerAuth, ApiParam, ApiQuery, ApiConsumes, ApiBody,
 } from '@nestjs/swagger';
 import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
@@ -74,17 +77,39 @@ export class SupportController {
   }
 
   @Post('tickets/:id/messages')
-  @ApiOperation({ summary: 'Gửi tin nhắn cho ticket đang mở' })
+  @ApiOperation({ summary: 'Gửi tin nhắn cho ticket đang mở (multipart, đính kèm file qua field "files")' })
   @ApiParam({ name: 'id', example: 1, description: 'ID ticket' })
+  @ApiConsumes('multipart/form-data', 'application/json')
+  @ApiBody({
+    schema: {
+      type: 'object',
+      properties: {
+        content: { type: 'string', example: 'Tôi vẫn chưa nhận được hàng' },
+        messageType: { type: 'string', enum: ['Reply'], default: 'Reply' },
+        files: {
+          type: 'array',
+          items: { type: 'string', format: 'binary' },
+          description: 'Tối đa 5 file, mỗi file ≤ 10MB',
+        },
+      },
+    },
+  })
   @ApiResponse({ status: 201, description: 'Tin nhắn đã được gửi' })
   @ApiResponse({ status: 400, description: 'Ticket đã đóng' })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
+  @UseInterceptors(
+    FilesInterceptor('files', 5, {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+    }),
+  )
   sendMessage(
     @Param('id', ParseIntPipe) id: number,
     @Body() dto: SendMessageDto,
+    @UploadedFiles() files: Express.Multer.File[] = [],
     @Request() req: any,
   ) {
-    return this.supportService.sendCustomerMessage(id, dto, req.user.sub);
+    return this.supportService.sendCustomerMessage(id, dto, req.user.sub, files);
   }
 
   @Get('tickets/:id/messages')
@@ -116,7 +141,13 @@ export class SupportController {
   @Sse('tickets/:id/stream')
   @ApiOperation({ summary: 'SSE stream — nhận tin nhắn mới theo thời gian thực' })
   @ApiParam({ name: 'id', example: 1, description: 'ID ticket' })
-  stream(@Param('id', ParseIntPipe) id: number): Observable<MessageEvent> {
+  async stream(
+    @Param('id', ParseIntPipe) id: number,
+    @Request() req: any,
+  ): Promise<Observable<MessageEvent>> {
+    // Verify ownership before subscribing — otherwise any logged-in customer
+    // could listen on any ticket id via the `?access_token=` query param.
+    await this.supportService.getMyTicketDetail(id, req.user.sub);
     return this.supportService
       .getTicketStream(id)
       .pipe(map((payload) => ({ data: JSON.stringify(payload.data) } as MessageEvent)));

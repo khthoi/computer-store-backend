@@ -21,6 +21,7 @@ import {
 import { PaymentsService } from './payments.service';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { VNPayReturnDto } from './dto/vnpay-return.dto';
+import { ZaloPayCallbackDto } from './dto/zalopay-callback.dto';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { RequirePermission } from '../../common/decorators/permission.decorator';
 import { Public } from '../../common/decorators/public.decorator';
@@ -79,6 +80,24 @@ export class PaymentsController {
   })
   vnpayReturn(@Query() query: VNPayReturnDto) {
     return this.paymentsService.handleVNPayReturn(query);
+  }
+
+  @Get('vnpay/ipn')
+  @Public()
+  @ApiOperation({ summary: 'VNPay IPN (server-to-server, trả về { RspCode, Message })' })
+  vnpayIpn(@Query() query: VNPayReturnDto) {
+    return this.paymentsService.handleVNPayIpn(query);
+  }
+
+  @Post('zalopay/callback')
+  @Public()
+  @HttpCode(HttpStatus.OK)
+  @ApiOperation({ summary: 'ZaloPay callback (webhook)' })
+  @ApiOkResponse({
+    schema: { example: { return_code: 1, return_message: 'success' } },
+  })
+  zalopayCallback(@Body() body: ZaloPayCallbackDto) {
+    return this.paymentsService.handleZaloPayCallback(body);
   }
 
   @Post('momo/callback')

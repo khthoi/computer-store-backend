@@ -6,13 +6,15 @@ import {
 import { InjectRepository } from '@nestjs/typeorm';
 import { ConfigService } from '@nestjs/config';
 import { Repository } from 'typeorm';
-import * as crypto from 'crypto';
 import { Transaction, TrangThaiGiaoDich, PhuongThucThanhToan } from './entities/transaction.entity';
 import { CreatePaymentDto } from './dto/create-payment.dto';
 import { VNPayReturnDto } from './dto/vnpay-return.dto';
+import { ZaloPayCallbackDto } from './dto/zalopay-callback.dto';
 import { OrdersService } from '../orders/orders.service';
 import { TrangThaiDon } from '../orders/entities/order.entity';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
+import { VNPayGateway } from './gateways/vnpay.gateway';
+import { ZaloPayGateway } from './gateways/zalopay.gateway';
 
 @Injectable()
 export class PaymentsService {
@@ -21,6 +23,8 @@ export class PaymentsService {
     private ordersService: OrdersService,
     private configService: ConfigService,
     private auditLogsService: AuditLogsService,
+    private vnpayGateway: VNPayGateway,
+    private zalopayGateway: ZaloPayGateway,
   ) {}
 
   async createTransaction(dto: CreatePaymentDto): Promise<{ transaction: Transaction; paymentUrl?: string }> {
@@ -73,19 +77,152 @@ export class PaymentsService {
     }
 
     if (dto.phuongThucThanhToan === PhuongThucThanhToan.VI_DIEN_TU && dto.nganHangVi === 'VNPay') {
-      const paymentUrl = this.buildVNPayUrl(tx, order.totalAmount, order.orderCode);
+      const paymentUrl = this.vnpayGateway.buildPaymentUrl({
+        txnRef: String(tx.id),
+        amount: Number(order.totalAmount),
+        orderInfo: `Thanh toan don hang ${order.orderCode}`,
+        ipAddr: '127.0.0.1',
+        orderId: order.id,
+      });
       return { transaction: tx, paymentUrl };
+    }
+
+    if (dto.phuongThucThanhToan === PhuongThucThanhToan.VI_DIEN_TU && dto.nganHangVi === 'ZaloPay') {
+      const appTransId = this.zalopayGateway.buildAppTransId(tx.id);
+      tx.maGiaoDichNgoai = appTransId;
+      await this.txRepo.save(tx);
+
+      const result = await this.zalopayGateway.createOrder({
+        appTransId,
+        userRef: `customer_${order.customerId ?? 'guest'}`,
+        amount: Number(order.totalAmount),
+        orderInfo: `Thanh toan don hang ${order.orderCode}`,
+        orderId: order.id,
+      });
+      if (result.return_code !== 1 || !result.order_url) {
+        tx.trangThaiGiaoDich = TrangThaiGiaoDich.THAT_BAI;
+        tx.ghiChuLoi = `ZaloPay create order failed: ${result.return_message}`;
+        await this.txRepo.save(tx);
+        throw new BadRequestException(`Tạo đơn ZaloPay thất bại: ${result.return_message}`);
+      }
+      return { transaction: tx, paymentUrl: result.order_url };
     }
 
     return { transaction: tx };
   }
 
-  async handleVNPayReturn(query: VNPayReturnDto): Promise<{ success: boolean; message: string }> {
-    const secretKey = this.configService.get<string>('VNPAY_SECRET_KEY', '');
-    const { vnp_SecureHash, ...params } = query as any;
+  async handleVNPayIpn(query: VNPayReturnDto): Promise<{ RspCode: string; Message: string }> {
+    const raw = query as unknown as Record<string, string>;
 
-    const isValid = vnp_SecureHash ? this.verifyVNPaySignature(params, vnp_SecureHash, secretKey) : false;
-    const success = isValid && query.vnp_ResponseCode === '00';
+    if (!this.vnpayGateway.verifySignature(raw)) {
+      return { RspCode: '97', Message: 'Invalid signature' };
+    }
+
+    const txnRef = query.vnp_TxnRef;
+    if (!txnRef) return { RspCode: '01', Message: 'Order not found' };
+
+    const tx = await this.txRepo.findOne({ where: { id: parseInt(txnRef) } });
+    if (!tx) return { RspCode: '01', Message: 'Order not found' };
+
+    if (Math.round(Number(tx.soTien) * 100) !== Number(query.vnp_Amount)) {
+      return { RspCode: '04', Message: 'Invalid amount' };
+    }
+
+    if (
+      tx.trangThaiGiaoDich === TrangThaiGiaoDich.THANH_CONG ||
+      tx.trangThaiGiaoDich === TrangThaiGiaoDich.THAT_BAI
+    ) {
+      return { RspCode: '02', Message: 'Order already confirmed' };
+    }
+
+    const before = { trangThaiGiaoDich: tx.trangThaiGiaoDich };
+    const success = this.vnpayGateway.isSuccess(raw);
+
+    if (success) {
+      tx.trangThaiGiaoDich = TrangThaiGiaoDich.THANH_CONG;
+      tx.maGiaoDichNgoai = query.vnp_TransactionNo ?? null;
+      tx.nganHangVi = query.vnp_BankCode ?? tx.nganHangVi;
+      tx.thoiDiemThanhToan = new Date();
+      await this.txRepo.save(tx);
+
+      const orderDto = await this.ordersService.updateStatus(
+        tx.donHangId,
+        { trangThai: TrangThaiDon.DA_XAC_NHAN, ghiChu: 'Thanh toán VNPay thành công (IPN)' },
+        0,
+      );
+      this.auditLogsService.log({
+        entityType: 'GiaoDich',
+        entityId: String(tx.id),
+        entityLabel: `Giao dịch #${tx.id}`,
+        actionType: 'CapNhat',
+        actionDetail: `IPN VNPay xác nhận thanh toán thành công đơn hàng #${orderDto.orderCode}`,
+        before: JSON.stringify(before),
+        after: JSON.stringify({ trangThaiGiaoDich: TrangThaiGiaoDich.THANH_CONG, maGiaoDichNgoai: tx.maGiaoDichNgoai }),
+      });
+    } else {
+      tx.trangThaiGiaoDich = TrangThaiGiaoDich.THAT_BAI;
+      tx.ghiChuLoi = `VNPay ResponseCode: ${query.vnp_ResponseCode}`;
+      await this.txRepo.save(tx);
+      this.auditLogsService.log({
+        entityType: 'GiaoDich',
+        entityId: String(tx.id),
+        entityLabel: `Giao dịch #${tx.id}`,
+        actionType: 'CapNhat',
+        actionDetail: `IPN VNPay xác nhận thanh toán thất bại: ${query.vnp_ResponseCode}`,
+        before: JSON.stringify(before),
+        after: JSON.stringify({ trangThaiGiaoDich: TrangThaiGiaoDich.THAT_BAI }),
+      });
+    }
+
+    return { RspCode: '00', Message: 'Confirm Success' };
+  }
+
+  async handleZaloPayCallback(body: ZaloPayCallbackDto): Promise<{ return_code: number; return_message: string }> {
+    const verify = this.zalopayGateway.verifyCallback(body);
+    if (!verify.valid || !verify.data) {
+      return { return_code: -1, return_message: 'mac not equal' };
+    }
+
+    const { app_trans_id, amount, zp_trans_id } = verify.data;
+    const tx = await this.txRepo.findOne({ where: { maGiaoDichNgoai: app_trans_id } });
+    if (!tx) return { return_code: 0, return_message: 'transaction not found' };
+
+    if (Math.round(Number(tx.soTien)) !== Number(amount)) {
+      return { return_code: 0, return_message: 'amount mismatch' };
+    }
+
+    if (tx.trangThaiGiaoDich === TrangThaiGiaoDich.THANH_CONG) {
+      return { return_code: 1, return_message: 'success' };
+    }
+
+    const before = { trangThaiGiaoDich: tx.trangThaiGiaoDich };
+    tx.trangThaiGiaoDich = TrangThaiGiaoDich.THANH_CONG;
+    tx.maGiaoDichNgoai = String(zp_trans_id);
+    tx.thoiDiemThanhToan = new Date();
+    await this.txRepo.save(tx);
+
+    const orderDto = await this.ordersService.updateStatus(
+      tx.donHangId,
+      { trangThai: TrangThaiDon.DA_XAC_NHAN, ghiChu: 'Thanh toán ZaloPay thành công (callback)' },
+      0,
+    );
+    this.auditLogsService.log({
+      entityType: 'GiaoDich',
+      entityId: String(tx.id),
+      entityLabel: `Giao dịch #${tx.id}`,
+      actionType: 'CapNhat',
+      actionDetail: `Callback ZaloPay xác nhận thanh toán đơn hàng #${orderDto.orderCode}`,
+      before: JSON.stringify(before),
+      after: JSON.stringify({ trangThaiGiaoDich: TrangThaiGiaoDich.THANH_CONG, maGiaoDichNgoai: tx.maGiaoDichNgoai }),
+    });
+
+    return { return_code: 1, return_message: 'success' };
+  }
+
+  async handleVNPayReturn(query: VNPayReturnDto): Promise<{ success: boolean; message: string }> {
+    const raw = query as unknown as Record<string, string>;
+    const isValid = this.vnpayGateway.verifySignature(raw);
+    const success = isValid && this.vnpayGateway.isSuccess(raw);
 
     const txnRef = query.vnp_TxnRef;
     if (!txnRef) return { success: false, message: 'Thiếu mã giao dịch' };
@@ -219,46 +356,4 @@ export class PaymentsService {
     return tx;
   }
 
-  private buildVNPayUrl(tx: Transaction, amount: number, orderCode: string): string {
-    const tmnCode = this.configService.get<string>('VNPAY_TMN_CODE', 'TEST_TMN');
-    const secretKey = this.configService.get<string>('VNPAY_SECRET_KEY', '');
-    const returnUrl = this.configService.get<string>('VNPAY_RETURN_URL', 'http://localhost:4000/payments/vnpay/return');
-
-    const now = new Date();
-    const createDate = now.toISOString().replace(/[-T:.Z]/g, '').slice(0, 14);
-    const expireDate = new Date(now.getTime() + 15 * 60 * 1000)
-      .toISOString().replace(/[-T:.Z]/g, '').slice(0, 14);
-
-    const params: Record<string, string> = {
-      vnp_Version: '2.1.0',
-      vnp_Command: 'pay',
-      vnp_TmnCode: tmnCode,
-      vnp_Amount: String(Math.round(amount * 100)),
-      vnp_CreateDate: createDate,
-      vnp_CurrCode: 'VND',
-      vnp_IpAddr: '127.0.0.1',
-      vnp_Locale: 'vn',
-      vnp_OrderInfo: `Thanh toan don hang ${orderCode}`,
-      vnp_OrderType: 'other',
-      vnp_ReturnUrl: returnUrl,
-      vnp_TxnRef: String(tx.id),
-      vnp_ExpireDate: expireDate,
-    };
-
-    const sortedKeys = Object.keys(params).sort();
-    const signData = sortedKeys.map((k) => `${k}=${params[k]}`).join('&');
-    const hmac = crypto.createHmac('sha512', secretKey).update(signData).digest('hex');
-
-    const query = sortedKeys.map((k) => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`).join('&');
-    return `https://sandbox.vnpayment.vn/paymentv2/vpcpay.html?${query}&vnp_SecureHash=${hmac}`;
-  }
-
-  private verifyVNPaySignature(params: Record<string, string>, hash: string, secretKey: string): boolean {
-    const sortedKeys = Object.keys(params)
-      .filter((k) => k.startsWith('vnp_') && k !== 'vnp_SecureHash')
-      .sort();
-    const signData = sortedKeys.map((k) => `${k}=${params[k]}`).join('&');
-    const expected = crypto.createHmac('sha512', secretKey).update(signData).digest('hex');
-    return expected === hash;
-  }
 }

@@ -8,11 +8,13 @@ import { AdminTransactionsController } from './admin-transactions.controller';
 import { AdminTransactionsService } from './admin-transactions.service';
 import { OrdersModule } from '../orders/orders.module';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
+import { VNPayGateway } from './gateways/vnpay.gateway';
+import { ZaloPayGateway } from './gateways/zalopay.gateway';
 
 @Module({
   imports: [TypeOrmModule.forFeature([Transaction, Order]), OrdersModule, AuditLogsModule],
   controllers: [PaymentsController, AdminTransactionsController],
-  providers: [PaymentsService, AdminTransactionsService],
+  providers: [PaymentsService, AdminTransactionsService, VNPayGateway, ZaloPayGateway],
   exports: [PaymentsService],
 })
 export class PaymentsModule {}

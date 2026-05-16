@@ -13,12 +13,14 @@ import { ReturnsController } from './returns.controller';
 import { AdminReturnsController } from './admin-returns.controller';
 import { LoyaltyModule } from '../loyalty/loyalty.module';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
+import { MediaModule } from '../media/media.module';
 
 @Module({
   imports: [
     TypeOrmModule.forFeature([ReturnRequest, ReturnAsset, ReturnRequestItem, ReturnResolution]),
     LoyaltyModule,
     AuditLogsModule,
+    MediaModule,
   ],
   controllers: [ReturnsController, AdminReturnsController],
   providers: [

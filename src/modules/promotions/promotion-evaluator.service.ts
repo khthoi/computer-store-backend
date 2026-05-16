@@ -6,6 +6,12 @@ import { PromotionScope, ScopeType } from './entities/promotion-scope.entity';
 import { BulkTier } from './entities/bulk-tier.entity';
 import { CartItemDto } from './dto/apply-coupon.dto';
 import { PromotionsService } from './promotions.service';
+import {
+  AppliedPromotionDto,
+  PromotionActionKind,
+  PromotionScopeKind,
+  PromotionStatusKind,
+} from '../cart/dto/cart-response.dto';
 
 export interface EvaluationContext {
   items: CartItemDto[];
@@ -33,6 +39,214 @@ export class PromotionEvaluatorService {
     const promotions = await this.promotionsService.findActivePromotions();
     const autoPromotions = promotions.filter((p) => !p.isCoupon);
     return this.evaluateAndStack(autoPromotions, ctx);
+  }
+
+  /**
+   * Builds the cart-side rendering of every promotion currently relevant for
+   * the user: every auto-applied promotion (with status active or unmet) plus
+   * the saved coupon (if any). Used by `/cart` so the storefront can render
+   * "what is being applied and why" without the FE recomputing anything.
+   */
+  async evaluateForCart(
+    ctx: EvaluationContext,
+    savedCouponCode: string | null,
+  ): Promise<AppliedPromotionDto[]> {
+    const active = await this.promotionsService.findActivePromotions();
+    const results: AppliedPromotionDto[] = [];
+    let hasExclusive = false;
+
+    for (const promo of active.filter((p) => !p.isCoupon)) {
+      if (hasExclusive) break;
+      const scopeOk = this.checkScope(promo.scopes, ctx);
+      if (!scopeOk) continue;
+      const status: PromotionStatusKind = this.checkConditions(promo.conditions, ctx)
+        ? 'active'
+        : 'unmet';
+      const discount = status === 'active' ? this.calculateDiscount(promo, ctx) : 0;
+      if (status === 'active' && discount <= 0) continue;
+      results.push(this.toAppliedDto(promo, 'auto', status, discount, ctx));
+      if (status === 'active' && promo.stackingPolicy === 'exclusive') {
+        hasExclusive = true;
+      }
+    }
+
+    if (savedCouponCode) {
+      const promo = await this.promotionsService.findByCouponCode(savedCouponCode);
+      if (!promo) {
+        results.push({
+          promotionId: 0,
+          name: savedCouponCode,
+          source: 'coupon',
+          scopeType: 'global',
+          scopeLabel: 'Toàn đơn',
+          actionType: 'other',
+          mechanic: 'Mã không hợp lệ hoặc đã hết hạn',
+          discountAmount: 0,
+          conditions: [],
+          status: 'exhausted',
+          unmetReason: 'Mã giảm giá không tồn tại hoặc đã hết hạn',
+          couponCode: savedCouponCode,
+        });
+      } else {
+        const exhausted =
+          promo.totalUsageLimit !== null && promo.usageCount >= promo.totalUsageLimit;
+        if (exhausted) {
+          results.push({
+            ...this.toAppliedDto(promo, 'coupon', 'exhausted', 0, ctx),
+            unmetReason: 'Mã đã hết lượt sử dụng',
+            couponCode: promo.code ?? savedCouponCode,
+          });
+        } else {
+          const scopeOk = this.checkScope(promo.scopes, ctx);
+          const condOk = scopeOk && this.checkConditions(promo.conditions, ctx);
+          const status: PromotionStatusKind = condOk ? 'active' : 'unmet';
+          const discount = status === 'active' ? this.calculateDiscount(promo, ctx) : 0;
+          results.push({
+            ...this.toAppliedDto(promo, 'coupon', status, discount, ctx),
+            couponCode: promo.code ?? savedCouponCode,
+          });
+        }
+      }
+    }
+
+    return results;
+  }
+
+  private toAppliedDto(
+    promo: Promotion,
+    source: 'auto' | 'coupon',
+    status: PromotionStatusKind,
+    discountAmount: number,
+    ctx: EvaluationContext,
+  ): AppliedPromotionDto {
+    const scope = (promo.scopes ?? [])[0];
+    const scopeType: PromotionScopeKind = (scope?.scopeType as PromotionScopeKind) ?? 'global';
+    const scopeLabel = this.describeScope(scopeType, scope, promo.scopes ?? []);
+    const action = (promo.actions ?? [])[0];
+    const actionType: PromotionActionKind = this.mapActionType(action?.actionType);
+    const mechanic = this.describeMechanic(action);
+    const conditions = (promo.conditions ?? []).map((c) => this.describeCondition(c));
+    const unmetReason = status === 'unmet'
+      ? this.firstUnmetReason(promo, ctx)
+      : undefined;
+    return {
+      promotionId: promo.id,
+      name: promo.name,
+      source,
+      scopeType,
+      scopeLabel,
+      actionType,
+      mechanic,
+      discountAmount,
+      conditions,
+      status,
+      unmetReason,
+      appliedToVariantIds: this.computeAppliedVariants(scopeType, scope, ctx),
+    };
+  }
+
+  private describeScope(
+    kind: PromotionScopeKind,
+    scope: PromotionScope | undefined,
+    allScopes: PromotionScope[],
+  ): string {
+    if (allScopes.length > 1) {
+      return `Áp dụng theo ${allScopes.length} phạm vi`;
+    }
+    if (!scope) return 'Toàn đơn';
+    const label = scope.scopeRefLabel ?? scope.scopeRefId?.toString() ?? '';
+    switch (kind) {
+      case 'global': return 'Toàn đơn';
+      case 'category': return `Danh mục: ${label}`;
+      case 'brand': return `Thương hiệu: ${label}`;
+      case 'variant': return `Sản phẩm: ${label}`;
+      default: return 'Toàn đơn';
+    }
+  }
+
+  private mapActionType(t: ActionType | undefined): PromotionActionKind {
+    switch (t) {
+      case ActionType.PERCENTAGE_DISCOUNT: return 'percentage';
+      case ActionType.FIXED_DISCOUNT_CART: return 'fixed_cart';
+      case ActionType.FREE_SHIPPING:       return 'free_shipping';
+      case ActionType.BULK_DISCOUNT:       return 'bulk';
+      default:                              return 'other';
+    }
+  }
+
+  private describeMechanic(action: PromotionAction | undefined): string {
+    if (!action) return 'Khuyến mãi';
+    switch (action.actionType) {
+      case ActionType.PERCENTAGE_DISCOUNT: {
+        const pct = Number(action.discountValue ?? 0);
+        const cap = action.maxDiscountAmount
+          ? ` (tối đa ${Number(action.maxDiscountAmount).toLocaleString('vi-VN')}₫)`
+          : '';
+        return `Giảm ${pct}%${cap}`;
+      }
+      case ActionType.FIXED_DISCOUNT_CART:
+        return `Giảm cố định ${Number(action.discountValue ?? 0).toLocaleString('vi-VN')}₫`;
+      case ActionType.FREE_SHIPPING:
+        return 'Miễn phí vận chuyển';
+      case ActionType.BULK_DISCOUNT:
+        return 'Giảm theo số lượng (bậc thang)';
+      default:
+        return 'Khuyến mãi';
+    }
+  }
+
+  private describeCondition(cond: PromotionCondition): string {
+    const parsed = this.parseValue(cond.value);
+    switch (cond.type) {
+      case ConditionType.MIN_ORDER_VALUE:
+        return `Đơn tối thiểu ${Number(parsed).toLocaleString('vi-VN')}₫`;
+      case ConditionType.MIN_ITEM_QUANTITY:
+        return `Số lượng tối thiểu ${parsed} sản phẩm`;
+      case ConditionType.FIRST_ORDER_ONLY:
+        return 'Chỉ áp dụng cho đơn đầu tiên';
+      case ConditionType.PAYMENT_METHOD:
+        return `Phương thức thanh toán: ${Array.isArray(parsed) ? parsed.join(', ') : parsed}`;
+      case ConditionType.PLATFORM:
+        return `Nền tảng: ${parsed}`;
+      case ConditionType.REQUIRED_CATEGORIES:
+        return `Cần có sản phẩm từ danh mục yêu cầu`;
+      case ConditionType.REQUIRED_PRODUCTS:
+        return `Cần có sản phẩm cụ thể trong giỏ`;
+      default:
+        return 'Điều kiện áp dụng';
+    }
+  }
+
+  private firstUnmetReason(promo: Promotion, ctx: EvaluationContext): string | undefined {
+    for (const cond of promo.conditions ?? []) {
+      if (!this.evaluateCondition(cond, ctx)) {
+        if (cond.type === ConditionType.MIN_ORDER_VALUE) {
+          const need = Number(this.parseValue(cond.value));
+          const missing = Math.max(0, need - ctx.subtotal);
+          return `Thiếu ${missing.toLocaleString('vi-VN')}₫ để đủ điều kiện`;
+        }
+        return this.describeCondition(cond);
+      }
+    }
+    if (!this.checkScope(promo.scopes, ctx)) {
+      return 'Giỏ hàng không có sản phẩm thuộc phạm vi áp dụng';
+    }
+    return undefined;
+  }
+
+  private computeAppliedVariants(
+    kind: PromotionScopeKind,
+    scope: PromotionScope | undefined,
+    ctx: EvaluationContext,
+  ): string[] | undefined {
+    if (!scope || kind === 'global') return undefined;
+    if (kind === 'variant') {
+      return ctx.items
+        .filter((i) => i.variantId === Number(scope.scopeRefId))
+        .map((i) => String(i.variantId));
+    }
+    // For category/brand we don't have per-item category in ctx; return undefined.
+    return undefined;
   }
 
   async applyCoupon(code: string, ctx: EvaluationContext): Promise<DiscountResult> {

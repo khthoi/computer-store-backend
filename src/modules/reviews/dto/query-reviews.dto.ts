@@ -50,6 +50,12 @@ export class QueryReviewsDto {
   @IsIn(['Website', 'App', 'Import'])
   nguon?: string;
 
+  @ApiPropertyOptional({ example: true, description: 'Chỉ trả đánh giá có ảnh đính kèm' })
+  @IsOptional()
+  @IsBoolean()
+  @Transform(({ value }) => value === 'true' || value === true)
+  hasImages?: boolean;
+
   @ApiPropertyOptional({ example: 1 })
   @IsOptional()
   @Type(() => Number)

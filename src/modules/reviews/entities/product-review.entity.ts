@@ -47,6 +47,9 @@ export class ProductReview {
   @Column({ name: 'noi_dung', type: 'text', nullable: true })
   content: string | null;
 
+  @Column({ name: 'hinh_anh', type: 'simple-json', nullable: true })
+  images: Array<{ url: string; publicId: string }> | null;
+
   @Column({ name: 'review_status', length: 20, default: 'Pending' })
   status: 'Pending' | 'Approved' | 'Rejected' | 'Hidden';
 

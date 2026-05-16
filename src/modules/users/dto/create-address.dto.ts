@@ -17,6 +17,12 @@ export class CreateAddressDto {
   @MaxLength(500)
   diaChiChiTiet: string;
 
+  @ApiPropertyOptional({ example: 'Phường Bến Nghé' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(200)
+  ward?: string;
+
   @ApiProperty({ example: 'Quận 1' })
   @IsString()
   @MaxLength(200)

@@ -2,6 +2,17 @@
  * Shape that the storefront ProductCard expects.
  * Field names match ProductCardProps in computer-store-client-frontend.
  */
+export interface StorefrontVariantOptionDto {
+  id: string;
+  name: string;
+  sku: string;
+  price: number;
+  originalPrice: number;
+  stock: number;
+  isDefault: boolean;
+  thumbnailUrl: string | null;
+}
+
 export interface StorefrontProductCardDto {
   id: string;
   slug: string | null;
@@ -17,6 +28,7 @@ export interface StorefrontProductCardDto {
   stockStatus: 'in-stock' | 'low-stock' | 'out-of-stock';
   stockQuantity?: number;
   badge?: string;
+  variants: StorefrontVariantOptionDto[];
 }
 
 export interface StorefrontHomepageSectionDto {

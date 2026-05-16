@@ -32,6 +32,18 @@ export class BuildPcCompatibilityEngine {
     @InjectRepository(Category) private readonly categoryRepo: Repository<Category>,
   ) {}
 
+  /**
+   * Spec values may be stored as rich-text HTML (e.g. "<p>DDR5</p>") in giaTriThongSo,
+   * while giaTriChuan holds the canonical token used for comparisons. Prefer the
+   * canonical value; fall back to stripping tags from the display value.
+   */
+  private pickSpecVal(sv: SpecValue | undefined): string {
+    if (!sv) return '';
+    const canonical = sv.giaTriChuan?.trim();
+    if (canonical) return canonical;
+    return (sv.giaTriThongSo ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
   /** BFS: returns rootId + all descendant category IDs. */
   private async resolveDescendantIds(rootId: number): Promise<Set<number>> {
     const result = new Set<number>([rootId]);
@@ -57,11 +69,20 @@ export class BuildPcCompatibilityEngine {
   async check(dto: CheckCompatibilityDto): Promise<CompatibilityResult> {
     if (!dto.phienBanIds?.length) return { compatible: true, issues: [] };
 
+    // Quantity per phienBanId (defaults to 1). Multiple entries of the same id are summed.
+    const qtyById = new Map<number, number>();
+    for (let i = 0; i < dto.phienBanIds.length; i++) {
+      const id = dto.phienBanIds[i];
+      const qty = Math.max(1, Math.floor(dto.soLuongs?.[i] ?? 1));
+      qtyById.set(id, (qtyById.get(id) ?? 0) + qty);
+    }
+    const uniqueIds = Array.from(qtyById.keys());
+
     const variants = await this.variantRepo
       .createQueryBuilder('v')
       .leftJoinAndSelect('v.product', 'sp')
       .leftJoinAndSelect('sp.danhMuc', 'dm')
-      .whereInIds(dto.phienBanIds)
+      .whereInIds(uniqueIds)
       .getMany();
 
     const rules = await this.ruleRepo
@@ -81,7 +102,7 @@ export class BuildPcCompatibilityEngine {
     const specValues = allMaKt.size === 0 ? [] : await this.specValueRepo
       .createQueryBuilder('sv')
       .leftJoinAndSelect('sv.loaiThongSo', 'lts')
-      .where('sv.phienBanId IN (:...ids)', { ids: dto.phienBanIds })
+      .where('sv.phienBanId IN (:...ids)', { ids: uniqueIds })
       .andWhere('lts.maKyThuat IN (:...keys)', { keys: Array.from(allMaKt) })
       .getMany();
 
@@ -122,10 +143,10 @@ export class BuildPcCompatibilityEngine {
       if (rule.slotDichId != null && destVariants.length === 0) continue;
 
       for (const sourceV of sourceVariants) {
-        const sourceVal = specIndex.get(`${sourceV.id}::${rule.maKtNguon}`)?.giaTriThongSo;
-        if (sourceVal == null || sourceVal === '') continue;
+        const sourceVal = this.pickSpecVal(specIndex.get(`${sourceV.id}::${rule.maKtNguon}`));
+        if (!sourceVal) continue;
 
-        const passed = this.evaluateRule(rule, sourceVal, destVariants, specIndex);
+        const passed = this.evaluateRule(rule, sourceVal, destVariants, specIndex, qtyById);
         if (!passed.ok) {
           issues.push({
             id: `rule-${rule.id}-v${sourceV.id}`,
@@ -148,6 +169,7 @@ export class BuildPcCompatibilityEngine {
     sourceVal: string,
     destVariants: ProductVariant[],
     specIndex: Map<string, SpecValue>,
+    qtyById: Map<number, number>,
   ): { ok: boolean; againstName: string; againstIds: number[] } {
     const normSrc = sourceVal.trim().toLowerCase();
     const heSo = Number(rule.heSo) || 1;
@@ -157,10 +179,11 @@ export class BuildPcCompatibilityEngine {
       const names: string[] = [];
       const ids: number[] = [];
       for (const d of destVariants) {
-        const v = specIndex.get(`${d.id}::${rule.maKtDich}`)?.giaTriThongSo;
-        if (v != null && v !== '') {
-          sum += Number(v) || 0;
-          names.push(d.tenPhienBan);
+        const v = this.pickSpecVal(specIndex.get(`${d.id}::${rule.maKtDich}`));
+        if (v) {
+          const qty = qtyById.get(d.id) ?? 1;
+          sum += (Number(v) || 0) * qty;
+          names.push(qty > 1 ? `${d.tenPhienBan} × ${qty}` : d.tenPhienBan);
           ids.push(d.id);
         }
       }
@@ -182,8 +205,8 @@ export class BuildPcCompatibilityEngine {
     }
 
     for (const d of destVariants) {
-      const destValRaw = specIndex.get(`${d.id}::${rule.maKtDich}`)?.giaTriThongSo;
-      if (destValRaw == null || destValRaw === '') continue;
+      const destValRaw = this.pickSpecVal(specIndex.get(`${d.id}::${rule.maKtDich}`));
+      if (!destValRaw) continue;
       const ok = this.compareSingle(
         rule.loaiKiemTra,
         normSrc,

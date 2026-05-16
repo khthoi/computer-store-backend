@@ -1,4 +1,4 @@
-import { Injectable, NotFoundException, ForbiddenException, BadRequestException } from '@nestjs/common';
+import { Injectable, NotFoundException, BadRequestException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { Repository } from 'typeorm';
 import { BuildSlot } from './entities/build-slot.entity';
@@ -8,7 +8,6 @@ import { BuildDetail } from './entities/build-detail.entity';
 import { SpecType } from '../specifications/entities/spec-type.entity';
 import { CategorySpecGroup } from '../specifications/entities/category-spec-group.entity';
 import { BuildPcCompatibilityEngine, CompatibilityResult } from './build-pc-compatibility.engine';
-import { CreateSavedBuildDto } from './dto/create-saved-build.dto';
 import { CheckCompatibilityDto } from './dto/check-compatibility.dto';
 import { CreateBuildSlotDto } from './dto/create-build-slot.dto';
 import { UpdateBuildSlotDto } from './dto/update-build-slot.dto';
@@ -326,55 +325,4 @@ export class BuildPcService {
     return SavedBuildDetailResponseDto.fromEntity(build);
   }
 
-  // ── Saved Builds (customer-facing) ────────────────────────────────────────
-
-  async create(dto: CreateSavedBuildDto, khachHangId: number): Promise<SavedBuild> {
-    const build = this.buildRepo.create({
-      ...dto,
-      khachHangId,
-      details: dto.details?.map((d) => this.detailRepo.create(d)) ?? [],
-    });
-    const savedBuild = await this.buildRepo.save(build);
-    this.auditLogsService.log({
-      entityType: 'SavedBuild',
-      entityId: String(savedBuild.id),
-      entityLabel: savedBuild.tenBuild ?? `Build #${savedBuild.id}`,
-      actionType: 'CREATE',
-      actionDetail: `Khách hàng lưu cấu hình Build PC "${savedBuild.tenBuild ?? ''}" (${savedBuild.details?.length ?? 0} linh kiện)`,
-      after: JSON.stringify({ id: savedBuild.id, khachHangId, tenBuild: savedBuild.tenBuild }),
-    });
-    return savedBuild;
-  }
-
-  async findMyBuilds(khachHangId: number): Promise<SavedBuild[]> {
-    return this.buildRepo.find({
-      where: { khachHangId },
-      relations: ['details'],
-      order: { ngayCapNhat: 'DESC' },
-    });
-  }
-
-  async findOne(id: number, khachHangId?: number): Promise<SavedBuild> {
-    const build = await this.buildRepo.findOne({ where: { id }, relations: ['details'] });
-    if (!build) throw new NotFoundException('Build không tồn tại');
-    if (!build.isPublic && build.khachHangId !== khachHangId) {
-      throw new ForbiddenException('Không có quyền truy cập');
-    }
-    return build;
-  }
-
-  async remove(id: number, khachHangId: number): Promise<void> {
-    const build = await this.buildRepo.findOne({ where: { id } });
-    if (!build) throw new NotFoundException('Build không tồn tại');
-    if (build.khachHangId !== khachHangId) throw new ForbiddenException('Không có quyền xoá');
-    await this.buildRepo.remove(build);
-    this.auditLogsService.log({
-      entityType: 'SavedBuild',
-      entityId: String(id),
-      entityLabel: build.tenBuild ?? `Build #${id}`,
-      actionType: 'DELETE',
-      actionDetail: `Khách hàng xóa cấu hình Build PC "${build.tenBuild ?? ''}"`,
-      before: JSON.stringify({ id: build.id, khachHangId, tenBuild: build.tenBuild }),
-    });
-  }
 }

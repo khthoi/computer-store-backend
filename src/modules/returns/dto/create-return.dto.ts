@@ -1,7 +1,7 @@
 import {
   IsInt, IsEnum, IsOptional, IsArray, IsString, MaxLength, Min, ValidateNested,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform, plainToInstance } from 'class-transformer';
 import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export const RETURN_REASON_CODES = [
@@ -31,6 +31,7 @@ class ReturnItemDto {
 
 export class CreateReturnDto {
   @ApiProperty({ example: 15, description: 'ID đơn hàng muốn đổi/trả' })
+  @Type(() => Number)
   @IsInt()
   orderId: number;
 
@@ -51,17 +52,43 @@ export class CreateReturnDto {
   @IsString()
   description?: string;
 
-  @ApiPropertyOptional({ type: [Number], example: [12, 13], description: 'Danh sách asset_id ảnh bằng chứng' })
+  @ApiPropertyOptional({ type: [Number], example: [12, 13], description: 'Danh sách asset_id có sẵn (thường để trống — upload qua images[])' })
   @IsOptional()
+  @Transform(({ value }) => {
+    if (Array.isArray(value)) return value.map((v) => Number(v)).filter((n) => Number.isFinite(n));
+    if (typeof value === 'string' && value.trim()) {
+      try {
+        const parsed = JSON.parse(value);
+        return Array.isArray(parsed) ? parsed.map((v) => Number(v)).filter((n) => Number.isFinite(n)) : [];
+      } catch {
+        return value.split(',').map((s) => Number(s.trim())).filter((n) => Number.isFinite(n));
+      }
+    }
+    return value;
+  })
   @IsArray()
   @IsInt({ each: true })
   assetIds?: number[];
 
   @ApiPropertyOptional({
-    type: [ReturnItemDto],
-    description: 'Danh sách phiên bản sản phẩm và số lượng muốn trả/hoàn tiền. Bắt buộc khi requestType = TraHang',
+    description: 'Danh sách phiên bản sản phẩm + số lượng. JSON string khi gửi multipart, hoặc array khi gửi JSON.',
+    example: '[{"variantId":12,"quantity":1}]',
   })
   @IsOptional()
+  @Transform(({ value }) => {
+    let raw: unknown = value;
+    if (typeof value === 'string' && value.trim()) {
+      try {
+        raw = JSON.parse(value);
+      } catch {
+        return value;
+      }
+    }
+    if (Array.isArray(raw)) {
+      return plainToInstance(ReturnItemDto, raw);
+    }
+    return raw;
+  })
   @IsArray()
   @ValidateNested({ each: true })
   @Type(() => ReturnItemDto)
