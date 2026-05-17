@@ -1,85 +1,142 @@
-# computer-store-backend
+# Computer Store Backend
 
-NestJS REST API backend for **Online PC Store System** — a retail platform for computers and peripherals.
-
-> AI agent documentation is in the `.ai/` folder. Read `CLAUDE.md` first before writing any code.
+REST API server for the **Online PC Store System** — a single-vendor e-commerce platform for computers, components, and peripherals. This service powers both the customer storefront and the staff admin dashboard.
 
 ## Tech Stack
 
-- **NestJS 11.0.14** · **TypeScript 6.0.3** · **TypeORM 0.3.28** · **MySQL 8**
-- **Redis 7** (cache + BullMQ queues) · **Passport JWT** · **Swagger**
-- Port: **4000** | Docs: **`/api/docs`**
+- **Runtime:** Node.js 20 LTS
+- **Framework:** NestJS 11 + TypeScript
+- **Database:** MySQL 8 via TypeORM
+- **Cache & Queue:** Redis 7 + BullMQ
+- **Auth:** Passport.js (JWT access + refresh tokens, RBAC)
+- **API Docs:** Swagger UI
+- **Media:** Cloudinary
+- **Payments:** VNPay, MoMo, Cash on Delivery
 
-## Quick Start
+## What's Inside
+
+A modular monolith covering the full retail workflow:
+
+### Catalog
+- Products, variants, brands, categories (tree), and configurable specifications
+- Media library with Cloudinary upload + multi-image gallery per product/variant
+- Build-PC configurator with compatibility rules across components
+
+### Sales & Orders
+- Shopping cart (guest + authenticated)
+- Checkout pipeline: cart validation → pricing → promotions → flash sale → loyalty redemption → order creation → atomic stock deduction → payment redirect → webhook confirmation
+- Order lifecycle management (pending → confirmed → packed → shipping → delivered / cancelled / returned)
+- Snapshotted line items (name, SKU, price-at-purchase) so historical orders never drift
+
+### Payments
+- VNPay and MoMo gateway integration with signed webhooks
+- COD flow with manual confirmation
+- Transaction log per order
+
+### Inventory & Suppliers
+- Stock-in receipts, manual adjustments, low-stock alerts (BullMQ background job)
+- Supplier directory linked to purchase records
+
+### Promotions & Loyalty
+- Discount rules: percentage / fixed / free-shipping
+- Manual coupons (`is_coupon`) and auto-apply rules
+- Stacking policy: `exclusive | stackable | stackable_with_coupons_only`
+- Flash sale slots with countdown and per-variant stock caps
+- Loyalty point earning rules + redemption, denormalized point balance kept in sync via transactional ledger
+
+### Customer Experience
+- Reviews (post-delivery only, moderation queue)
+- Returns / refund requests
+- Wishlist
+- Support tickets with SSE-based real-time replies
+- Notifications via Server-Sent Events
+
+### Content Management
+- Banners, homepage modules, FAQ, navigation menus, popups, site-wide settings
+- Static pages with rich-text content
+
+### Operations
+- Reports with scheduled snapshots and CSV/Excel export
+- Audit logging for sensitive admin actions
+- Role-based access control with cached permission lookups
+
+## Authentication
+
+- Customer login: `POST /api/auth/login`
+- Admin login: `POST /api/auth/admin/login`
+- Access token: JWT, 15 minute TTL, sent as `Authorization: Bearer <token>`
+- Refresh token: 30 day TTL, HttpOnly cookie
+- Logout invalidates the access token via a Redis blacklist
+
+## API Response Shape
+
+Every successful response is wrapped by the global response interceptor:
+
+```json
+{
+  "statusCode": 200,
+  "message": "success",
+  "data": { ... },
+  "timestamp": "2026-05-17T10:00:00.000Z"
+}
+```
+
+List endpoints return `{ data, total, page, limit, totalPages }` inside `data`. Errors return `{ statusCode, message, error }`.
+
+## Getting Started
 
 ```bash
+# Install dependencies
 npm install
-cp .env.example .env   # fill in DB, JWT, Redis, Cloudinary, payment keys
+
+# Configure environment
+cp .env.example .env
+# Fill in: DB credentials, JWT secrets, Redis URL, Cloudinary keys,
+#         VNPay/MoMo credentials, mail SMTP, frontend URLs
+
+# Run database migrations
+npx typeorm migration:run -d ormconfig.ts
+
+# Start in development (hot reload)
 npm run start:dev
 ```
 
-## Commands
+The server boots on **http://localhost:4000** with API docs at **http://localhost:4000/api/docs**.
 
-```bash
-npm run start:dev       # Development with hot reload
-npm run build           # Compile TypeScript
-npm run test            # Unit tests
-npm run test:e2e        # End-to-end tests
-npm run test:cov        # Coverage report
+## Available Scripts
 
-# TypeORM migrations
-npx typeorm migration:generate src/database/migrations/Init -d ormconfig.ts
-npx typeorm migration:run -d ormconfig.ts
-```
-
-## AI Agent Guidance (`.ai/`)
-
-| File | Purpose | When to Read |
-|---|---|---|
-| `CLAUDE.md` | Master guide: tech stack, naming rules, build phases, key rules | **Always — read first** |
-| `.ai/DATABASE.md` | Full mapping: Vietnamese ERD tables → English entity class + properties | When creating/editing any entity |
-| `.ai/MODULES.md` | All 27 modules: DB tables, endpoints, business logic summary | When working on any module |
-| `.ai/ARCHITECTURE.md` | Folder structure, Redis usage, BullMQ queues, Docker, indexes | When setting up infrastructure or adding a new module |
-| `.ai/CONVENTIONS.md` | Code patterns for DTOs, entities, services, controllers, errors | When writing any source file |
-| `.ai/BUSINESS-RULES.md` | Critical business logic: checkout flow, stock, loyalty, promotions | When implementing order/payment/stock logic |
-
-## 3 Rules Always Apply
-
-1. **All code in English** — variable names, method names, DTO properties, file names
-2. **DB columns stay Vietnamese** — `@Column({ name: 'ten_san_pham' })` as defined in ERD
-3. **No file > 500 lines** — split into sub-services or separate controllers
-
-## Build Order
-
-```
-Phase 0 → Foundation (TypeORM, ConfigModule, Swagger, Guards)
-Phase 1 → Auth + Users + Employees + Roles
-Phase 2 → Categories + Brands + Specs + Products + Media + BuildPC
-Phase 3 → Cart + Orders + Payments (VNPay/MoMo/COD)
-Phase 4 → Inventory + Suppliers
-Phase 5 → Promotions + Flash Sales + Loyalty
-Phase 6 → Reviews + Returns + Support Tickets
-Phase 7 → Notifications + Wishlist + Search
-Phase 8 → CMS (banners, pages, FAQ, menus)
-Phase 9 → Reports + Settings
-Phase 10 → Tests + Docker + PM2 + Nginx
-```
-
-## Module Structure (mandatory for every module)
-
-```
-src/modules/<feature>/
-├── <feature>.module.ts
-├── <feature>.controller.ts       # public routes
-├── admin-<feature>.controller.ts # admin routes
-├── <feature>.service.ts
-├── dto/  (create, update, query, response — one file each)
-└── entities/  (one file per entity)
-```
+| Command | Purpose |
+|---|---|
+| `npm run start:dev` | Development server with hot reload |
+| `npm run start:prod` | Production server (after `npm run build`) |
+| `npm run build` | Compile TypeScript to `dist/` |
+| `npm run lint` | Run ESLint |
+| `npm run test` | Unit tests (Jest) |
+| `npm run test:e2e` | End-to-end tests |
+| `npm run test:cov` | Coverage report |
 
 ## Docker
 
+A `docker-compose.yml` provisions the full stack:
+
 ```bash
 docker compose up -d
-# NestJS :4000 + MySQL :3306 + Redis :6379
 ```
+
+Brings up:
+- NestJS API on `:4000`
+- MySQL 8 on `:3306`
+- Redis 7 on `:6379`
+
+## Security
+
+- `helmet()` HTTP headers
+- CORS whitelist for the storefront (`:3000`) and admin (`:3001`)
+- Global validation pipe with whitelisting and DTO transformation
+- Rate limiting: 100 req/min for public routes, 1000 req/min for authenticated
+- All admin routes guarded by `@Roles()` + `RolesGuard`
+- Token blacklist on logout with Redis TTL
+
+## License
+
+Proprietary — internal project.
