@@ -12,6 +12,7 @@ import { randomBytes, randomUUID } from 'crypto';
 import { UsersService } from '../users/users.service';
 import { EmployeesService } from '../employees/employees.service';
 import { ProfileService } from '../employees/profile.service';
+import { RolesService } from '../roles/roles.service';
 import { RedisService } from '../../common/redis/redis.service';
 import { MailService } from '../mail/mail.service';
 import { AuditLogsService } from '../audit-logs/audit-logs.service';
@@ -63,6 +64,7 @@ export class AuthService {
     private readonly usersService: UsersService,
     private readonly employeesService: EmployeesService,
     private readonly profileService: ProfileService,
+    private readonly rolesService: RolesService,
     private readonly jwtService: JwtService,
     private readonly configService: ConfigService,
     private readonly redisService: RedisService,
@@ -157,7 +159,7 @@ export class AuthService {
         userAgent: userAgent ?? undefined,
       },
     });
-    return { user: this.toEmployeeDto(fullEmployee), ...tokens };
+    return { user: await this.toEmployeeDto(fullEmployee), ...tokens };
   }
 
   // ─── Failed login logging (called by LocalEmployeeStrategy) ───────────────
@@ -449,14 +451,17 @@ export class AuthService {
     };
   }
 
-  private toEmployeeDto(employee: Employee): AuthEmployeeDto {
+  private async toEmployeeDto(employee: Employee): Promise<AuthEmployeeDto> {
+    const roles = employee.roles?.map((r) => r.tenVaiTro) ?? [];
+    const permissions = await this.rolesService.getPermissionsForRoles(roles);
     return {
       id: String(employee.id),
       code: employee.maNhanVien,
       email: employee.email,
       fullName: normalizePossiblyMojibakeText(employee.hoTen) ?? employee.hoTen,
       avatar: employee.anhDaiDien ?? null,
-      roles: employee.roles?.map((r) => r.tenVaiTro) ?? [],
+      roles,
+      permissions,
     };
   }
 }

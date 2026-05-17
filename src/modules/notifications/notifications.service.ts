@@ -6,6 +6,7 @@ import { Repository } from 'typeorm';
 import { Subject } from 'rxjs';
 import { Notification } from './entities/notification.entity';
 import { AutoNotificationConfig } from './entities/auto-notification-config.entity';
+import { Customer } from '../users/entities/customer.entity';
 import { QueryNotificationsDto } from './dto/query-notifications.dto';
 import { CreateConfigDto } from './dto/create-config.dto';
 import { UpdateConfigDto } from './dto/update-config.dto';
@@ -21,6 +22,8 @@ export class NotificationsService {
     private readonly notifRepo: Repository<Notification>,
     @InjectRepository(AutoNotificationConfig)
     private readonly configRepo: Repository<AutoNotificationConfig>,
+    @InjectRepository(Customer)
+    private readonly customerRepo: Repository<Customer>,
     private readonly auditLogsService: AuditLogsService,
   ) {}
 
@@ -83,7 +86,18 @@ export class NotificationsService {
     });
     if (!config) return; // no active config — silently skip
 
+    const hasEmailChannel = config.channels.some((ch) => ch === 'Email');
+    let emailEnabled = true;
+    if (hasEmailChannel) {
+      const customer = await this.customerRepo.findOne({
+        where: { id: customerId },
+        select: ['id', 'nhanThongBaoEmail'],
+      });
+      emailEnabled = customer?.nhanThongBaoEmail ?? true;
+    }
+
     for (const channel of config.channels) {
+      if (channel === 'Email' && !emailEnabled) continue;
       const notif = this.notifRepo.create({
         customerId,
         type: triggerKey,

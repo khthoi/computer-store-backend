@@ -97,7 +97,6 @@ export class ProductsController {
         sku: 'ROG-RTX4070-12G',
         shortDescription: 'Card màn hình cao cấp dòng ROG',
         descriptionHtml: '<p>Card màn hình cao cấp...</p>',
-        warrantyPolicy: 'Bảo hành 36 tháng',
         averageRating: 4.5,
         reviewCount: 128,
         status: 'published',

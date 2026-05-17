@@ -16,6 +16,7 @@ import { AuthGuard } from '@nestjs/passport';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiBody, ApiOkResponse, ApiResponse, ApiQuery } from '@nestjs/swagger';
 import { Request, Response } from 'express';
 import { AuthService } from './auth.service';
+import { RolesService } from '../roles/roles.service';
 import { RegisterCustomerDto } from './dto/register-customer.dto';
 import { LoginDto } from './dto/login.dto';
 import { ForgotPasswordDto } from './dto/forgot-password.dto';
@@ -42,7 +43,10 @@ const RT_COOKIE_SESSION = RT_COOKIE_BASE; // không có maxAge → session cooki
 @ApiTags('Auth')
 @Controller('auth')
 export class AuthController {
-  constructor(private readonly authService: AuthService) {}
+  constructor(
+    private readonly authService: AuthService,
+    private readonly rolesService: RolesService,
+  ) {}
 
   @Public()
   @Post('register')
@@ -156,20 +160,27 @@ export class AuthController {
 
   @Get('me')
   @ApiBearerAuth('access-token')
-  @ApiOperation({ summary: 'Thông tin người dùng từ JWT (không query DB)' })
+  @ApiOperation({
+    summary: 'Thông tin người dùng từ JWT — kèm permissions đã resolve (employee)',
+  })
   @ApiOkResponse({
     schema: {
       example: {
         sub: 5,
-        email: 'nguyenvana@gmail.com',
-        role: 'customer',
-        iat: 1714000000,
-        exp: 1714001800,
+        email: 'admin@store.vn',
+        type: 'employee',
+        roles: ['admin'],
+        permissions: ['orders.read', 'orders.update', 'products.read'],
+        jti: 'a1b2c3...',
       },
     },
   })
   @ApiResponse({ status: 401, description: 'Unauthorized' })
-  me(@CurrentUser() user: JwtPayload) {
-    return user;
+  async me(@CurrentUser() user: JwtPayload) {
+    if (user.type === 'employee') {
+      const permissions = await this.rolesService.getPermissionsForRoles(user.roles ?? []);
+      return { ...user, permissions };
+    }
+    return { ...user, permissions: [] };
   }
 }

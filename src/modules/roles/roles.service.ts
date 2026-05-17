@@ -16,6 +16,7 @@ import { AuditLogsService } from '../audit-logs/audit-logs.service';
 
 const PERMISSIONS_CACHE_KEY = 'cache:permissions:all';
 const PERMISSIONS_CACHE_TTL = 600; // 10 phút
+const ROLE_PERM_TTL = 600;
 
 @Injectable()
 export class RolesService {
@@ -117,6 +118,9 @@ export class RolesService {
 
   async update(id: number, dto: UpdateRoleDto): Promise<Role> {
     const role = await this.findOne(id);
+    if (role.isSystem) {
+      throw new BadRequestException('Không thể chỉnh sửa vai trò hệ thống');
+    }
     if (dto.tenVaiTro && dto.tenVaiTro !== role.tenVaiTro) {
       const existing = await this.roleRepo.findOne({ where: { tenVaiTro: dto.tenVaiTro } });
       if (existing) throw new ConflictException(`Vai trò "${dto.tenVaiTro}" đã tồn tại`);
@@ -138,6 +142,9 @@ export class RolesService {
 
   async remove(id: number): Promise<void> {
     const role = await this.findOne(id);
+    if (role.isSystem) {
+      throw new BadRequestException('Không thể xóa vai trò hệ thống');
+    }
     // Kiểm tra còn nhân viên đang giữ vai trò này không (query ngược)
     const count = await this.roleRepo
       .createQueryBuilder('r')
@@ -158,6 +165,9 @@ export class RolesService {
 
   async assignPermissions(roleId: number, permissionIds: number[]): Promise<Role> {
     const role = await this.findOne(roleId);
+    if (role.isSystem) {
+      throw new BadRequestException('Không thể chỉnh sửa quyền của vai trò hệ thống');
+    }
     const beforePermissions = role.permissions?.map((p) => ({ id: p.id, module: p.module, hanhDong: p.hanhDong })) ?? [];
     const permissions = await this.permRepo.findBy({ id: In(permissionIds) });
     if (permissions.length !== permissionIds.length) {
@@ -191,5 +201,27 @@ export class RolesService {
 
   async getRolesByNames(names: string[]): Promise<Role[]> {
     return this.roleRepo.find({ where: { tenVaiTro: In(names) }, relations: ['permissions'] });
+  }
+
+  /**
+   * Resolve the deduped permission codes granted to a set of role names.
+   * Uses per-role Redis cache `role:permissions:<name>` (TTL 10min) — same key
+   * the PermissionGuard reads, so guard checks and frontend gating never drift.
+   */
+  async getPermissionsForRoles(roleNames: string[]): Promise<string[]> {
+    if (!roleNames || roleNames.length === 0) return [];
+    const permSet = new Set<string>();
+    for (const roleName of roleNames) {
+      const perms = await this.redisService.cache<string[]>(
+        `role:permissions:${roleName}`,
+        ROLE_PERM_TTL,
+        async () => {
+          const role = await this.findByName(roleName);
+          return role?.permissions?.map((p) => p.maQuyen) ?? [];
+        },
+      );
+      perms.forEach((p) => permSet.add(p));
+    }
+    return Array.from(permSet);
   }
 }

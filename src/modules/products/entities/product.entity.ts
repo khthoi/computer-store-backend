@@ -40,9 +40,6 @@ export class Product {
   @Column({ name: 'mo_ta_chi_tiet', type: 'text', nullable: true })
   moTaChiTiet: string | null;
 
-  @Column({ name: 'chinh_sach_bao_hanh', type: 'text', nullable: true })
-  chinhSachBaoHanh: string | null;
-
   @Column({ name: 'diem_danh_gia_tb', type: 'decimal', precision: 3, scale: 2, nullable: true })
   diemDanhGiaTb: number | null;
 

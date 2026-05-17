@@ -12,6 +12,7 @@ import { GoogleStrategy } from './strategies/google.strategy';
 import { UsersModule } from '../users/users.module';
 import { EmployeesModule } from '../employees/employees.module';
 import { AuditLogsModule } from '../audit-logs/audit-logs.module';
+import { RolesModule } from '../roles/roles.module';
 
 @Module({
   imports: [
@@ -27,6 +28,7 @@ import { AuditLogsModule } from '../audit-logs/audit-logs.module';
     UsersModule,
     EmployeesModule,
     AuditLogsModule,
+    RolesModule,
   ],
   controllers: [AuthController, GoogleOAuthController],
   providers: [AuthService, JwtStrategy, LocalCustomerStrategy, LocalEmployeeStrategy, GoogleStrategy],

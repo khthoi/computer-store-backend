@@ -66,6 +66,9 @@ export class Customer {
   @Column({ name: 'asset_id_avatar', nullable: true })
   assetIdAvatar: number | null;
 
+  @Column({ name: 'nhan_thong_bao_email', type: 'boolean', default: true })
+  nhanThongBaoEmail: boolean;
+
   @ManyToOne(() => MediaAsset, { nullable: true, eager: false })
   @JoinColumn({ name: 'asset_id_avatar' })
   avatar: MediaAsset | null;

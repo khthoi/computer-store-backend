@@ -19,6 +19,7 @@ import { memoryStorage } from 'multer';
 import { ApiTags, ApiOperation, ApiBearerAuth, ApiOkResponse, ApiConsumes, ApiBody, ApiResponse, ApiParam } from '@nestjs/swagger';
 import { UsersService } from './users.service';
 import { UpdateProfileDto } from './dto/update-profile.dto';
+import { UpdateNotificationPreferencesDto } from './dto/update-notification-preferences.dto';
 import { CreateAddressDto } from './dto/create-address.dto';
 import { UpdateAddressDto } from './dto/update-address.dto';
 import { CustomerProfileResponseDto } from './dto/customer-response.dto';
@@ -46,6 +47,17 @@ export class UsersController {
   @ApiResponse({ status: 401, description: 'Unauthorized' })
   updateProfile(@CurrentUser() user: JwtPayload, @Body() dto: UpdateProfileDto) {
     return this.usersService.updateProfile(user.sub, dto);
+  }
+
+  @Patch('me/notification-preferences')
+  @ApiOperation({ summary: 'Cập nhật tùy chọn nhận thông báo' })
+  @ApiOkResponse({ type: CustomerProfileResponseDto })
+  @ApiResponse({ status: 401, description: 'Unauthorized' })
+  updateNotificationPreferences(
+    @CurrentUser() user: JwtPayload,
+    @Body() dto: UpdateNotificationPreferencesDto,
+  ) {
+    return this.usersService.updateNotificationPreferences(user.sub, dto.emailNotificationsEnabled);
   }
 
   @Patch('me/avatar')

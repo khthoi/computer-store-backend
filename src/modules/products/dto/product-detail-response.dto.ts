@@ -24,7 +24,7 @@ export interface PublicVariantDetailResponse {
   weight: number | null;
   warrantyPolicy: string | null;
   warrantyMonths: number | null;
-  status: 'visible' | 'hidden' | 'out_of_stock';
+  status: 'visible' | 'hidden';
   isDefault: boolean;
   images: PublicVariantImageResponse[];
 }
@@ -37,7 +37,6 @@ export interface PublicProductDetailResponse {
   sku: string;
   shortDescription: string | null;
   descriptionHtml: string;
-  warrantyPolicy: string | null;
   averageRating: number;
   reviewCount: number;
   status: 'published' | 'draft' | 'archived';
@@ -58,10 +57,9 @@ const PRODUCT_STATUS_MAP: Record<string, 'published' | 'draft' | 'archived'> = {
   NgungBan: 'archived',
 };
 
-const VARIANT_DETAIL_STATUS_MAP: Record<string, 'visible' | 'hidden' | 'out_of_stock'> = {
+const VARIANT_DETAIL_STATUS_MAP: Record<string, 'visible' | 'hidden'> = {
   HienThi: 'visible',
   An: 'hidden',
-  HetHang: 'out_of_stock',
 };
 
 const IMAGE_TYPE_MAP: Record<string, 'main' | 'gallery'> = {
@@ -132,7 +130,6 @@ export function mapPublicProductDetail(
     sku: defaultVariant?.sku ?? '',
     shortDescription: product.moTaNgan ?? null,
     descriptionHtml: product.moTaChiTiet ?? '',
-    warrantyPolicy: product.chinhSachBaoHanh ?? null,
     averageRating: product.diemDanhGiaTb != null ? Number(product.diemDanhGiaTb) : 0,
     reviewCount: product.soLuotDanhGia ?? 0,
     status: PRODUCT_STATUS_MAP[product.trangThai] ?? 'draft',

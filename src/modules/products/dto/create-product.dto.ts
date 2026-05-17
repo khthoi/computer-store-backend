@@ -45,9 +45,9 @@ export class CreateVariantDto {
   @IsNumber()
   trongLuong?: number;
 
-  @ApiPropertyOptional({ enum: ['HienThi', 'An', 'HetHang'], default: 'HienThi' })
+  @ApiPropertyOptional({ enum: ['HienThi', 'An'], default: 'HienThi' })
   @IsOptional()
-  @IsIn(['HienThi', 'An', 'HetHang'])
+  @IsIn(['HienThi', 'An'])
   trangThai?: string;
 
   @ApiPropertyOptional()
@@ -55,11 +55,17 @@ export class CreateVariantDto {
   @IsString()
   moTaChiTiet?: string;
 
-  @ApiPropertyOptional()
+  @ApiPropertyOptional({ description: 'Chính sách bảo hành (HTML)' })
   @IsOptional()
   @IsString()
-  @MaxLength(500)
   chinhSachBaoHanh?: string;
+
+  @ApiPropertyOptional({ description: 'Thời gian bảo hành (tháng)' })
+  @IsOptional()
+  @Type(() => Number)
+  @IsInt()
+  @Min(0)
+  thoiGianBaoHanh?: number;
 
   @ApiPropertyOptional({ description: 'Đặt làm phiên bản mặc định hiển thị trên listing/card' })
   @IsOptional()
@@ -101,12 +107,6 @@ export class CreateProductDto {
   @IsOptional()
   @IsString()
   moTaChiTiet?: string;
-
-  @ApiPropertyOptional()
-  @IsOptional()
-  @IsString()
-  @MaxLength(500)
-  chinhSachBaoHanh?: string;
 
   @ApiPropertyOptional({ enum: ['DangBan', 'NgungBan', 'Nhap'], default: 'Nhap' })
   @IsOptional()

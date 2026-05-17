@@ -14,7 +14,6 @@ const PRODUCT_STATUS_MAP: Record<string, 'published' | 'draft' | 'archived'> = {
 const VARIANT_STATUS_MAP: Record<string, 'active' | 'inactive'> = {
   HienThi: 'active',
   An: 'inactive',
-  HetHang: 'inactive',
 };
 
 export function mapProductStatus(trangThai: string): 'published' | 'draft' | 'archived' {
@@ -47,6 +46,7 @@ export interface VariantListResponse {
   thumbnailUrl: string | null;
   updatedAt: string;
   isDefault: boolean;
+  warrantyMonths: number | null;
 }
 
 export function mapVariantListResponse(v: ProductVariant): VariantListResponse {
@@ -62,6 +62,7 @@ export function mapVariantListResponse(v: ProductVariant): VariantListResponse {
     thumbnailUrl: mainImage?.urlHinhAnh ?? null,
     updatedAt: v.ngayCapNhat?.toISOString() ?? new Date().toISOString(),
     isDefault: v.isMacDinh,
+    warrantyMonths: v.thoiGianBaoHanh ?? null,
   };
 }
 
@@ -90,10 +91,9 @@ export interface ProductListResponse {
 
 // ─── Variant admin detail response ───────────────────────────────────────────
 
-const DETAIL_STATUS_MAP: Record<string, 'visible' | 'hidden' | 'out_of_stock'> = {
+const DETAIL_STATUS_MAP: Record<string, 'visible' | 'hidden'> = {
   HienThi: 'visible',
   An: 'hidden',
-  HetHang: 'out_of_stock',
 };
 
 const IMAGE_TYPE_MAP: Record<string, 'main' | 'gallery'> = {
@@ -120,9 +120,11 @@ export interface VariantAdminDetail {
   originalPrice: number;
   salePrice: number;
   weight: number | undefined;
-  status: 'visible' | 'hidden' | 'out_of_stock';
+  status: 'visible' | 'hidden';
   updatedAt: string;
   description: string;
+  warrantyPolicy: string | null;
+  warrantyMonths: number | null;
   specificationGroups: unknown[];
   media: ImageMediaResponse[];
 }
@@ -156,6 +158,8 @@ export function mapVariantAdminDetail(variant: ProductVariant, specGroups: unkno
     status: DETAIL_STATUS_MAP[variant.trangThai] ?? 'hidden',
     updatedAt: variant.ngayCapNhat?.toISOString() ?? new Date().toISOString(),
     description: variant.moTaChiTiet ?? '',
+    warrantyPolicy: variant.chinhSachBaoHanh ?? null,
+    warrantyMonths: variant.thoiGianBaoHanh ?? null,
     specificationGroups: specGroups,
     media: images,
   };

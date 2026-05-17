@@ -21,6 +21,9 @@ export class Role {
   @Column({ name: 'mo_ta', length: 500, nullable: true })
   moTa: string | null;
 
+  @Column({ name: 'is_system', type: 'tinyint', width: 1, default: 0 })
+  isSystem: boolean;
+
   @CreateDateColumn({ name: 'ngay_tao' })
   createdAt: Date;
 

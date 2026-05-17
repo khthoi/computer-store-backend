@@ -39,7 +39,7 @@ export class ProductVariant {
   trongLuong: number | null;
 
   @Column({ name: 'trang_thai', length: 20, default: 'HienThi' })
-  trangThai: string; // 'HienThi' | 'An' | 'HetHang'
+  trangThai: string; // 'HienThi' | 'An' — availability is derived from stock
 
   @Column({ name: 'mo_ta_chi_tiet', type: 'text', nullable: true })
   moTaChiTiet: string | null;

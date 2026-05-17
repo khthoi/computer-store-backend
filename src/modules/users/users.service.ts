@@ -75,6 +75,17 @@ export class UsersService {
     return this.toProfileDto(saved);
   }
 
+  async updateNotificationPreferences(
+    customerId: number,
+    emailNotificationsEnabled: boolean,
+  ): Promise<CustomerProfileResponseDto> {
+    const customer = await this.customerRepo.findOne({ where: { id: customerId } });
+    if (!customer) throw new NotFoundException('Khách hàng không tồn tại');
+    customer.nhanThongBaoEmail = emailNotificationsEnabled;
+    const saved = await this.customerRepo.save(customer);
+    return this.toProfileDto(saved);
+  }
+
   async uploadAvatar(customerId: number, file: Express.Multer.File): Promise<CustomerProfileResponseDto> {
     const today = new Date().toISOString().substring(0, 10);
     const rateKey = `avatar_daily:${customerId}:${today}`;
@@ -463,6 +474,7 @@ export class UsersService {
       emailVerified: c.xacMinhEmail,
       points: c.diemHienTai,
       assetIdAvatar: c.assetIdAvatar,
+      emailNotificationsEnabled: c.nhanThongBaoEmail ?? true,
       totalOrders: 0,
       totalSpent: 0,
       lastOrderAt: null,

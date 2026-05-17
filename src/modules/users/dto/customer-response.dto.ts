@@ -15,6 +15,7 @@ export class CustomerProfileResponseDto {
   @ApiProperty({ example: false }) emailVerified: boolean;
   @ApiProperty({ example: 1200 }) points: number;
   @ApiProperty({ example: null, nullable: true }) assetIdAvatar: number | null;
+  @ApiProperty({ example: true }) emailNotificationsEnabled: boolean;
   @ApiProperty({ example: 0 }) totalOrders: number;
   @ApiProperty({ example: 0 }) totalSpent: number;
   @ApiProperty({ example: null, nullable: true }) lastOrderAt: string | null;

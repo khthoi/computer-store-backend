@@ -18,7 +18,7 @@ import { UpdateContactMessageDto } from './dto/update-contact-message.dto';
 
 @ApiTags('Admin — Contact Messages')
 @ApiBearerAuth()
-@Roles('admin', 'cskh', 'staff')
+@Roles('admin', 'support', 'staff')
 @Controller('admin/contact-messages')
 export class AdminContactMessagesController {
   constructor(private readonly service: ContactMessagesService) {}

@@ -1,6 +1,7 @@
 import { Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import { ReportsQueryService } from '../reports/reports-query.service';
+import { RolesService } from '../roles/roles.service';
 
 const STATUS_MAP: Record<string, string> = {
   ChoTT: 'pending',
@@ -17,7 +18,86 @@ export class DashboardService {
   constructor(
     private readonly dataSource: DataSource,
     private readonly reportsQueryService: ReportsQueryService,
+    private readonly rolesService: RolesService,
   ) {}
+
+  /**
+   * Per-permission "to-do" counters for the dashboard reminder grid.
+   * Each field is only populated when the caller has the matching permission —
+   * fields the caller cannot see are omitted from the response. The endpoint
+   * itself is open to every authenticated employee; gating is per-field.
+   */
+  async getActionItems(roleNames: string[]): Promise<{
+    pendingOrders?: number;
+    processingOrders?: number;
+    pendingReturns?: number;
+    openSupportTickets?: number;
+    openContactMessages?: number;
+    pendingReviews?: number;
+    lowStockCount?: number;
+  }> {
+    const perms = new Set(await this.rolesService.getPermissionsForRoles(roleNames));
+    const isAdmin = roleNames.includes('admin');
+    const has = (p: string) => isAdmin || perms.has(p);
+
+    const result: Record<string, number> = {};
+
+    const tasks: Promise<void>[] = [];
+    if (has('orders.read')) {
+      tasks.push(
+        this.dataSource
+          .query(`SELECT COUNT(*) AS v FROM don_hang WHERE trang_thai_don = 'ChoTT'`)
+          .then((r: { v: string }[]) => { result.pendingOrders = Number(r[0].v); }),
+      );
+      tasks.push(
+        this.dataSource
+          .query(
+            `SELECT COUNT(*) AS v FROM don_hang
+             WHERE trang_thai_don IN ('DaXacNhan', 'DongGoi')`,
+          )
+          .then((r: { v: string }[]) => { result.processingOrders = Number(r[0].v); }),
+      );
+    }
+    if (has('returns.read')) {
+      tasks.push(
+        this.dataSource
+          .query(`SELECT COUNT(*) AS v FROM yeu_cau_doi_tra WHERE trang_thai = 'ChoDuyet'`)
+          .then((r: { v: string }[]) => { result.pendingReturns = Number(r[0].v); }),
+      );
+    }
+    if (has('support.read')) {
+      tasks.push(
+        this.dataSource
+          .query(
+            `SELECT COUNT(*) AS v FROM ticket_khieu_nai
+             WHERE trang_thai IN ('Moi', 'DangXuLy')`,
+          )
+          .then((r: { v: string }[]) => { result.openSupportTickets = Number(r[0].v); }),
+      );
+      tasks.push(
+        this.dataSource
+          .query(`SELECT COUNT(*) AS v FROM lien_he_form WHERE trang_thai = 'moi'`)
+          .then((r: { v: string }[]) => { result.openContactMessages = Number(r[0].v); }),
+      );
+    }
+    if (has('reviews.update')) {
+      tasks.push(
+        this.dataSource
+          .query(`SELECT COUNT(*) AS v FROM danh_gia_san_pham WHERE review_status = 'Pending'`)
+          .then((r: { v: string }[]) => { result.pendingReviews = Number(r[0].v); }),
+      );
+    }
+    if (has('inventory.read')) {
+      tasks.push(
+        this.dataSource
+          .query(`SELECT COUNT(*) AS v FROM ton_kho WHERE so_luong_ton <= nguong_canh_bao`)
+          .then((r: { v: string }[]) => { result.lowStockCount = Number(r[0].v); }),
+      );
+    }
+
+    await Promise.all(tasks);
+    return result;
+  }
 
   async getOverview() {
     const [kpis, revenueChart, topProductsRaw, ordersByStatus, recentOrders, lowStock] =

@@ -388,6 +388,8 @@ export class ProductsService {
           giaBan: v.giaBan,
           trongLuong: v.trongLuong,
           moTaChiTiet: v.moTaChiTiet,
+          chinhSachBaoHanh: v.chinhSachBaoHanh,
+          thoiGianBaoHanh: v.thoiGianBaoHanh,
           trangThai: 'An',
           isMacDinh: i === 0,
         });
@@ -453,6 +455,8 @@ export class ProductsService {
       giaBan: variant.giaBan,
       trongLuong: variant.trongLuong,
       moTaChiTiet: variant.moTaChiTiet,
+      chinhSachBaoHanh: variant.chinhSachBaoHanh,
+      thoiGianBaoHanh: variant.thoiGianBaoHanh,
       trangThai: 'An',
       isMacDinh: false,
     });
