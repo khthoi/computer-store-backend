@@ -4,10 +4,13 @@ import { PromotionCondition, ConditionType, ConditionOperator } from './entities
 import { PromotionAction, ActionType } from './entities/promotion-action.entity';
 import { PromotionScope, ScopeType } from './entities/promotion-scope.entity';
 import { BulkTier } from './entities/bulk-tier.entity';
+import { BulkComponent } from './entities/bulk-component.entity';
 import { CartItemDto } from './dto/apply-coupon.dto';
 import { PromotionsService } from './promotions.service';
 import {
   AppliedPromotionDto,
+  BundleComponentInfo,
+  BxgyInfo,
   PromotionActionKind,
   PromotionScopeKind,
   PromotionStatusKind,
@@ -22,6 +25,10 @@ export interface EvaluationContext {
   platform?: string;
   categoryIds?: number[];
   brandIds?: number[];
+  /** Per-variant lookup: productId / categoryId — used by bundle/BXGY scope rules. */
+  productByVariant?: Map<number, { productId: number; categoryId: number | null }>;
+  /** Raw shipping fee before promotion. Set by checkout; cart can omit (treated as 0). */
+  shippingFee?: number;
 }
 
 export interface DiscountResult {
@@ -34,6 +41,57 @@ export interface DiscountResult {
 @Injectable()
 export class PromotionEvaluatorService {
   constructor(private readonly promotionsService: PromotionsService) {}
+
+  /**
+   * Checkout-side single-promotion evaluator. Returns a typed effect indicating
+   * how the promotion should be materialised (free shipping, bundle, BXGY gift,
+   * or generic discount). Null when conditions/scope fail or net effect = 0.
+   */
+  async evaluateSinglePromotion(
+    promo: Promotion,
+    ctx: EvaluationContext,
+  ): Promise<{
+    kind: 'free_shipping' | 'bundle' | 'bxgy' | 'other';
+    promotionId: number;
+    promotionName: string;
+    discountAmount: number;
+    gift?: { productId: number; getQty: number; pct: number };
+  } | null> {
+    if (!this.checkScope(promo.scopes, ctx)) return null;
+    if (!this.checkConditions(promo.conditions, ctx)) return null;
+    const action = (promo.actions ?? [])[0];
+    if (!action) return null;
+    if (action.actionType === ActionType.FREE_SHIPPING) {
+      const amount = Math.max(0, Math.round(ctx.shippingFee ?? 0));
+      if (amount <= 0) return null;
+      return { kind: 'free_shipping', promotionId: promo.id, promotionName: promo.name, discountAmount: amount };
+    }
+    if (action.actionType === ActionType.BUNDLE_DISCOUNT) {
+      const discount = this.applyBundleDiscount(action, ctx);
+      if (discount <= 0) return null;
+      return { kind: 'bundle', promotionId: promo.id, promotionName: promo.name, discountAmount: discount };
+    }
+    if (action.actionType === ActionType.BXGY) {
+      const applications = this.countBxgyApplications(action, ctx);
+      if (applications <= 0) return null;
+      const giftProductId = action.bxgyGetProductId ? Number(action.bxgyGetProductId) : null;
+      if (giftProductId == null) return null;
+      return {
+        kind: 'bxgy',
+        promotionId: promo.id,
+        promotionName: promo.name,
+        discountAmount: 0,
+        gift: {
+          productId: giftProductId,
+          getQty: (action.bxgyGetQty ?? 0) * applications,
+          pct: Math.min(100, Math.max(0, action.bxgyGetDiscountPct ?? 100)),
+        },
+      };
+    }
+    const discount = this.applyAction(action, ctx);
+    if (discount <= 0) return null;
+    return { kind: 'other', promotionId: promo.id, promotionName: promo.name, discountAmount: discount };
+  }
 
   async applyAutoPromotions(ctx: EvaluationContext): Promise<DiscountResult[]> {
     const promotions = await this.promotionsService.findActivePromotions();
@@ -63,7 +121,10 @@ export class PromotionEvaluatorService {
         ? 'active'
         : 'unmet';
       const discount = status === 'active' ? this.calculateDiscount(promo, ctx) : 0;
-      if (status === 'active' && discount <= 0) continue;
+      const isFreeShipping = (promo.actions ?? [])[0]?.actionType === ActionType.FREE_SHIPPING;
+      // Free-shipping promotions must remain visible even when discount = 0
+      // (cart context has no shippingFee). Otherwise apply the same filter.
+      if (status === 'active' && discount <= 0 && !isFreeShipping) continue;
       results.push(this.toAppliedDto(promo, 'auto', status, discount, ctx));
       if (status === 'active' && promo.stackingPolicy === 'exclusive') {
         hasExclusive = true;
@@ -142,6 +203,41 @@ export class PromotionEvaluatorService {
       status,
       unmetReason,
       appliedToVariantIds: this.computeAppliedVariants(scopeType, scope, ctx),
+      appliesToShipping: action?.actionType === ActionType.FREE_SHIPPING,
+      bundleComponents: action?.actionType === ActionType.BUNDLE_DISCOUNT
+        ? this.describeBundleProgress(action.bulkComponents ?? [], ctx)
+        : undefined,
+      bxgy: action?.actionType === ActionType.BXGY
+        ? this.describeBxgy(action, ctx)
+        : undefined,
+    };
+  }
+
+  private describeBundleProgress(components: BulkComponent[], ctx: EvaluationContext): BundleComponentInfo[] {
+    return components.map((c) => {
+      const achieved = this.countBundleComponent(c, ctx);
+      return {
+        label: c.refLabel ?? `${c.scope}#${c.refId}`,
+        requiredQty: c.minQuantity,
+        achievedQty: achieved,
+        satisfied: achieved >= c.minQuantity,
+      };
+    });
+  }
+
+  private describeBxgy(action: PromotionAction, ctx: EvaluationContext): BxgyInfo {
+    const buyQty = action.bxgyBuyQty ?? 0;
+    const getQty = action.bxgyGetQty ?? 0;
+    const applications = this.countBxgyApplications(action, ctx);
+    const gift = this.findBxgyGiftCandidate(action, ctx);
+    return {
+      buyQty,
+      getQty,
+      applications,
+      giftVariantId: gift?.variantId ?? null,
+      giftLabel: gift?.label ?? null,
+      unitPrice: gift?.price ?? 0,
+      discountPct: action.bxgyGetDiscountPct ?? 100,
     };
   }
 
@@ -170,6 +266,8 @@ export class PromotionEvaluatorService {
       case ActionType.FIXED_DISCOUNT_CART: return 'fixed_cart';
       case ActionType.FREE_SHIPPING:       return 'free_shipping';
       case ActionType.BULK_DISCOUNT:       return 'bulk';
+      case ActionType.BUNDLE_DISCOUNT:     return 'bundle';
+      case ActionType.BXGY:                return 'bxgy';
       default:                              return 'other';
     }
   }
@@ -190,6 +288,20 @@ export class PromotionEvaluatorService {
         return 'Miễn phí vận chuyển';
       case ActionType.BULK_DISCOUNT:
         return 'Giảm theo số lượng (bậc thang)';
+      case ActionType.BUNDLE_DISCOUNT: {
+        const t = action.discountType;
+        const v = Number(action.discountValue ?? 0);
+        if (t === 'percentage') return `Combo: giảm ${v}% trên giá combo`;
+        if (t === 'fixed') return `Combo: giảm ${v.toLocaleString('vi-VN')}₫ mỗi combo`;
+        return 'Khuyến mãi combo';
+      }
+      case ActionType.BXGY: {
+        const buy = action.bxgyBuyQty ?? 0;
+        const get = action.bxgyGetQty ?? 0;
+        const pct = action.bxgyGetDiscountPct ?? 100;
+        if (pct >= 100) return `Mua ${buy} tặng ${get}`;
+        return `Mua ${buy}, tặng ${get} với giảm ${pct}%`;
+      }
       default:
         return 'Khuyến mãi';
     }
@@ -393,12 +505,151 @@ export class PromotionEvaluatorService {
       case ActionType.FIXED_DISCOUNT_CART:
         return Math.min(action.discountValue ?? 0, ctx.subtotal);
       case ActionType.FREE_SHIPPING:
-        return 0;
+        // Represents the amount the customer saves on shipping. Cart contexts
+        // pass shippingFee = 0 (unknown) so the promotion stays visible but
+        // contributes 0 to subtotal discount. Checkout passes the real fee.
+        return Math.max(0, Math.round(ctx.shippingFee ?? 0));
       case ActionType.BULK_DISCOUNT:
         return this.applyBulkDiscount(action.bulkTiers ?? [], ctx);
+      case ActionType.BUNDLE_DISCOUNT:
+        return this.applyBundleDiscount(action, ctx);
+      case ActionType.BXGY:
+        return this.applyBxgy(action, ctx);
       default:
         return action.discountValue ?? 0;
     }
+  }
+
+  // ── Bundle helpers ─────────────────────────────────────────────────────────
+
+  private countBundleComponent(c: BulkComponent, ctx: EvaluationContext): number {
+    const refId = Number(c.refId);
+    if (!Number.isFinite(refId)) return 0;
+    let qty = 0;
+    for (const item of ctx.items) {
+      if (c.scope === 'variant') {
+        if (item.variantId === refId) qty += item.quantity;
+      } else if (c.scope === 'product') {
+        const info = ctx.productByVariant?.get(item.variantId);
+        if (info?.productId === refId) qty += item.quantity;
+      } else if (c.scope === 'category') {
+        const info = ctx.productByVariant?.get(item.variantId);
+        if (info?.categoryId === refId) qty += item.quantity;
+      }
+    }
+    return qty;
+  }
+
+  private applyBundleDiscount(action: PromotionAction, ctx: EvaluationContext): number {
+    const components = action.bulkComponents ?? [];
+    if (!components.length) return 0;
+    let bundleCount = Infinity;
+    for (const c of components) {
+      const got = this.countBundleComponent(c, ctx);
+      const possible = Math.floor(got / Math.max(1, c.minQuantity));
+      if (possible < bundleCount) bundleCount = possible;
+      if (bundleCount === 0) return 0;
+    }
+    if (!Number.isFinite(bundleCount) || bundleCount <= 0) return 0;
+
+    // Compute the combo-base price (sum of one set's listed prices).
+    const comboBase = components.reduce((sum, c) => {
+      const refId = Number(c.refId);
+      let unitPrice = 0;
+      // Pick the cheapest matching item's price as the component unit price.
+      for (const item of ctx.items) {
+        const info = ctx.productByVariant?.get(item.variantId);
+        const matches =
+          (c.scope === 'variant' && item.variantId === refId) ||
+          (c.scope === 'product' && info?.productId === refId) ||
+          (c.scope === 'category' && info?.categoryId === refId);
+        if (matches) {
+          if (unitPrice === 0 || item.price < unitPrice) unitPrice = item.price;
+        }
+      }
+      return sum + unitPrice * c.minQuantity;
+    }, 0);
+
+    const value = Number(action.discountValue ?? 0);
+    let perBundleDiscount = 0;
+    if (action.discountType === 'percentage') {
+      perBundleDiscount = (comboBase * value) / 100;
+    } else if (action.discountType === 'fixed') {
+      perBundleDiscount = value;
+    }
+    const total = Math.round(perBundleDiscount * bundleCount);
+    return Math.min(total, ctx.subtotal);
+  }
+
+  // ── BXGY helpers ───────────────────────────────────────────────────────────
+
+  private getBxgyEligibleProductIds(action: PromotionAction): number[] {
+    if (!action.bxgyEligibleProductIds) return [];
+    return action.bxgyEligibleProductIds
+      .split(',')
+      .map((s) => Number(s.trim()))
+      .filter((n) => Number.isFinite(n));
+  }
+
+  private countBxgyBuyQuantity(action: PromotionAction, ctx: EvaluationContext): number {
+    const eligible = this.getBxgyEligibleProductIds(action);
+    const buyProductId = action.bxgyBuyProductId ? Number(action.bxgyBuyProductId) : null;
+    let qty = 0;
+    for (const item of ctx.items) {
+      const info = ctx.productByVariant?.get(item.variantId);
+      if (buyProductId != null) {
+        if (info?.productId === buyProductId) qty += item.quantity;
+      } else if (eligible.length > 0) {
+        if (info && eligible.includes(info.productId)) qty += item.quantity;
+      } else {
+        // No filter — every item counts as a "buy".
+        qty += item.quantity;
+      }
+    }
+    return qty;
+  }
+
+  private countBxgyApplications(action: PromotionAction, ctx: EvaluationContext): number {
+    const buyQty = Math.max(1, action.bxgyBuyQty ?? 1);
+    const buyCount = this.countBxgyBuyQuantity(action, ctx);
+    const raw = Math.floor(buyCount / buyQty);
+    const cap = action.bxgyMaxApplications ?? Infinity;
+    return Math.max(0, Math.min(raw, cap));
+  }
+
+  private findBxgyGiftCandidate(
+    action: PromotionAction,
+    ctx: EvaluationContext,
+  ): { variantId: number; label: string; price: number; productId: number } | null {
+    const giftProductId = action.bxgyGetProductId ? Number(action.bxgyGetProductId) : null;
+    // Look up the gift variant from items already in cart (auto-add mode also
+    // needs the variant to attach to). If not in cart, evaluator returns null —
+    // checkout will fetch it from DB before adding to the order.
+    for (const item of ctx.items) {
+      const info = ctx.productByVariant?.get(item.variantId);
+      if (giftProductId != null && info?.productId === giftProductId) {
+        return { variantId: item.variantId, label: '', price: item.price, productId: giftProductId };
+      }
+    }
+    return giftProductId != null
+      ? { variantId: 0, label: '', price: 0, productId: giftProductId }
+      : null;
+  }
+
+  private applyBxgy(action: PromotionAction, ctx: EvaluationContext): number {
+    const applications = this.countBxgyApplications(action, ctx);
+    if (applications <= 0) return 0;
+    const getQty = action.bxgyGetQty ?? 0;
+    if (getQty <= 0) return 0;
+    const pct = Math.min(100, Math.max(0, action.bxgyGetDiscountPct ?? 100));
+    const gift = this.findBxgyGiftCandidate(action, ctx);
+    if (!gift) return 0;
+    // When gift variant exists in cart we know its price; otherwise the
+    // discount is materialised in checkout when the gift line item is added.
+    // For preview purposes return 0 in that case to avoid double-counting.
+    if (gift.price <= 0) return 0;
+    const giftValue = gift.price * getQty * applications;
+    return Math.round((giftValue * pct) / 100);
   }
 
   private applyBulkDiscount(tiers: BulkTier[], ctx: EvaluationContext): number {

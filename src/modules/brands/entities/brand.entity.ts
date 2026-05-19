@@ -28,6 +28,9 @@ export class Brand {
   @Column({ name: 'website_url', type: 'text', nullable: true })
   websiteUrl: string | null;
 
+  @Column({ name: 'xuat_xu', length: 100, nullable: true })
+  xuatXu: string | null;
+
   @Column({ name: 'asset_id_logo', nullable: true })
   assetIdLogo: number | null;
 }

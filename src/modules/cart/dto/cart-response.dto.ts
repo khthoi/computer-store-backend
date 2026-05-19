@@ -2,8 +2,32 @@ import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
 export type PromotionSource = 'auto' | 'coupon';
 export type PromotionScopeKind = 'global' | 'category' | 'brand' | 'variant';
-export type PromotionActionKind = 'percentage' | 'fixed_cart' | 'free_shipping' | 'bulk' | 'other';
+export type PromotionActionKind =
+  | 'percentage'
+  | 'fixed_cart'
+  | 'free_shipping'
+  | 'bulk'
+  | 'bundle'
+  | 'bxgy'
+  | 'other';
 export type PromotionStatusKind = 'active' | 'unmet' | 'exhausted';
+
+export interface BundleComponentInfo {
+  label: string;
+  requiredQty: number;
+  achievedQty: number;
+  satisfied: boolean;
+}
+
+export interface BxgyInfo {
+  buyQty: number;
+  getQty: number;
+  applications: number;
+  giftVariantId: number | null;
+  giftLabel: string | null;
+  unitPrice: number;
+  discountPct: number;
+}
 
 export class AppliedPromotionDto {
   @ApiProperty({ example: 1 })
@@ -21,7 +45,7 @@ export class AppliedPromotionDto {
   @ApiProperty({ example: 'Danh mục: Laptop Gaming' })
   scopeLabel: string;
 
-  @ApiProperty({ enum: ['percentage', 'fixed_cart', 'free_shipping', 'bulk', 'other'], example: 'percentage' })
+  @ApiProperty({ enum: ['percentage', 'fixed_cart', 'free_shipping', 'bulk', 'bundle', 'bxgy', 'other'], example: 'percentage' })
   actionType: PromotionActionKind;
 
   @ApiProperty({ example: 'Giảm 10% (tối đa 500.000₫)' })
@@ -44,6 +68,15 @@ export class AppliedPromotionDto {
 
   @ApiPropertyOptional({ example: 'SALE10' })
   couponCode?: string;
+
+  @ApiPropertyOptional({ description: 'True when this promotion reduces the shipping fee instead of cart subtotal' })
+  appliesToShipping?: boolean;
+
+  @ApiPropertyOptional({ description: 'For BUNDLE promotions: required components and progress' })
+  bundleComponents?: BundleComponentInfo[];
+
+  @ApiPropertyOptional({ description: 'For BXGY promotions: buy/get info' })
+  bxgy?: BxgyInfo;
 }
 
 export class CartItemVariantDto {
@@ -128,4 +161,7 @@ export class CartResponseDto {
 
   @ApiProperty({ type: [AppliedPromotionDto] })
   appliedPromotions: AppliedPromotionDto[];
+
+  @ApiProperty({ description: 'True when a free-shipping promotion is active for this cart', example: false })
+  freeShippingApplied: boolean;
 }

@@ -30,14 +30,20 @@ export class CartService {
     if (!cart.items?.length) throw new BadRequestException('Giỏ hàng đang trống');
     // Validate by attempting to apply. Throws BadRequestException if invalid.
     const subtotal = cart.items.reduce((s, i) => s + Number(i.giaTaiThoiDiem) * i.soLuong, 0);
-    const { categoryIds, brandIds } = await this.collectScopeIds(cart.items.map((i) => i.phienBanId));
+    const { categoryIds, brandIds, productByVariant } = await this.collectScopeIds(cart.items.map((i) => i.phienBanId));
     const ctx: EvaluationContext = {
-      items: cart.items.map((i) => ({ variantId: i.phienBanId, quantity: i.soLuong, price: Number(i.giaTaiThoiDiem) })),
+      items: cart.items.map((i) => ({
+        variantId: i.phienBanId,
+        quantity: i.soLuong,
+        price: Number(i.giaTaiThoiDiem),
+        productId: productByVariant.get(i.phienBanId)?.productId,
+      })),
       subtotal,
       customerId: userId,
       isFirstOrder: false,
       categoryIds,
       brandIds,
+      productByVariant,
     };
     await this.promotionEvaluator.applyCoupon(code, ctx);
     await this.cartRepo.update(cart.id, { couponCode: code });
@@ -52,11 +58,16 @@ export class CartService {
     return this.getMyCart(userId);
   }
 
-  private async collectScopeIds(variantIds: number[]): Promise<{ categoryIds: number[]; brandIds: number[] }> {
-    if (!variantIds.length) return { categoryIds: [], brandIds: [] };
-    const rows: Array<{ phienBanId: number; danhMucId: number | null; brandIds: string | null }> =
+  private async collectScopeIds(variantIds: number[]): Promise<{
+    categoryIds: number[];
+    brandIds: number[];
+    productByVariant: Map<number, { productId: number; categoryId: number | null }>;
+  }> {
+    if (!variantIds.length) return { categoryIds: [], brandIds: [], productByVariant: new Map() };
+    const rows: Array<{ phienBanId: number; sanPhamId: number; danhMucId: number | null; brandIds: string | null }> =
       await this.dataSource.query(
         `SELECT pbsp.phien_ban_id AS phienBanId,
+                sp.san_pham_id   AS sanPhamId,
                 sp.danh_muc_id   AS danhMucId,
                 (SELECT GROUP_CONCAT(spth.thuong_hieu_id) FROM san_pham_thuong_hieu spth
                    WHERE spth.san_pham_id = sp.san_pham_id) AS brandIds
@@ -73,7 +84,14 @@ export class CartService {
           .filter((x) => Number.isFinite(x)),
       ),
     );
-    return { categoryIds, brandIds };
+    const productByVariant = new Map<number, { productId: number; categoryId: number | null }>();
+    for (const r of rows) {
+      productByVariant.set(Number(r.phienBanId), {
+        productId: Number(r.sanPhamId),
+        categoryId: r.danhMucId != null ? Number(r.danhMucId) : null,
+      });
+    }
+    return { categoryIds, brandIds, productByVariant };
   }
 
   async getMyCart(userId: number): Promise<CartResponseDto> {
@@ -280,14 +298,21 @@ export class CartService {
     const subtotal = mappedItems.reduce((s, i) => s + i.priceAtTime * i.quantity, 0);
     let appliedPromotions: any[] = [];
     if (items.length > 0) {
-      const { categoryIds, brandIds } = await this.collectScopeIds(items.map((i) => i.phienBanId));
+      const { categoryIds, brandIds, productByVariant } = await this.collectScopeIds(items.map((i) => i.phienBanId));
       const ctx: EvaluationContext = {
-        items: mappedItems.map((i) => ({ variantId: i.variantId, quantity: i.quantity, price: i.priceAtTime })),
+        items: mappedItems.map((i) => ({
+          variantId: i.variantId,
+          quantity: i.quantity,
+          price: i.priceAtTime,
+          productId: productByVariant.get(i.variantId)?.productId,
+        })),
         subtotal,
         customerId: cart.khachHangId,
         isFirstOrder: false,
         categoryIds,
         brandIds,
+        productByVariant,
+        shippingFee: 0,
       };
       try {
         appliedPromotions = await this.promotionEvaluator.evaluateForCart(ctx, cart.couponCode);
@@ -295,10 +320,14 @@ export class CartService {
         appliedPromotions = [];
       }
     }
+    // Free-shipping promotions don't reduce subtotal — exclude from totalDiscount.
     const totalDiscount = appliedPromotions
-      .filter((p) => p.status === 'active')
+      .filter((p) => p.status === 'active' && !p.appliesToShipping)
       .reduce((s: number, p: any) => s + Number(p.discountAmount ?? 0), 0);
     const total = Math.max(0, subtotal - totalDiscount);
+    const freeShippingApplied = appliedPromotions.some(
+      (p) => p.status === 'active' && p.appliesToShipping,
+    );
 
     return {
       id: cart.id,
@@ -310,6 +339,7 @@ export class CartService {
       totalDiscount,
       total,
       appliedPromotions,
+      freeShippingApplied,
     };
   }
 }

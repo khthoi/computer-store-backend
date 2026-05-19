@@ -291,6 +291,8 @@ export class BuildPcService {
     const qb = this.buildRepo
       .createQueryBuilder('b')
       .leftJoinAndSelect('b.khachHang', 'kh')
+      .leftJoinAndSelect('b.details', 'd')
+      .leftJoinAndSelect('d.phienBan', 'pv')
       .orderBy('b.ngayCapNhat', 'DESC');
 
     if (customerId) qb.andWhere('b.khachHangId = :customerId', { customerId });

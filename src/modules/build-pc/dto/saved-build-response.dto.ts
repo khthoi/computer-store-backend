@@ -29,7 +29,18 @@ export class SavedBuildResponseDto {
     dto.moTa = e.moTa ?? undefined;
     const TRANG_THAI_MAP: Record<string, string> = { draft: 'draft', complete: 'complete', shared: 'complete', published: 'complete' };
     dto.trangThai = TRANG_THAI_MAP[e.trangThai] ?? 'draft';
-    dto.tongGia = Number(e.tongGiaUocTinh ?? 0);
+    const snapshot = Number(e.tongGiaUocTinh ?? 0);
+    if (snapshot > 0) {
+      dto.tongGia = snapshot;
+    } else {
+      let computed = 0;
+      for (const d of e.details ?? []) {
+        const price = Number(d.giaSnapshot ?? d.phienBan?.giaBan ?? 0);
+        const qty = d.soLuong ?? 1;
+        computed += price * qty;
+      }
+      dto.tongGia = computed;
+    }
     dto.isPublic = Boolean(e.isPublic);
     dto.soLuotXem = e.soLuotXem;
     dto.soLuotClone = e.soLuotClone;

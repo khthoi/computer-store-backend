@@ -13,6 +13,9 @@ export enum AppliedPromotionType {
   COUPON = 'coupon',
   AUTO = 'auto',
   FLASHSALE = 'flashsale',
+  FREE_SHIPPING = 'free_shipping',
+  BUNDLE = 'bundle',
+  BXGY = 'bxgy',
 }
 
 @Entity('don_hang_khuyen_mai_ap_dung')

@@ -14,6 +14,10 @@ export class CartItemDto {
   @ApiProperty({ example: 15000000 })
   @IsInt() @Min(0)
   price: number;
+
+  /** Optional — populated by cart/orders services so promotion evaluator
+   *  can match BXGY/Bundle rules that reference product IDs. */
+  productId?: number;
 }
 
 export class ApplyCouponDto {

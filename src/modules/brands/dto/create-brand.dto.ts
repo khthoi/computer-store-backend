@@ -44,6 +44,12 @@ export class CreateBrandDto {
   @MaxLength(500)
   websiteUrl?: string;
 
+  @ApiPropertyOptional({ description: 'Country of origin (ISO code or free text)' })
+  @IsOptional()
+  @IsString()
+  @MaxLength(100)
+  xuatXu?: string;
+
   @ApiPropertyOptional()
   @IsOptional()
   @Type(() => Number)

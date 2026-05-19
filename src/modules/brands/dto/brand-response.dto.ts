@@ -6,6 +6,7 @@ export class BrandResponseDto {
   slug: string;
   description: string;
   websiteUrl: string;
+  countryOfOrigin: string;
   logoUrl?: string;
   logoAlt?: string;
   active: boolean;
@@ -21,6 +22,7 @@ export function mapBrandToDto(brand: Brand, productCount = 0): BrandResponseDto 
     slug: brand.slug ?? '',
     description: brand.moTa ?? '',
     websiteUrl: brand.websiteUrl ?? '',
+    countryOfOrigin: brand.xuatXu ?? '',
     logoUrl: brand.logo ?? undefined,
     logoAlt: brand.logoAlt ?? undefined,
     active: brand.trangThai === 'HienThi',

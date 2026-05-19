@@ -145,16 +145,77 @@ export class OrdersService {
       }
     }
 
-    const phiVanChuyen = dto.phuongThucVanChuyen === 'GiaoNhanh' ? 40000 : dto.phuongThucVanChuyen === 'NhanTaiCuaHang' ? 0 : 25000;
+    const rawShippingFee = dto.phuongThucVanChuyen === 'GiaoNhanh' ? 40000 : dto.phuongThucVanChuyen === 'NhanTaiCuaHang' ? 0 : 25000;
 
-    let soTienGiamGia = 0;
+    // Evaluate auto-applied promotions (FREE_SHIPPING / BUNDLE / BXGY / others).
+    const autoResult = await this.evaluateAutoPromotionsForCheckout(
+      userId, tongTienHang, cart.items, rawShippingFee,
+    );
+    let phiVanChuyen = rawShippingFee;
+    let autoDiscountAmount = 0;
+    const autoAppliedRows: Array<{ promotionId: number; name: string; type: AppliedPromotionType; amount: number }> = [];
+    const bxgyGiftLines: Array<{ promotionId: number; promotionName: string; productId: number; getQty: number; pct: number }> = [];
+
+    for (const r of autoResult) {
+      if (r.kind === 'free_shipping') {
+        phiVanChuyen = 0;
+        autoAppliedRows.push({ promotionId: r.promotionId, name: r.promotionName, type: AppliedPromotionType.FREE_SHIPPING, amount: r.discountAmount });
+      } else if (r.kind === 'bundle') {
+        autoDiscountAmount += r.discountAmount;
+        autoAppliedRows.push({ promotionId: r.promotionId, name: r.promotionName, type: AppliedPromotionType.BUNDLE, amount: r.discountAmount });
+      } else if (r.kind === 'bxgy') {
+        if (r.gift) bxgyGiftLines.push({ promotionId: r.promotionId, promotionName: r.promotionName, ...r.gift });
+        autoAppliedRows.push({ promotionId: r.promotionId, name: r.promotionName, type: AppliedPromotionType.BXGY, amount: r.discountAmount });
+      } else {
+        autoDiscountAmount += r.discountAmount;
+        autoAppliedRows.push({ promotionId: r.promotionId, name: r.promotionName, type: AppliedPromotionType.AUTO, amount: r.discountAmount });
+      }
+    }
+
+    let soTienGiamGia = autoDiscountAmount;
     let appliedPromotionId: number | null = null;
     let couponName: string | null = null;
     if (dto.couponCode) {
       const result = await this.applyDiscount(dto.couponCode, userId, tongTienHang, cart.items);
-      soTienGiamGia = result.discountAmount;
+      soTienGiamGia += result.discountAmount;
       appliedPromotionId = result.promotionId;
       couponName = result.promotionName ?? dto.couponCode;
+    }
+
+    // Add BXGY gift line items (giaTaiThoiDiem reflects post-discount unit price).
+    for (const gift of bxgyGiftLines) {
+      const giftVariant = await this.dataSource.query(
+        `SELECT pbsp.phien_ban_id, pbsp.gia_ban, pbsp.sku, pbsp.trang_thai, sp.ten_san_pham,
+                COALESCE(SUM(tk.so_luong_ton), 0) AS ton_kho
+         FROM phien_ban_san_pham pbsp
+         JOIN san_pham sp ON sp.san_pham_id = pbsp.san_pham_id
+         LEFT JOIN ton_kho tk ON tk.phien_ban_id = pbsp.phien_ban_id
+         WHERE pbsp.san_pham_id = ? AND pbsp.trang_thai != 'An'
+         GROUP BY pbsp.phien_ban_id
+         ORDER BY pbsp.gia_ban ASC
+         LIMIT 1`,
+        [gift.productId],
+      );
+      const gv = giftVariant[0];
+      if (!gv || Number(gv.ton_kho) < gift.getQty) continue;
+      const giftPrice = Number(gv.gia_ban);
+      const giftUnit = Math.max(0, Math.round(giftPrice * (1 - gift.pct / 100)));
+      const giftLineTotal = giftUnit * gift.getQty;
+      orderItemsData.push({
+        donHangId: 0,
+        phienBanId: Number(gv.phien_ban_id),
+        soLuong: gift.getQty,
+        giaTaiThoiDiem: giftUnit,
+        thanhTien: giftLineTotal,
+        tenSanPhamSnapshot: gv.ten_san_pham,
+        skuSnapshot: gv.sku,
+        giaGocSnapshot: giftPrice,
+        flashSaleIdSnapshot: null,
+        flashSaleTenSnapshot: null,
+        khuyenMaiIdSnapshot: gift.promotionId,
+        khuyenMaiTenSnapshot: gift.promotionName,
+      });
+      tongTienHang += giftLineTotal;
     }
 
     const tongThanhToan = tongTienHang + phiVanChuyen - soTienGiamGia;
@@ -220,7 +281,7 @@ export class OrdersService {
           }),
         );
       }
-      if (appliedPromotionId && soTienGiamGia > 0) {
+      if (appliedPromotionId) {
         appliedPromos.push(
           manager.create(OrderAppliedPromotion, {
             donHangId: savedOrder.id,
@@ -228,7 +289,19 @@ export class OrdersService {
             ten: couponName ?? (dto.couponCode ?? 'Voucher'),
             maCoupon: dto.couponCode ?? null,
             loai: AppliedPromotionType.COUPON,
-            soTienGiam: soTienGiamGia,
+            soTienGiam: soTienGiamGia - autoDiscountAmount,
+          }),
+        );
+      }
+      for (const row of autoAppliedRows) {
+        appliedPromos.push(
+          manager.create(OrderAppliedPromotion, {
+            donHangId: savedOrder.id,
+            khuyenMaiId: row.promotionId,
+            ten: row.name,
+            maCoupon: null,
+            loai: row.type,
+            soTienGiam: row.amount,
           }),
         );
       }
@@ -1117,6 +1190,101 @@ export class OrdersService {
         shippingFee: Number(order.phiVanChuyen),
         total: Number(order.tongThanhToan),
       },
+    };
+  }
+
+  /**
+   * Evaluates every active auto-applied promotion against the current cart and
+   * returns a flat list of effects (free shipping, bundle discount, BXGY gift,
+   * or generic discount). Called from checkout to materialise these effects.
+   */
+  private async evaluateAutoPromotionsForCheckout(
+    userId: number,
+    tongTien: number,
+    cartItems: Array<{ variantId: number; quantity: number; priceAtTime: number }>,
+    rawShippingFee: number,
+  ): Promise<Array<{
+    kind: 'free_shipping' | 'bundle' | 'bxgy' | 'other';
+    promotionId: number;
+    promotionName: string;
+    discountAmount: number;
+    gift?: { productId: number; getQty: number; pct: number };
+  }>> {
+    if (!cartItems.length) return [];
+    const ctx = await this.buildEvaluationContext(userId, tongTien, cartItems, rawShippingFee);
+    const promotions = await this.promotionsService.findActivePromotions();
+    const autoPromos = promotions.filter((p) => !p.isCoupon);
+    const results: Array<{
+      kind: 'free_shipping' | 'bundle' | 'bxgy' | 'other';
+      promotionId: number;
+      promotionName: string;
+      discountAmount: number;
+      gift?: { productId: number; getQty: number; pct: number };
+    }> = [];
+    let hasExclusive = false;
+    for (const promo of autoPromos) {
+      if (hasExclusive) break;
+      const evaluated = await this.promotionEvaluator.evaluateSinglePromotion(promo, ctx);
+      if (!evaluated) continue;
+      results.push(evaluated);
+      if (evaluated.discountAmount > 0 && promo.stackingPolicy === 'exclusive') {
+        hasExclusive = true;
+      }
+    }
+    return results;
+  }
+
+  private async buildEvaluationContext(
+    userId: number,
+    tongTien: number,
+    cartItems: Array<{ variantId: number; quantity: number; priceAtTime: number }>,
+    shippingFee: number,
+  ): Promise<EvaluationContext> {
+    const variantIds = cartItems.map((i) => i.variantId);
+    const rows: Array<{ phienBanId: number; sanPhamId: number; danhMucId: number | null; brandIds: string | null }> =
+      variantIds.length
+        ? await this.dataSource.query(
+            `SELECT pbsp.phien_ban_id AS phienBanId,
+                    sp.san_pham_id   AS sanPhamId,
+                    sp.danh_muc_id   AS danhMucId,
+                    (SELECT GROUP_CONCAT(spth.thuong_hieu_id) FROM san_pham_thuong_hieu spth
+                       WHERE spth.san_pham_id = sp.san_pham_id) AS brandIds
+             FROM phien_ban_san_pham pbsp
+             JOIN san_pham sp ON sp.san_pham_id = pbsp.san_pham_id
+             WHERE pbsp.phien_ban_id IN (?)`,
+            [variantIds],
+          )
+        : [];
+    const categoryIds = Array.from(new Set(rows.map((r) => Number(r.danhMucId)).filter((x) => Number.isFinite(x))));
+    const brandIds = Array.from(
+      new Set(
+        rows
+          .flatMap((r) => (r.brandIds ? r.brandIds.split(',').map((s) => Number(s)) : []))
+          .filter((x) => Number.isFinite(x)),
+      ),
+    );
+    const productByVariant = new Map<number, { productId: number; categoryId: number | null }>();
+    for (const r of rows) {
+      productByVariant.set(Number(r.phienBanId), {
+        productId: Number(r.sanPhamId),
+        categoryId: r.danhMucId != null ? Number(r.danhMucId) : null,
+      });
+    }
+    const isFirstOrder = await this.checkIsFirstOrder(userId);
+    return {
+      items: cartItems.map((i) => ({
+        variantId: i.variantId,
+        quantity: i.quantity,
+        price: Number(i.priceAtTime),
+        productId: productByVariant.get(i.variantId)?.productId,
+      })),
+      subtotal: tongTien,
+      customerId: userId,
+      isFirstOrder,
+      categoryIds,
+      brandIds,
+      productByVariant,
+      shippingFee,
     };
   }
 
