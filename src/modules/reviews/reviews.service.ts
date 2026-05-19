@@ -32,7 +32,7 @@ export class ReviewsService {
     productId: number,
     page = 1,
     limit = 10,
-    filters: { rating?: number; hasImages?: boolean } = {},
+    filters: { rating?: number; hasImages?: boolean; variantId?: number } = {},
   ) {
     const offset = (page - 1) * limit;
 
@@ -50,9 +50,15 @@ export class ReviewsService {
       // regardless of MySQL column type or whitespace variations.
       filterClauses.push("r.hinh_anh IS NOT NULL AND r.hinh_anh <> '' AND r.hinh_anh <> '[]'");
     }
+    // Variant filter — applied to items/total/distribution/avg so the SKU
+    // rating reflects only the selected variant.
+    if (filters.variantId && filters.variantId > 0) {
+      filterClauses.push('r.phien_ban_id = ?');
+      filterParams.push(filters.variantId);
+    }
     const extraWhere = filterClauses.length > 0 ? ` AND ${filterClauses.join(' AND ')}` : '';
 
-    const [rows, [{ total }], distRows] = await Promise.all([
+    const [rows, [{ total }], distRows, [avgRow]] = await Promise.all([
       this.dataSource.query(
         `SELECT
           r.review_id, r.phien_ban_id, r.khach_hang_id, r.don_hang_id,
@@ -83,6 +89,13 @@ export class ReviewsService {
          GROUP BY r.rating`,
         [productId],
       ),
+      this.dataSource.query(
+        `SELECT AVG(r.rating) AS avg_rating, COUNT(*) AS cnt
+         FROM danh_gia_san_pham r
+         INNER JOIN phien_ban_san_pham v ON v.phien_ban_id = r.phien_ban_id
+         WHERE v.san_pham_id = ? AND r.review_status = 'Approved'${extraWhere}`,
+        [productId, ...filterParams],
+      ),
     ]);
 
     const distribution: Record<1 | 2 | 3 | 4 | 5, number> = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
@@ -91,12 +104,15 @@ export class ReviewsService {
       if (star >= 1 && star <= 5) distribution[star] = Number(row.cnt);
     }
 
+    const averageRating = avgRow?.avg_rating != null ? Number(avgRow.avg_rating) : 0;
+
     return {
       items: (rows as any[]).map((r) => this.rawToDto(r)),
       total: Number(total),
       page,
       limit,
       distribution,
+      averageRating,
     };
   }
 

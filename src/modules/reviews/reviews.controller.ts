@@ -27,6 +27,7 @@ export class ReviewsController {
   @ApiQuery({ name: 'limit', required: false, description: 'Số item/trang', example: 10 })
   @ApiQuery({ name: 'rating', required: false, description: 'Lọc theo số sao (1-5)', example: 5 })
   @ApiQuery({ name: 'hasImages', required: false, description: 'Chỉ trả đánh giá có ảnh', example: true })
+  @ApiQuery({ name: 'variantId', required: false, description: 'Lọc theo phiên bản sản phẩm', example: 5 })
   @ApiOkResponse({
     schema: {
       example: {
@@ -49,6 +50,7 @@ export class ReviewsController {
     return this.reviewsService.getApprovedReviews(productId, query.page, query.limit, {
       rating: query.rating,
       hasImages: query.hasImages,
+      variantId: query.variantId,
     });
   }
 
